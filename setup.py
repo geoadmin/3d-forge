@@ -4,6 +4,7 @@ from setuptools import setup
 
 requires = [
         'ipython',
+        'nose',
     ]
 
 setup(name='3d-forge',
