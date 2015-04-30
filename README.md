@@ -18,3 +18,14 @@ Read/Write quantized-mesh tiles
 #### Get the latest traceback
 
     %tb
+
+
+## Styling
+
+#### Check styling
+
+    venv/bin/flakes8 --ignore=E501 {yourFile}.py
+
+#### Fix styling (only pep8 errors)
+
+    venv/bin/autopep8 -v -i -a --ignore=E501 {yourFile}.py
