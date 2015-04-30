@@ -2,6 +2,10 @@
 
 from setuptools import setup
 
+requires = [
+        'ipython',
+    ]
+
 setup(name='3d-forge',
       version='0.0',
       description='QMesh reader/writer',
@@ -10,4 +14,6 @@ setup(name='3d-forge',
       author_email='',
       license='MIT',
       packages=['forge'],
-      zip_safe=False)
+      zip_safe=False,
+      install_requires=requires,
+      )
