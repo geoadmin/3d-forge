@@ -7,7 +7,9 @@ from forge.lib.decoders import unpackEntry, unpackIndices, decodeIndices
 from forge.models.terrain import *
 
 
-with open('forge/data/quantized-mesh/0.terrain', 'rb') as f:
+#with open('forge/data/quantized-mesh/0.terrain', 'rb') as f:
+with open('forge/data/quantized-mesh/raron.flat.1.terrain', 'rb') as f:
+#with open('forge/data/quantized-mesh/goms.mountains.1.terrain', 'rb') as f:
     header = OrderedDict()
     for k, v in quantizedMeshHeader.iteritems():
         size = calcsize(v)
