@@ -3,7 +3,10 @@
 from setuptools import setup
 
 requires = [
+        'autopep8',
+        'flake8',
         'ipython',
+        'nose',
     ]
 
 setup(name='3d-forge',
