@@ -24,7 +24,7 @@ Read/Write quantized-mesh tiles
 
 #### Check styling
 
-    venv/bin/flakes8 --ignore=E501 {yourFile}.py
+    venv/bin/flake8 --ignore=E501 {yourFile}.py
 
 #### Fix styling (only pep8 errors)
 
