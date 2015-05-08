@@ -21,12 +21,12 @@ class TestTerrainTile(unittest.TestCase):
         We compare the results
         '''
         ter = TerrainTile()
-        #ter.fromFile('forge/data/quantized-mesh/0.terrain')
-        #ter.fromFile('forge/data/quantized-mesh/raron.flat.1.terrain')
-        ter.fromFile('forge/data/quantized-mesh/goms.mountains.1.terrain')
+        #ter.fromFile('forge/data/quantized-mesh/0.terrain', 7.80938, 7.81773, 46.30261, 46.3079)
+        #ter.fromFile('forge/data/quantized-mesh/raron.flat.1.terrain', 7.80938, 7.81773, 46.30261, 46.30790)
+        ter.fromFile('forge/data/quantized-mesh/goms.mountains.1.terrain', 7.80938, 7.81773, 46.30261, 46.30799)
         ter.toFile(self.tmpfile)
         ter2 = TerrainTile()
-        ter2.fromFile(self.tmpfile)
+        ter2.fromFile(self.tmpfile, 7.80938, 7.81773, 46.30261, 46.30799)
 
         # check headers
         self.failUnless(len(ter.header) > 0)

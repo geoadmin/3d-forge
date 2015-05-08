@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 
 from collections import OrderedDict
-from forge.lib.helpers import zigZagToNumber, numberToZigZag
+from forge.lib.helpers import zigZagToNumber, numberToZigZag, transformCoordinate
 from forge.lib.decoders import unpackEntry, unpackIndices, decodeIndices, packEntry, packIndices, encodeIndices
 
+MAX = 32767;
+def lerp(p, q, time):
+    return ((1.0 - time) * p) + (time * q)
 
 # http://cesiumjs.org/data-and-assets/terrain/formats/quantized-mesh-1.0.html
 class TerrainTile:
@@ -63,8 +66,19 @@ class TerrainTile:
     BYTESPLIT = 65636
 
 
+    #Coordinates are given in lon/lat WSG84
+    def __init__(self, west = None, east = None, south = None, north = None):
+        self._west = west if west is not None else -1.0
+        self._east = east if east is not None else 1.0
+        self._south = south if south is not None else -1.0
+        self._north = north if north is not None else 1.0
+        self._longs = []
+        self._lats = []
+        self._heights = []
+        # Swiss Grid coordinates
+        self._easts = []
+        self._norths = []
 
-    def __init__(self):
         self.header = OrderedDict()
         for k, v in TerrainTile.quantizedMeshHeader.iteritems():
             self.header[k] = 0.0
@@ -78,6 +92,13 @@ class TerrainTile:
         self.northI = []
 
     def __str__(self):
+        def coords():
+            str = '\nSwis Grid Coordinates ----------------------------\n'
+            for i, east in enumerate(self._easts):
+                str += '[%f, %f, %f]' % (east, self._norths[i], self._heights[i])
+            return str
+            
+
         str = 'Header: %s' % self.header
         str += '\nVertexCount: %s' % len(self.u)
         str += '\nuVertex: %s' % self.u
@@ -92,8 +113,34 @@ class TerrainTile:
         str += '\neastIndices: %s' % self.eastI
         str += '\nnorthIndicesCount: %s' % len(self.northI)
         str += '\nnorthIndices: %s' % self.northI
+        
+        # output coordinates
+        str += coords()
+
         str += '\nNumber of triangles: %s' % (len(self.indices) / 3)
         return str
+
+
+    # This is really slow, so only do it when really needed
+    def _updateCoords(self):
+        self._longs = []
+        self._lats = []
+        self._heights = []
+        self._easts = []
+        self._norths = []
+        for u in self.u:
+            self._longs.append(lerp(self._west, self._east, u / MAX))
+        for v in self.v:
+            self._lats.append(lerp(self._south, self._north, v / MAX))
+        for h in self.h:
+            self._heights.append(lerp(self.header['minimumHeight'], self.header['minimumHeight'], h / MAX))
+        for i, lon in enumerate(self._longs):
+            lat = self._lats[i]
+            point = 'POINT (%f %f)' % (lon, lat)
+            p = transformCoordinate(point, 4326, 21781)
+            self._easts.append(p.GetX())
+            self._norths.append(p.GetY())
+
 
     def toFile(self, filename):
         with open(filename, 'wb') as f:
@@ -141,8 +188,8 @@ class TerrainTile:
                 f.write(packEntry(meta['northIndices'], ni))
 
 
-    def fromFile(self, filename):
-        self.__init__()
+    def fromFile(self, filename, west, east, south, north):
+        self.__init__(west, east, south, north)
         with open(filename, 'rb') as f:
             # Header
             for k, v in TerrainTile.quantizedMeshHeader.iteritems():
