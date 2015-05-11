@@ -4,11 +4,15 @@ from collections import OrderedDict
 from forge.lib.helpers import zigZagToNumber, numberToZigZag, transformCoordinate
 from forge.lib.decoders import unpackEntry, unpackIndices, decodeIndices, packEntry, packIndices, encodeIndices
 
-MAX = 32767;
+MAX = 32767
+
+
 def lerp(p, q, time):
     return ((1.0 - time) * p) + (time * q)
 
 # http://cesiumjs.org/data-and-assets/terrain/formats/quantized-mesh-1.0.html
+
+
 class TerrainTile:
     quantizedMeshHeader = OrderedDict([
         ['centerX', 'd'],  # 8bytes
@@ -65,9 +69,8 @@ class TerrainTile:
 
     BYTESPLIT = 65636
 
-
-    #Coordinates are given in lon/lat WSG84
-    def __init__(self, west = None, east = None, south = None, north = None):
+    # Coordinates are given in lon/lat WSG84
+    def __init__(self, west=None, east=None, south=None, north=None):
         self._west = west if west is not None else -1.0
         self._east = east if east is not None else 1.0
         self._south = south if south is not None else -1.0
@@ -97,7 +100,6 @@ class TerrainTile:
             for i, east in enumerate(self._easts):
                 str += '[%f, %f, %f]' % (east, self._norths[i], self._heights[i])
             return str
-            
 
         str = 'Header: %s' % self.header
         str += '\nVertexCount: %s' % len(self.u)
@@ -113,13 +115,12 @@ class TerrainTile:
         str += '\neastIndices: %s' % self.eastI
         str += '\nnorthIndicesCount: %s' % len(self.northI)
         str += '\nnorthIndices: %s' % self.northI
-        
+
         # output coordinates
         str += coords()
 
         str += '\nNumber of triangles: %s' % (len(self.indices) / 3)
         return str
-
 
     # This is really slow, so only do it when really needed
     def _updateCoords(self):
@@ -140,7 +141,6 @@ class TerrainTile:
             p = transformCoordinate(point, 4326, 21781)
             self._easts.append(p.GetX())
             self._norths.append(p.GetY())
-
 
     def toFile(self, filename):
         with open(filename, 'wb') as f:
@@ -186,7 +186,6 @@ class TerrainTile:
             f.write(packEntry(meta['northVertexCount'], len(self.northI)))
             for ni in self.northI:
                 f.write(packEntry(meta['northIndices'], ni))
-
 
     def fromFile(self, filename, west, east, south, north):
         self.__init__(west, east, south, north)
