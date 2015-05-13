@@ -1,6 +1,9 @@
 # 3d-forge
 Read/Write quantized-mesh tiles
 
+To clone use the --recursive option to get all submodules.
+`git clone --recursive https://github.com/geoadmin/3d-forge`
+
 ## Getting started
 
     make all
