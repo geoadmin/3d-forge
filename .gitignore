@@ -6,3 +6,4 @@ venv
 *.dbf
 *.prj
 *.shp
+*.mako
