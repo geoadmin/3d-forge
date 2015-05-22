@@ -54,9 +54,9 @@ class TerrainTopology(object):
                 if indexData is not None:
                     self.indexData.append(indexData)
                 else:
-                    self.uVertex.append(coords[0])
-                    self.vVertex.append(coords[1])
-                    self.hVertex.append(coords[2])
+                    self.uVertex.append(coord[0])
+                    self.vVertex.append(coord[1])
+                    self.hVertex.append(coord[2])
                     self.indexData.append(index)
                     # Keep track of coordinates for bbsphere and friends
                     self.coords.append(coord)
@@ -65,8 +65,8 @@ class TerrainTopology(object):
     def _findVertexIndex(self, coord):
         # Naive approach for now
         for i in range(0, len(self.uVertex)):
-            if self.uVertex[i] == coord[0]:
-                if self.vVertex[i] == coord[1]:
-                    return i
+            if self.uVertex[i] == coord[0] and self.vVertex[i] == coord[1] and \
+                    self.hVertex[i] == coord[2]:
+                return i
         # Index doesn't exist yet
         return None
