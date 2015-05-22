@@ -6,4 +6,4 @@ venv
 *.dbf
 *.prj
 *.shp
-*.mako
+apache/testapp.conf
