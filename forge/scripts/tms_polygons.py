@@ -43,7 +43,7 @@ for tz in range(MINZOOM, MAXZOOM + 1):
     srs.ImportFromEPSG(4326)
     layer = dataSource.CreateLayer('%s' % tz, srs, ogr.wkbPolygon)
     fieldKey = ogr.FieldDefn('Key', ogr.OFTString)
-    fieldKey.SetWidth(12)
+    fieldKey.SetWidth(24)
     layer.CreateField(fieldKey)
 
     for tx in range(tminx, tmaxx + 1):
