@@ -20,7 +20,7 @@ class ShpToGDALFeatures(object):
         # 0 refers to read-only
         dataSource = drv.Open(self.shpFilePath, 0)
         if dataSource is None:
-            raise IOError('Could not open %s.' % self.shpFilePath)
+            raise IOError('Could not open %s' % self.shpFilePath)
         print 'Opening shapefile...'
         layer = dataSource.GetLayer()
         features = [feature for feature in layer]
