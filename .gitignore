@@ -2,8 +2,5 @@ venv
 3d_forge.egg-info
 *.pyc
 *.swp
-*.shx
-*.dbf
-*.prj
-*.shp
+.tmp/
 apache/testapp.conf
