@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 
+import os
 import osgeo.ogr as ogr
 import osgeo.osr as osr
 from forge.models.terrain import TerrainTile
 
-basename = '1'
+basename = 'raron.flat.1'
+
+os.makedirs('.tmp')
 
 # Prepare writing of shapefile
 drv = ogr.GetDriverByName('ESRI Shapefile')
@@ -22,7 +25,11 @@ ter._updateCoords()
 for i in range(0, len(ter.indices), 3):
     # triangle is i, i+1 and i+2
     feature = ogr.Feature(layer.GetLayerDefn())
-    wkt = 'POLYGON ((%f %f %f, %f %f %f, %f %f %f, %f %f %f))' % (ter._longs[ter.indices[i]], ter._lats[ter.indices[i]], ter._heights[ter.indices[i]], ter._longs[ter.indices[i + 1]], ter._lats[ter.indices[i + 1]], ter._heights[ter.indices[i + 1]], ter._longs[ter.indices[i + 2]], ter._lats[ter.indices[i + 2]], ter._heights[ter.indices[i + 2]], ter._longs[ter.indices[i]], ter._lats[ter.indices[i]], ter._heights[ter.indices[i]])
+    coords = (ter._longs[ter.indices[i]], ter._lats[ter.indices[i]], ter._heights[ter.indices[i]],
+              ter._longs[ter.indices[i + 1]], ter._lats[ter.indices[i + 1]], ter._heights[ter.indices[i + 1]],
+              ter._longs[ter.indices[i + 2]], ter._lats[ter.indices[i + 2]], ter._heights[ter.indices[i + 2]],
+              ter._longs[ter.indices[i]], ter._lats[ter.indices[i]], ter._heights[ter.indices[i]])
+    wkt = 'POLYGON ((%f %f %f, %f %f %f, %f %f %f, %f %f %f))' % coords
     polygon = ogr.CreateGeometryFromWkt(wkt)
     feature.SetGeometry(polygon)
     layer.CreateFeature(feature)
