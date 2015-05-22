@@ -18,7 +18,7 @@ class ShpToGDALFeatures(object):
         drvName = 'ESRI Shapefile'
         drv = ogr.GetDriverByName(drvName)
         # 0 refers to read-only
-        dataSource = drv.Open(self.shpFilesPath, 0)
+        dataSource = drv.Open(self.shpFilePath, 0)
         if dataSource is None:
             raise IOError('Could not open %s.' % self.shpFilePath)
         print 'Opening shapefile...'

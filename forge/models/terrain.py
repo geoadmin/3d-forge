@@ -134,7 +134,7 @@ class TerrainTile:
         for v in self.v:
             self._lats.append(lerp(self._south, self._north, v / MAX))
         for h in self.h:
-            self._heights.append(lerp(self.header['minimumHeight'], self.header['minimumHeight'], h / MAX))
+            self._heights.append(lerp(self.header['minimumHeight'], self.header['maximumHeight'], h / MAX))
         for i, lon in enumerate(self._longs):
             lat = self._lats[i]
             point = 'POINT (%f %f)' % (lon, lat)

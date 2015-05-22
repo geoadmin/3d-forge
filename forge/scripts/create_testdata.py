@@ -4,14 +4,14 @@ import osgeo.ogr as ogr
 import osgeo.osr as osr
 from forge.models.terrain import TerrainTile
 
-basename = 'raron.flat.1'
+basename = '1'
 
 #Prepare writing of shapefile
 drv = ogr.GetDriverByName('ESRI Shapefile')
 dataSource = drv.CreateDataSource('.tmp/' + basename + '.shp')
 srs = osr.SpatialReference()
 srs.ImportFromEPSG(4326)
-layer = dataSource.CreateLayer('basename', srs, ogr.wkbPolygon)
+layer = dataSource.CreateLayer('basename', srs, ogr.wkbPolygon25D)
 
 
 #Read terrain file
@@ -29,3 +29,13 @@ for i in range(0, len(ter.indices), 3):
     feature.Destroy()
 
 dataSource.Destroy()
+
+from forge.lib.loaders import ShpToGDALFeatures
+
+shapefile = ShpToGDALFeatures(shpFilePath = '.tmp/raron.flat.1.shp')
+
+features = shapefile.__read__()
+
+for f in features:
+    print f.GetGeometryRef().ExportToWkt()
+
