@@ -7,6 +7,7 @@ requires = [
         'flake8',
         'ipython',
         'nose',
+        'mako',
     ]
 
 setup(name='3d-forge',

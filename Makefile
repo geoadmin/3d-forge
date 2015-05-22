@@ -2,6 +2,7 @@ VENV = venv
 PYTHON_CMD = $(VENV)/bin/python
 PORT ?= 9025
 PYTHON_FILES := $(shell find forge/ -name '*.py')
+USERNAME := $(shell whoami)
 
 .PHONY: help
 help:
@@ -23,12 +24,15 @@ help:
 	@echo
 
 .PHONY: all
-all: install lint
+all: install apache/testapp.conf lint
 
 .PHONY: install
 install:
 	virtualenv $(VENV) --system-site-packages
 	$(PYTHON_CMD) setup.py develop
+
+apache/testapp.conf: apache/testapp.conf.mako
+	$(VENV)/bin/mako-render --var "user=$(USERNAME)" --var "directory=$(CURDIR)" $< > $@
 
 .PHONY: lint
 lint:
