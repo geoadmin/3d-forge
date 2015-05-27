@@ -17,9 +17,15 @@ class TerrainTopology(object):
         self.hVertex = []
         self.indexData = []
         self.coords = []
+        self.minHeight = float('inf')
+        self.maxHeight = float('-inf')
 
     def __str__(self):
-        str = 'uVertex length:'
+        str = 'Min height:'
+        str += '\n%s' % self.minHeight
+        str += '\nMax height:'
+        str += '\n%s' % self.maxHeight
+        str += '\nuVertex length:'
         str += '\n%s' % len(self.uVertex)
         str += '\nuVertex list:'
         str += '\n%s' % self.uVertex
@@ -57,6 +63,10 @@ class TerrainTopology(object):
                     self.uVertex.append(coord[0])
                     self.vVertex.append(coord[1])
                     self.hVertex.append(coord[2])
+                    if coord[2] < self.minHeight:
+                        self.minHeight = coord[2]
+                    if coord[2] > self.maxHeight:
+                        self.maxHeight = coord[2]
                     self.indexData.append(index)
                     # Keep track of coordinates for bbsphere and friends
                     self.coords.append(coord)
