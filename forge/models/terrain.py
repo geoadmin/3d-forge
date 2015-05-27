@@ -4,7 +4,7 @@ from collections import OrderedDict
 from forge.lib.helpers import zigZagToNumber, numberToZigZag, transformCoordinate
 from forge.lib.decoders import unpackEntry, unpackIndices, decodeIndices, packEntry, packIndices, encodeIndices
 
-MAX = 32767
+MAX = 32767.0
 
 
 def lerp(p, q, time):
@@ -98,7 +98,7 @@ class TerrainTile:
         def coords():
             str = '\nSwis Grid Coordinates ----------------------------\n'
             for i, east in enumerate(self._easts):
-                str += '[%f, %f, %f]' % (east, self._norths[i], self._heights[i])
+                str += '[%f, %f, %f]' % (east, self._norths[i], self._alts[i])
             return str
 
         str = 'Header: %s' % self.header
@@ -129,18 +129,21 @@ class TerrainTile:
         self._heights = []
         self._easts = []
         self._norths = []
+        self._alts = []
         for u in self.u:
-            self._longs.append(lerp(self._west, self._east, u / MAX))
+            self._longs.append(lerp(self._west, self._east, float(u) / MAX))
         for v in self.v:
-            self._lats.append(lerp(self._south, self._north, v / MAX))
+            self._lats.append(lerp(self._south, self._north, float(v) / MAX))
         for h in self.h:
-            self._heights.append(lerp(self.header['minimumHeight'], self.header['maximumHeight'], h / MAX))
+            self._heights.append(lerp(self.header['minimumHeight'], self.header['maximumHeight'], float(h) / MAX))
         for i, lon in enumerate(self._longs):
             lat = self._lats[i]
-            point = 'POINT (%f %f)' % (lon, lat)
+            height = self._heights[i]
+            point = 'POINT (%f %f %f)' % (lon, lat, height)
             p = transformCoordinate(point, 4326, 21781)
             self._easts.append(p.GetX())
             self._norths.append(p.GetY())
+            self._alts.append(p.GetZ())
 
     def toFile(self, filename):
         with open(filename, 'wb') as f:
