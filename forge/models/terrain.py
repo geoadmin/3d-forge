@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 
 from collections import OrderedDict
+from forge.lib.topology import TerrainTopology
+from forge.lib.bounding_sphere import BoundingSphere
 from forge.lib.helpers import zigZagToNumber, numberToZigZag, transformCoordinate
+from forge.lib.llh_ecef import LLH2ECEF
 from forge.lib.decoders import unpackEntry, unpackIndices, decodeIndices, packEntry, packIndices, encodeIndices
 
 MAX = 32767.0
@@ -240,3 +243,92 @@ class TerrainTile:
             data = f.read(1)
             if data:
                 raise Exception('Should have reached end of file, but didn\'t')
+
+    def fromTerrainTopology(self, topology):
+        assert isinstance(topology, TerrainTopology), 'topology object must be an instance of TerrainTopology'
+        llh2ecef = lambda x: LLH2ECEF(x[0], x[1], x[2])
+        ecefCoords = map(llh2ecef, topology.coords)
+        bSphere = BoundingSphere(ecefCoords)
+
+        ecefMinX = float('inf')
+        ecefMinY = float('inf')
+        ecefMinZ = float('inf')
+        ecefMaxX = float('-inf')
+        ecefMaxY = float('-inf')
+        ecefMaxZ = float('-inf')
+
+        for coord in ecefCoords:
+            if coord[0] < ecefMinX:
+                ecefMinX = coord[0]
+            if coord[1] < ecefMinY:
+                ecefMinY = coord[1]
+            if coord[2] < ecefMinZ:
+                ecefMinZ = coord[2]
+            if coord[0] > ecefMaxX:
+                ecefMaxX = coord[0]
+            if coord[1] > ecefMaxY:
+                ecefMaxY = coord[1]
+            if coord[2] > ecefMaxZ:
+                ecefMaxZ = coord[2]
+
+        centerCoords = [
+            (ecefMinX + ecefMaxX) / 2,
+            (ecefMinY + ecefMaxY) / 2,
+            (ecefMinZ + ecefMaxZ) / 2
+        ]
+
+        # TODO just for now
+        occlusionPCoords = [0.0, 0.0, 0.0]
+        for k, v in TerrainTile.quantizedMeshHeader.iteritems():
+            if v == 'centerX':
+                self.header[k] = centerCoords[0]
+            elif v == 'centerY':
+                self.header[k] = centerCoords[1]
+            elif v == 'centerZ':
+                self.header[k] = centerCoords[2]
+            elif v == 'minimumHeight':
+                self.header[k] = topology.minHeight
+            elif v == 'maximumHeight':
+                self.header[k] = topology.maxHeight
+            elif v == 'boundingSphereCenterX':
+                self.header[k] = bSphere.center[0]
+            elif v == 'boundingSphereCenterY':
+                self.header[k] = bSphere.center[1]
+            elif v == 'boundingSphereCenterZ':
+                self.header[k] = bSphere.center[2]
+            elif v == 'boundingSphereRadius':
+                self.header[k] = bSphere.radius
+            elif v == 'horizonOcclusionPointX':
+                self.header[k] = occlusionPCoords[0]
+            elif v == 'horizonOcclusionPointY':
+                self.header[k] = occlusionPCoords[1]
+            elif v == 'horizonOcclusionPointZ':
+                self.header[k] = occlusionPCoords[2]
+
+        quantizeLatIndices = lambda x: int(round((MAX / (topology.maxLat - topology.minLat)) * (x - topology.minLat)))
+        quantizeLonIndices = lambda x: int(round((MAX / (topology.maxLon - topology.minLon)) * (x - topology.minLon)))
+        quantizeHeightIndices = lambda x: int(round((MAX / (topology.maxHeight - topology.minHeight)) * (x - topology.minHeight)))
+
+        # High watermark encoding performed during toFile
+        self.u = map(quantizeLatIndices, topology.uVertex)
+        self.v = map(quantizeLonIndices, topology.vVertex)
+        self.h = map(quantizeHeightIndices, topology.hVertex)
+        self.indices = topology.indexData
+
+        # List all the vertices on the edge of the tile
+        # High water mark encoded?
+        for i in range(0, len(self.indices)):
+            # Use original coordinates
+            indice = self.indices[i]
+            lat = topology.uVertex[indice]
+            lon = topology.vVertex[indice]
+
+            if lat == topology.minLat:
+                self.southI.append(indice)
+            elif lat == topology.maxLat:
+                self.northI.append(indice)
+
+            if lon == topology.minLon:
+                self.westI.append(indice)
+            elif lon == topology.maxLon:
+                self.eastI.append(indice)

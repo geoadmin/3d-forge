@@ -11,12 +11,12 @@ directory = '.tmp'
 try:
     os.makedirs(directory)
 except:
-    print 'Directory %s already exists' %directory
+    print 'Directory %s already exists' % directory
 
 # Prepare writing of shapefile
 drv = ogr.GetDriverByName('ESRI Shapefile')
 if os.path.isfile('.tmp/' + basename + '.shp'):
-    raise IOError('File %s/%s.shp already exists' %(directory, basename))
+    raise IOError('File %s/%s.shp already exists' % (directory, basename))
 dataSource = drv.CreateDataSource(directory + '/' + basename + '.shp')
 srs = osr.SpatialReference()
 srs.ImportFromEPSG(4326)
