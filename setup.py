@@ -8,6 +8,7 @@ requires = [
         'ipython',
         'nose',
         'mako',
+        'boto',
     ]
 
 setup(name='3d-forge',
