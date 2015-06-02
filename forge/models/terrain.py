@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 
+import os
+import osgeo.ogr as ogr
+import osgeo.osr as osr
 from collections import OrderedDict
 from forge.lib.topology import TerrainTopology
 from forge.lib.bounding_sphere import BoundingSphere
@@ -109,6 +112,7 @@ class TerrainTile:
         str += '\nuVertex: %s' % self.u
         str += '\nvVertex: %s' % self.v
         str += '\nhVertex: %s' % self.h
+        str += '\nindexDataCount: %s' % len(self.indices)
         str += '\nindexData: %s' % self.indices
         str += '\nwestIndicesCount: %s' % len(self.westI)
         str += '\nwestIndices: %s' % self.westI
@@ -120,7 +124,7 @@ class TerrainTile:
         str += '\nnorthIndices: %s' % self.northI
 
         # output coordinates
-        str += coords()
+        str += '\n%s' % coords()
 
         str += '\nNumber of triangles: %s' % (len(self.indices) / 3)
         return str
@@ -148,54 +152,9 @@ class TerrainTile:
             self._norths.append(p.GetY())
             self._alts.append(p.GetZ())
 
-    def toFile(self, filename):
-        with open(filename, 'wb') as f:
-            # Header
-            for k, v in TerrainTile.quantizedMeshHeader.iteritems():
-                f.write(packEntry(v, self.header[k]))
-
-            # Vertices
-            f.write(packEntry(TerrainTile.vertexData['vertexCount'], len(self.u)))
-            for u in self.u:
-                f.write(packEntry(TerrainTile.vertexData['uVertexCount'], numberToZigZag(u)))
-            for v in self.v:
-                f.write(packEntry(TerrainTile.vertexData['vVertexCount'], numberToZigZag(v)))
-            for h in self.h:
-                f.write(packEntry(TerrainTile.vertexData['heightVertexCount'], numberToZigZag(h)))
-
-            # Indices
-            # TODO: verify padding
-            meta = TerrainTile.indexData16
-            if len(self.u) > TerrainTile.BYTESPLIT:
-                meta = TerrainTile.indexData32
-
-            f.write(packEntry(meta['triangleCount'], len(self.indices) / 3))
-            ind = encodeIndices(self.indices)
-            packIndices(f, meta['indices'], ind)
-
-            meta = TerrainTile.EdgeIndices16
-            if len(self.u) > TerrainTile.BYTESPLIT:
-                meta = TerrainTile.indexData32
-
-            f.write(packEntry(meta['westVertexCount'], len(self.westI)))
-            for wi in self.westI:
-                f.write(packEntry(meta['westIndices'], wi))
-
-            f.write(packEntry(meta['southVertexCount'], len(self.southI)))
-            for si in self.southI:
-                f.write(packEntry(meta['southIndices'], si))
-
-            f.write(packEntry(meta['eastVertexCount'], len(self.eastI)))
-            for ei in self.eastI:
-                f.write(packEntry(meta['eastIndices'], ei))
-
-            f.write(packEntry(meta['northVertexCount'], len(self.northI)))
-            for ni in self.northI:
-                f.write(packEntry(meta['northIndices'], ni))
-
-    def fromFile(self, filename, west, east, south, north):
+    def fromFile(self, filePath, west, east, south, north):
         self.__init__(west, east, south, north)
-        with open(filename, 'rb') as f:
+        with open(filePath, 'rb') as f:
             # Header
             for k, v in TerrainTile.quantizedMeshHeader.iteritems():
                 self.header[k] = unpackEntry(f, v)
@@ -244,8 +203,98 @@ class TerrainTile:
             if data:
                 raise Exception('Should have reached end of file, but didn\'t')
 
+    def toFile(self, filePath):
+        if not filePath.endswith('.terrain'):
+            raise Exception('Wrong file extension')
+
+        if os.path.isfile(filePath):
+            raise IOError('File %s already exists' % filePath)
+
+        with open(filePath, 'wb') as f:
+            # Header
+            for k, v in TerrainTile.quantizedMeshHeader.iteritems():
+                f.write(packEntry(v, self.header[k]))
+
+            # Vertices
+            f.write(packEntry(TerrainTile.vertexData['vertexCount'], len(self.u)))
+            for u in self.u:
+                f.write(packEntry(TerrainTile.vertexData['uVertexCount'], numberToZigZag(u)))
+            for v in self.v:
+                f.write(packEntry(TerrainTile.vertexData['vVertexCount'], numberToZigZag(v)))
+            for h in self.h:
+                f.write(packEntry(TerrainTile.vertexData['heightVertexCount'], numberToZigZag(h)))
+
+            # Indices
+            # TODO: verify padding
+            meta = TerrainTile.indexData16
+            if len(self.u) > TerrainTile.BYTESPLIT:
+                meta = TerrainTile.indexData32
+
+            f.write(packEntry(meta['triangleCount'], len(self.indices) / 3))
+            ind = encodeIndices(self.indices)
+            packIndices(f, meta['indices'], ind)
+
+            meta = TerrainTile.EdgeIndices16
+            if len(self.u) > TerrainTile.BYTESPLIT:
+                meta = TerrainTile.indexData32
+
+            f.write(packEntry(meta['westVertexCount'], len(self.westI)))
+            for wi in self.westI:
+                f.write(packEntry(meta['westIndices'], wi))
+
+            f.write(packEntry(meta['southVertexCount'], len(self.southI)))
+            for si in self.southI:
+                f.write(packEntry(meta['southIndices'], si))
+
+            f.write(packEntry(meta['eastVertexCount'], len(self.eastI)))
+            for ei in self.eastI:
+                f.write(packEntry(meta['eastIndices'], ei))
+
+            f.write(packEntry(meta['northVertexCount'], len(self.northI)))
+            for ni in self.northI:
+                f.write(packEntry(meta['northIndices'], ni))
+        print '%s has been created successfully' % filePath
+
+    def toShapefile(self, filePath, epsg=4326):
+        if not filePath.endswith('.shp'):
+            raise Exception('Wrong file extension')
+
+        if os.path.isfile(filePath):
+            raise IOError('File %s already exists' % filePath)
+
+        if len(self.indices) == 0:
+            raise Exception('No indices, you must first generate the topology')
+        elif len(self._lats) == 0:
+            self._updateCoords()
+
+        baseName = os.path.split(filePath)[1]
+        drv = ogr.GetDriverByName('ESRI Shapefile')
+        dataSource = drv.CreateDataSource(filePath)
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(epsg)
+        layer = dataSource.CreateLayer(baseName, srs, ogr.wkbPolygon25D)
+        for i in range(0, len(self.indices), 3):
+            j = i + 1
+            k = i + 2
+            ring = ogr.Geometry(ogr.wkbLinearRing)
+            ring.AddPoint(self._longs[self.indices[i]], self._lats[self.indices[i]], self._heights[self.indices[i]])
+            ring.AddPoint(self._longs[self.indices[j]], self._lats[self.indices[j]], self._heights[self.indices[j]])
+            ring.AddPoint(self._longs[self.indices[k]], self._lats[self.indices[k]], self._heights[self.indices[k]])
+            ring.AddPoint(self._longs[self.indices[i]], self._lats[self.indices[i]], self._heights[self.indices[i]])
+            polygon = ogr.Geometry(ogr.wkbPolygon)
+            polygon.AddGeometry(ring)
+
+            feature = ogr.Feature(layer.GetLayerDefn())
+            feature.SetGeometry(polygon)
+            layer.CreateFeature(feature)
+            feature.Destroy()
+        dataSource.Destroy()
+        print '%s has been created successfully' % filePath
+
     def fromTerrainTopology(self, topology):
-        assert isinstance(topology, TerrainTopology), 'topology object must be an instance of TerrainTopology'
+        if not isinstance(topology, TerrainTopology):
+            raise Exception('topology object must be an instance of TerrainTopology')
+
         llh2ecef = lambda x: LLH2ECEF(x[0], x[1], x[2])
         ecefCoords = map(llh2ecef, topology.coords)
         bSphere = BoundingSphere()

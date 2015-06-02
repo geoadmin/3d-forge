@@ -45,6 +45,7 @@ class TerrainTopology(object):
         str += '\n%s' % len(self.indexData)
         str += '\nindexData list:'
         str += '\n%s' % self.indexData
+        str += '\nNumber of triangles: %s' % (len(self.indexData) / 3)
         return str
 
     def create(self):
