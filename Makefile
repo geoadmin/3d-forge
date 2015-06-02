@@ -59,3 +59,4 @@ clean:
 	rm -rf *.egg-info
 	rm -rf 3d-testapp
 	rm -f apache/testapp.conf
+	rm -f .tmp/*.*
