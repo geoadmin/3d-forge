@@ -361,9 +361,12 @@ class TerrainTile:
             elif k == 'horizonOcclusionPointZ':
                 self.header[k] = occlusionPCoords[2]
 
-        quantizeLonIndices = lambda x: int(round((MAX / (topology.maxLon - topology.minLon)) * (x - topology.minLon)))
-        quantizeLatIndices = lambda x: int(round((MAX / (topology.maxLat - topology.minLat)) * (x - topology.minLat)))
-        quantizeHeightIndices = lambda x: int(round((MAX / (topology.maxHeight - topology.minHeight)) * (x - topology.minHeight)))
+        bLon = MAX / (topology.maxLon - topology.minLon)
+        bLat = MAX / (topology.maxLat - topology.minLat)
+        bHeight = MAX / (topology.maxHeight - topology.minHeight)
+        quantizeLonIndices = lambda x: int(round((x - topology.minLon) * bLon))
+        quantizeLatIndices = lambda x: int(round((x - topology.minLat) * bLat))
+        quantizeHeightIndices = lambda x: int(round((x - topology.minHeight) * bHeight))
 
         # High watermark encoding performed during toFile
         self.u = map(quantizeLonIndices, topology.uVertex)
@@ -379,12 +382,12 @@ class TerrainTile:
             lon = topology.uVertex[indice]
             lat = topology.vVertex[indice]
 
-            if lon == topology.minLon:
+            if lon == self._west:
                 self.westI.append(indice)
-            elif lon == topology.maxLon:
+            elif lon == self._east:
                 self.eastI.append(indice)
 
-            if lat == topology.minLat:
+            if lat == self._south:
                 self.southI.append(indice)
-            elif lat == topology.maxLat:
+            elif lat == self._north:
                 self.northI.append(indice)
