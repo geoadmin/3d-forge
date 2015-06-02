@@ -248,7 +248,8 @@ class TerrainTile:
         assert isinstance(topology, TerrainTopology), 'topology object must be an instance of TerrainTopology'
         llh2ecef = lambda x: LLH2ECEF(x[0], x[1], x[2])
         ecefCoords = map(llh2ecef, topology.coords)
-        bSphere = BoundingSphere(ecefCoords)
+        bSphere = BoundingSphere()
+        bSphere.fromPoints(ecefCoords)
 
         ecefMinX = float('inf')
         ecefMinY = float('inf')
@@ -276,33 +277,32 @@ class TerrainTile:
             (ecefMinY + ecefMaxY) / 2,
             (ecefMinZ + ecefMaxZ) / 2
         ]
-
         # TODO just for now
         occlusionPCoords = [0.0, 0.0, 0.0]
         for k, v in TerrainTile.quantizedMeshHeader.iteritems():
-            if v == 'centerX':
+            if k == 'centerX':
                 self.header[k] = centerCoords[0]
-            elif v == 'centerY':
+            elif k == 'centerY':
                 self.header[k] = centerCoords[1]
-            elif v == 'centerZ':
+            elif k == 'centerZ':
                 self.header[k] = centerCoords[2]
-            elif v == 'minimumHeight':
+            elif k == 'minimumHeight':
                 self.header[k] = topology.minHeight
-            elif v == 'maximumHeight':
+            elif k == 'maximumHeight':
                 self.header[k] = topology.maxHeight
-            elif v == 'boundingSphereCenterX':
+            elif k == 'boundingSphereCenterX':
                 self.header[k] = bSphere.center[0]
-            elif v == 'boundingSphereCenterY':
+            elif k == 'boundingSphereCenterY':
                 self.header[k] = bSphere.center[1]
-            elif v == 'boundingSphereCenterZ':
+            elif k == 'boundingSphereCenterZ':
                 self.header[k] = bSphere.center[2]
-            elif v == 'boundingSphereRadius':
+            elif k == 'boundingSphereRadius':
                 self.header[k] = bSphere.radius
-            elif v == 'horizonOcclusionPointX':
+            elif k == 'horizonOcclusionPointX':
                 self.header[k] = occlusionPCoords[0]
-            elif v == 'horizonOcclusionPointY':
+            elif k == 'horizonOcclusionPointY':
                 self.header[k] = occlusionPCoords[1]
-            elif v == 'horizonOcclusionPointZ':
+            elif k == 'horizonOcclusionPointZ':
                 self.header[k] = occlusionPCoords[2]
 
         quantizeLatIndices = lambda x: int(round((MAX / (topology.maxLat - topology.minLat)) * (x - topology.minLat)))

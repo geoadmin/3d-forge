@@ -11,7 +11,7 @@ extension = '.shp'
 
 # Prepare writing of shapefile
 drv = ogr.GetDriverByName('ESRI Shapefile')
-if os.path.isfile('%s%s%s' % (directory, basename, extension)):
+if os.path.isfile('%s/%s%s' % (directory, basename, extension)):
     raise IOError('File %s/%s%s already exists' % (directory, basename, extension))
 dataSource = drv.CreateDataSource('%s/%s%s' % (directory, basename, extension))
 srs = osr.SpatialReference()
