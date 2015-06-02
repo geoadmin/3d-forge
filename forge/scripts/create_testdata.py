@@ -7,20 +7,16 @@ from forge.models.terrain import TerrainTile
 
 basename = 'raron.flat.1'
 directory = '.tmp'
-
-try:
-    os.makedirs(directory)
-except:
-    print 'Directory %s already exists' % directory
+extension = '.shp'
 
 # Prepare writing of shapefile
 drv = ogr.GetDriverByName('ESRI Shapefile')
-if os.path.isfile('.tmp/' + basename + '.shp'):
-    raise IOError('File %s/%s.shp already exists' % (directory, basename))
-dataSource = drv.CreateDataSource(directory + '/' + basename + '.shp')
+if os.path.isfile('%s%s%s' % (directory, basename, extension)):
+    raise IOError('File %s/%s%s already exists' % (directory, basename, extension))
+dataSource = drv.CreateDataSource('%s/%s%s' % (directory, basename, extension))
 srs = osr.SpatialReference()
 srs.ImportFromEPSG(4326)
-layer = dataSource.CreateLayer('basename', srs, ogr.wkbPolygon25D)
+layer = dataSource.CreateLayer(basename, srs, ogr.wkbPolygon25D)
 
 
 # Read terrain file
@@ -45,7 +41,7 @@ dataSource.Destroy()
 
 from forge.lib.loaders import ShpToGDALFeatures
 
-shapefile = ShpToGDALFeatures(shpFilePath=directory + '/' + basename + '.shp')
+shapefile = ShpToGDALFeatures(shpFilePath='%s/%s%s' % (directory, basename, extension))
 
 features = shapefile.__read__()
 
