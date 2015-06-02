@@ -13,7 +13,7 @@ wgs84_a2 = wgs84_a ** 2           # To speed things up a bit
 wgs84_b2 = wgs84_b ** 2
 
 
-def LLH2ECEF(lat, lon, alt):
+def LLH2ECEF(lon, lat, alt):
     lat *= (math.pi / 180.0)
     lon *= (math.pi / 180.0)
 
@@ -40,4 +40,4 @@ def ECEF2LLH(x, y, z):
     lon *= (180. / math.pi)
     lat *= (180. / math.pi)
 
-    return [lat, lon, alt]
+    return [lon, lat, alt]

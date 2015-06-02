@@ -21,6 +21,7 @@ terrainTopo = TerrainTopology(features)
 terrainTopo.create()
 terrainFormat = TerrainTile()
 terrainFormat.fromTerrainTopology(terrainTopo)
+terrainFormat._updateCoords()
 print terrainFormat
 
 terrainFormat.toFile(filePathTarget)

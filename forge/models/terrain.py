@@ -295,6 +295,13 @@ class TerrainTile:
         if not isinstance(topology, TerrainTopology):
             raise Exception('topology object must be an instance of TerrainTopology')
 
+        # Set tile bounds
+        # TODO handle borders transitions
+        self._west = topology.minLon
+        self._east = topology.maxLon
+        self._south = topology.minLat
+        self._north = topology.maxLat
+
         llh2ecef = lambda x: LLH2ECEF(x[0], x[1], x[2])
         ecefCoords = map(llh2ecef, topology.coords)
         bSphere = BoundingSphere()
@@ -322,9 +329,9 @@ class TerrainTile:
                 ecefMaxZ = coord[2]
 
         centerCoords = [
-            (ecefMinX + ecefMaxX) / 2,
-            (ecefMinY + ecefMaxY) / 2,
-            (ecefMinZ + ecefMaxZ) / 2
+            ecefMinX + (ecefMaxX - ecefMinX) * 0.5,
+            ecefMinY + (ecefMaxY - ecefMinY) * 0.5,
+            ecefMinZ + (ecefMaxZ - ecefMinZ) * 0.5
         ]
         # TODO just for now
         occlusionPCoords = [0.0, 0.0, 0.0]
@@ -354,13 +361,13 @@ class TerrainTile:
             elif k == 'horizonOcclusionPointZ':
                 self.header[k] = occlusionPCoords[2]
 
-        quantizeLatIndices = lambda x: int(round((MAX / (topology.maxLat - topology.minLat)) * (x - topology.minLat)))
         quantizeLonIndices = lambda x: int(round((MAX / (topology.maxLon - topology.minLon)) * (x - topology.minLon)))
+        quantizeLatIndices = lambda x: int(round((MAX / (topology.maxLat - topology.minLat)) * (x - topology.minLat)))
         quantizeHeightIndices = lambda x: int(round((MAX / (topology.maxHeight - topology.minHeight)) * (x - topology.minHeight)))
 
         # High watermark encoding performed during toFile
-        self.u = map(quantizeLatIndices, topology.uVertex)
-        self.v = map(quantizeLonIndices, topology.vVertex)
+        self.u = map(quantizeLonIndices, topology.uVertex)
+        self.v = map(quantizeLatIndices, topology.vVertex)
         self.h = map(quantizeHeightIndices, topology.hVertex)
         self.indices = topology.indexData
 
@@ -369,15 +376,15 @@ class TerrainTile:
         for i in range(0, len(self.indices)):
             # Use original coordinates
             indice = self.indices[i]
-            lat = topology.uVertex[indice]
-            lon = topology.vVertex[indice]
-
-            if lat == topology.minLat:
-                self.southI.append(indice)
-            elif lat == topology.maxLat:
-                self.northI.append(indice)
+            lon = topology.uVertex[indice]
+            lat = topology.vVertex[indice]
 
             if lon == topology.minLon:
                 self.westI.append(indice)
             elif lon == topology.maxLon:
                 self.eastI.append(indice)
+
+            if lat == topology.minLat:
+                self.southI.append(indice)
+            elif lat == topology.maxLat:
+                self.northI.append(indice)
