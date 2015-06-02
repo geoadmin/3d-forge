@@ -6,7 +6,7 @@ import osgeo.osr as osr
 from collections import OrderedDict
 from forge.lib.topology import TerrainTopology
 from forge.lib.bounding_sphere import BoundingSphere
-from forge.lib.helpers import zigZagToNumber, numberToZigZag, transformCoordinate
+from forge.lib.helpers import zigZagDecode, zigZagEncode, transformCoordinate
 from forge.lib.llh_ecef import LLH2ECEF
 from forge.lib.decoders import unpackEntry, unpackIndices, decodeIndices, packEntry, packIndices, encodeIndices
 
@@ -159,20 +159,21 @@ class TerrainTile:
             for k, v in TerrainTile.quantizedMeshHeader.iteritems():
                 self.header[k] = unpackEntry(f, v)
 
+            # Delta decoding
+            ud = 0
+            vd = 0
+            hd = 0
             # Vertices
             vertexCount = unpackEntry(f, TerrainTile.vertexData['vertexCount'])
             for i in range(0, vertexCount):
-                self.u.append(zigZagToNumber(
-                    unpackEntry(f, TerrainTile.vertexData['uVertexCount'])
-                ))
+                ud += zigZagDecode(unpackEntry(f, TerrainTile.vertexData['uVertexCount']))
+                self.u.append(ud)
             for i in range(0, vertexCount):
-                self.v.append(zigZagToNumber(
-                    unpackEntry(f, TerrainTile.vertexData['vVertexCount'])
-                ))
+                vd += zigZagDecode(unpackEntry(f, TerrainTile.vertexData['vVertexCount']))
+                self.v.append(vd)
             for i in range(0, vertexCount):
-                self.h.append(zigZagToNumber(
-                    unpackEntry(f, TerrainTile.vertexData['heightVertexCount'])
-                ))
+                hd += zigZagDecode(unpackEntry(f, TerrainTile.vertexData['heightVertexCount']))
+                self.h.append(hd)
 
             # Indices
             # TODO: verify padding
@@ -215,14 +216,19 @@ class TerrainTile:
             for k, v in TerrainTile.quantizedMeshHeader.iteritems():
                 f.write(packEntry(v, self.header[k]))
 
+            # Delta decoding
+            verterCount = len(self.u)
             # Vertices
-            f.write(packEntry(TerrainTile.vertexData['vertexCount'], len(self.u)))
-            for u in self.u:
-                f.write(packEntry(TerrainTile.vertexData['uVertexCount'], numberToZigZag(u)))
-            for v in self.v:
-                f.write(packEntry(TerrainTile.vertexData['vVertexCount'], numberToZigZag(v)))
-            for h in self.h:
-                f.write(packEntry(TerrainTile.vertexData['heightVertexCount'], numberToZigZag(h)))
+            f.write(packEntry(TerrainTile.vertexData['vertexCount'], verterCount))
+            for i in range(0, verterCount - 1):
+                ud = self.u[i + 1] - self.u[i]
+                f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(ud)))
+            for i in range(0, verterCount - 1):
+                vd = self.v[i + 1] - self.v[i]
+                f.write(packEntry(TerrainTile.vertexData['vVertexCount'], zigZagEncode(vd)))
+            for i in range(0, verterCount - 1):
+                hd = self.h[i + 1] - self.h[i]
+                f.write(packEntry(TerrainTile.vertexData['heightVertexCount'], zigZagEncode(hd)))
 
             # Indices
             # TODO: verify padding
