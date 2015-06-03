@@ -8,7 +8,7 @@ from forge.models.terrain import TerrainTile
 class TestTerrainTile(unittest.TestCase):
 
     def setUp(self):
-        self.tmpfile = 'terrain.tmp'
+        self.tmpfile = 'temp.terrain'
 
     def tearDown(self):
         os.remove(self.tmpfile)

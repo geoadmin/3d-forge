@@ -12,6 +12,7 @@ help:
 	@echo
 	@echo "- install            Install the app"
 	@echo "- lint               Linter for python code"
+	@echo "- test               Launch the tests"
 	@echo "- all                All of the above"
 	@echo "- autolint           Auto lint code styling"
 	@echo "- updatesubmodule    Update 3d testapp"
@@ -25,7 +26,7 @@ help:
 	@echo
 
 .PHONY: all
-all: install apache/testapp.conf lint
+all: install apache/testapp.conf test lint
 
 .PHONY: install
 install:
@@ -38,6 +39,10 @@ apache/testapp.conf: apache/testapp.conf.mako
 .PHONY: lint
 lint:
 	venv/bin/flake8 --ignore=E501 forge/
+
+.PHONY: test
+test:
+	$(VENV)/bin/nosetests forge/tests/
 
 .PHONY: autolint
 autolint:
@@ -59,3 +64,4 @@ clean:
 	rm -rf *.egg-info
 	rm -rf 3d-testapp
 	rm -f apache/testapp.conf
+	rm -f .tmp/*.*

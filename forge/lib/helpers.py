@@ -3,7 +3,7 @@
 from osgeo import osr, ogr
 
 
-def numberToZigZag(n):
+def zigZagEncode(n):
     """
     ZigZag-Encodes a number:
        -1 = 1
@@ -15,7 +15,7 @@ def numberToZigZag(n):
     return (n << 1) ^ (n >> 31)
 
 
-def zigZagToNumber(z):
+def zigZagDecode(z):
     """ Reverses ZigZag encoding """
     return (z >> 1) ^ (-(z & 1))
     # return (z >> 1) if not z & 1 else -(z+1 >> 1)

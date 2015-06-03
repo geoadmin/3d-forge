@@ -1,10 +1,16 @@
 # -*- coding: utf-8 -*-
 
+import os
+import osgeo.ogr as ogr
+import osgeo.osr as osr
 from collections import OrderedDict
-from forge.lib.helpers import zigZagToNumber, numberToZigZag, transformCoordinate
+from forge.lib.topology import TerrainTopology
+from forge.lib.bounding_sphere import BoundingSphere
+from forge.lib.helpers import zigZagDecode, zigZagEncode, transformCoordinate
+from forge.lib.llh_ecef import LLH2ECEF
 from forge.lib.decoders import unpackEntry, unpackIndices, decodeIndices, packEntry, packIndices, encodeIndices
 
-MAX = 32767
+MAX = 32767.0
 
 
 def lerp(p, q, time):
@@ -98,7 +104,7 @@ class TerrainTile:
         def coords():
             str = '\nSwis Grid Coordinates ----------------------------\n'
             for i, east in enumerate(self._easts):
-                str += '[%f, %f, %f]' % (east, self._norths[i], self._heights[i])
+                str += '[%f, %f, %f]' % (east, self._norths[i], self._alts[i])
             return str
 
         str = 'Header: %s' % self.header
@@ -106,6 +112,7 @@ class TerrainTile:
         str += '\nuVertex: %s' % self.u
         str += '\nvVertex: %s' % self.v
         str += '\nhVertex: %s' % self.h
+        str += '\nindexDataCount: %s' % len(self.indices)
         str += '\nindexData: %s' % self.indices
         str += '\nwestIndicesCount: %s' % len(self.westI)
         str += '\nwestIndices: %s' % self.westI
@@ -117,7 +124,7 @@ class TerrainTile:
         str += '\nnorthIndices: %s' % self.northI
 
         # output coordinates
-        str += coords()
+        str += '\n%s' % coords()
 
         str += '\nNumber of triangles: %s' % (len(self.indices) / 3)
         return str
@@ -129,33 +136,99 @@ class TerrainTile:
         self._heights = []
         self._easts = []
         self._norths = []
+        self._alts = []
         for u in self.u:
-            self._longs.append(lerp(self._west, self._east, u / MAX))
+            self._longs.append(lerp(self._west, self._east, float(u) / MAX))
         for v in self.v:
-            self._lats.append(lerp(self._south, self._north, v / MAX))
+            self._lats.append(lerp(self._south, self._north, float(v) / MAX))
         for h in self.h:
-            self._heights.append(lerp(self.header['minimumHeight'], self.header['maximumHeight'], h / MAX))
+            self._heights.append(lerp(self.header['minimumHeight'], self.header['maximumHeight'], float(h) / MAX))
         for i, lon in enumerate(self._longs):
             lat = self._lats[i]
-            point = 'POINT (%f %f)' % (lon, lat)
+            height = self._heights[i]
+            point = 'POINT (%f %f %f)' % (lon, lat, height)
             p = transformCoordinate(point, 4326, 21781)
             self._easts.append(p.GetX())
             self._norths.append(p.GetY())
+            self._alts.append(p.GetZ())
 
-    def toFile(self, filename):
-        with open(filename, 'wb') as f:
+    def fromFile(self, filePath, west, east, south, north):
+        self.__init__(west, east, south, north)
+        with open(filePath, 'rb') as f:
+            # Header
+            for k, v in TerrainTile.quantizedMeshHeader.iteritems():
+                self.header[k] = unpackEntry(f, v)
+
+            # Delta decoding
+            ud = 0
+            vd = 0
+            hd = 0
+            # Vertices
+            vertexCount = unpackEntry(f, TerrainTile.vertexData['vertexCount'])
+            for i in range(0, vertexCount):
+                ud += zigZagDecode(unpackEntry(f, TerrainTile.vertexData['uVertexCount']))
+                self.u.append(ud)
+            for i in range(0, vertexCount):
+                vd += zigZagDecode(unpackEntry(f, TerrainTile.vertexData['vVertexCount']))
+                self.v.append(vd)
+            for i in range(0, vertexCount):
+                hd += zigZagDecode(unpackEntry(f, TerrainTile.vertexData['heightVertexCount']))
+                self.h.append(hd)
+
+            # Indices
+            # TODO: verify padding
+            meta = TerrainTile.indexData16
+            if vertexCount > TerrainTile.BYTESPLIT:
+                meta = TerrainTile.indexData32
+            triangleCount = unpackEntry(f, meta['triangleCount'])
+            ind = unpackIndices(f, triangleCount * 3, meta['indices'])
+            self.indices = decodeIndices(ind)
+
+            meta = TerrainTile.EdgeIndices16
+            if len(self.u) > TerrainTile.BYTESPLIT:
+                meta = TerrainTile.indexData32
+            # Edges (vertices on the edge of the tile) indices (are the also high water mark encoded?)
+            westIndicesCount = unpackEntry(f, meta['westVertexCount'])
+            self.westI = unpackIndices(f, westIndicesCount, meta['westIndices'])
+
+            southIndicesCount = unpackEntry(f, meta['southVertexCount'])
+            self.southI = unpackIndices(f, southIndicesCount, meta['southIndices'])
+
+            eastIndicesCount = unpackEntry(f, meta['eastVertexCount'])
+            self.eastI = unpackIndices(f, eastIndicesCount, meta['eastIndices'])
+
+            northIndicesCount = unpackEntry(f, meta['northVertexCount'])
+            self.northI = unpackIndices(f, northIndicesCount, meta['northIndices'])
+
+            data = f.read(1)
+            if data:
+                raise Exception('Should have reached end of file, but didn\'t')
+
+    def toFile(self, filePath):
+        if not filePath.endswith('.terrain'):
+            raise Exception('Wrong file extension')
+
+        if os.path.isfile(filePath):
+            raise IOError('File %s already exists' % filePath)
+
+        with open(filePath, 'wb') as f:
             # Header
             for k, v in TerrainTile.quantizedMeshHeader.iteritems():
                 f.write(packEntry(v, self.header[k]))
 
+            # Delta decoding
+            verterCount = len(self.u)
             # Vertices
-            f.write(packEntry(TerrainTile.vertexData['vertexCount'], len(self.u)))
-            for u in self.u:
-                f.write(packEntry(TerrainTile.vertexData['uVertexCount'], numberToZigZag(u)))
-            for v in self.v:
-                f.write(packEntry(TerrainTile.vertexData['vVertexCount'], numberToZigZag(v)))
-            for h in self.h:
-                f.write(packEntry(TerrainTile.vertexData['heightVertexCount'], numberToZigZag(h)))
+            f.write(packEntry(TerrainTile.vertexData['vertexCount'], verterCount))
+            for i in range(0, verterCount - 1):
+                ud = self.u[i + 1] - self.u[i]
+                f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(ud)))
+            for i in range(0, verterCount - 1):
+                vd = self.v[i + 1] - self.v[i]
+                f.write(packEntry(TerrainTile.vertexData['vVertexCount'], zigZagEncode(vd)))
+            for i in range(0, verterCount - 1):
+                hd = self.h[i + 1] - self.h[i]
+                f.write(packEntry(TerrainTile.vertexData['heightVertexCount'], zigZagEncode(hd)))
 
             # Indices
             # TODO: verify padding
@@ -186,54 +259,141 @@ class TerrainTile:
             f.write(packEntry(meta['northVertexCount'], len(self.northI)))
             for ni in self.northI:
                 f.write(packEntry(meta['northIndices'], ni))
+        print '%s has been created successfully' % filePath
 
-    def fromFile(self, filename, west, east, south, north):
-        self.__init__(west, east, south, north)
-        with open(filename, 'rb') as f:
-            # Header
-            for k, v in TerrainTile.quantizedMeshHeader.iteritems():
-                self.header[k] = unpackEntry(f, v)
+    def toShapefile(self, filePath, epsg=4326):
+        if not filePath.endswith('.shp'):
+            raise Exception('Wrong file extension')
 
-            # Vertices
-            vertexCount = unpackEntry(f, TerrainTile.vertexData['vertexCount'])
-            for i in range(0, vertexCount):
-                self.u.append(zigZagToNumber(
-                    unpackEntry(f, TerrainTile.vertexData['uVertexCount'])
-                ))
-            for i in range(0, vertexCount):
-                self.v.append(zigZagToNumber(
-                    unpackEntry(f, TerrainTile.vertexData['vVertexCount'])
-                ))
-            for i in range(0, vertexCount):
-                self.h.append(zigZagToNumber(
-                    unpackEntry(f, TerrainTile.vertexData['heightVertexCount'])
-                ))
+        if os.path.isfile(filePath):
+            raise IOError('File %s already exists' % filePath)
 
-            # Indices
-            # TODO: verify padding
-            meta = TerrainTile.indexData16
-            if vertexCount > TerrainTile.BYTESPLIT:
-                meta = TerrainTile.indexData32
-            triangleCount = unpackEntry(f, meta['triangleCount'])
-            ind = unpackIndices(f, triangleCount * 3, meta['indices'])
-            self.indices = decodeIndices(ind)
+        if len(self.indices) == 0:
+            raise Exception('No indices, you must first generate the topology')
+        elif len(self._lats) == 0:
+            self._updateCoords()
 
-            meta = TerrainTile.EdgeIndices16
-            if len(self.u) > TerrainTile.BYTESPLIT:
-                meta = TerrainTile.indexData32
-            # Edges (vertices on the edge of the tile) indices (are the also high water mark encoded?)
-            westIndicesCount = unpackEntry(f, meta['westVertexCount'])
-            self.westI = unpackIndices(f, westIndicesCount, meta['westIndices'])
+        baseName = os.path.split(filePath)[1]
+        drv = ogr.GetDriverByName('ESRI Shapefile')
+        dataSource = drv.CreateDataSource(filePath)
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(epsg)
+        layer = dataSource.CreateLayer(baseName, srs, ogr.wkbPolygon25D)
+        for i in range(0, len(self.indices), 3):
+            j = i + 1
+            k = i + 2
+            ring = ogr.Geometry(ogr.wkbLinearRing)
+            ring.AddPoint(self._longs[self.indices[i]], self._lats[self.indices[i]], self._heights[self.indices[i]])
+            ring.AddPoint(self._longs[self.indices[j]], self._lats[self.indices[j]], self._heights[self.indices[j]])
+            ring.AddPoint(self._longs[self.indices[k]], self._lats[self.indices[k]], self._heights[self.indices[k]])
+            ring.AddPoint(self._longs[self.indices[i]], self._lats[self.indices[i]], self._heights[self.indices[i]])
+            polygon = ogr.Geometry(ogr.wkbPolygon)
+            polygon.AddGeometry(ring)
 
-            southIndicesCount = unpackEntry(f, meta['southVertexCount'])
-            self.southI = unpackIndices(f, southIndicesCount, meta['southIndices'])
+            feature = ogr.Feature(layer.GetLayerDefn())
+            feature.SetGeometry(polygon)
+            layer.CreateFeature(feature)
+            feature.Destroy()
+        dataSource.Destroy()
+        print '%s has been created successfully' % filePath
 
-            eastIndicesCount = unpackEntry(f, meta['eastVertexCount'])
-            self.eastI = unpackIndices(f, eastIndicesCount, meta['eastIndices'])
+    def fromTerrainTopology(self, topology):
+        if not isinstance(topology, TerrainTopology):
+            raise Exception('topology object must be an instance of TerrainTopology')
 
-            northIndicesCount = unpackEntry(f, meta['northVertexCount'])
-            self.northI = unpackIndices(f, northIndicesCount, meta['northIndices'])
+        # Set tile bounds
+        # TODO handle borders transitions
+        self._west = topology.minLon
+        self._east = topology.maxLon
+        self._south = topology.minLat
+        self._north = topology.maxLat
 
-            data = f.read(1)
-            if data:
-                raise Exception('Should have reached end of file, but didn\'t')
+        llh2ecef = lambda x: LLH2ECEF(x[0], x[1], x[2])
+        ecefCoords = map(llh2ecef, topology.coords)
+        bSphere = BoundingSphere()
+        bSphere.fromPoints(ecefCoords)
+
+        ecefMinX = float('inf')
+        ecefMinY = float('inf')
+        ecefMinZ = float('inf')
+        ecefMaxX = float('-inf')
+        ecefMaxY = float('-inf')
+        ecefMaxZ = float('-inf')
+
+        for coord in ecefCoords:
+            if coord[0] < ecefMinX:
+                ecefMinX = coord[0]
+            if coord[1] < ecefMinY:
+                ecefMinY = coord[1]
+            if coord[2] < ecefMinZ:
+                ecefMinZ = coord[2]
+            if coord[0] > ecefMaxX:
+                ecefMaxX = coord[0]
+            if coord[1] > ecefMaxY:
+                ecefMaxY = coord[1]
+            if coord[2] > ecefMaxZ:
+                ecefMaxZ = coord[2]
+
+        centerCoords = [
+            ecefMinX + (ecefMaxX - ecefMinX) * 0.5,
+            ecefMinY + (ecefMaxY - ecefMinY) * 0.5,
+            ecefMinZ + (ecefMaxZ - ecefMinZ) * 0.5
+        ]
+        # TODO just for now
+        occlusionPCoords = [0.0, 0.0, 0.0]
+        for k, v in TerrainTile.quantizedMeshHeader.iteritems():
+            if k == 'centerX':
+                self.header[k] = centerCoords[0]
+            elif k == 'centerY':
+                self.header[k] = centerCoords[1]
+            elif k == 'centerZ':
+                self.header[k] = centerCoords[2]
+            elif k == 'minimumHeight':
+                self.header[k] = topology.minHeight
+            elif k == 'maximumHeight':
+                self.header[k] = topology.maxHeight
+            elif k == 'boundingSphereCenterX':
+                self.header[k] = bSphere.center[0]
+            elif k == 'boundingSphereCenterY':
+                self.header[k] = bSphere.center[1]
+            elif k == 'boundingSphereCenterZ':
+                self.header[k] = bSphere.center[2]
+            elif k == 'boundingSphereRadius':
+                self.header[k] = bSphere.radius
+            elif k == 'horizonOcclusionPointX':
+                self.header[k] = occlusionPCoords[0]
+            elif k == 'horizonOcclusionPointY':
+                self.header[k] = occlusionPCoords[1]
+            elif k == 'horizonOcclusionPointZ':
+                self.header[k] = occlusionPCoords[2]
+
+        bLon = MAX / (topology.maxLon - topology.minLon)
+        bLat = MAX / (topology.maxLat - topology.minLat)
+        bHeight = MAX / (topology.maxHeight - topology.minHeight)
+        quantizeLonIndices = lambda x: int(round((x - topology.minLon) * bLon))
+        quantizeLatIndices = lambda x: int(round((x - topology.minLat) * bLat))
+        quantizeHeightIndices = lambda x: int(round((x - topology.minHeight) * bHeight))
+
+        # High watermark encoding performed during toFile
+        self.u = map(quantizeLonIndices, topology.uVertex)
+        self.v = map(quantizeLatIndices, topology.vVertex)
+        self.h = map(quantizeHeightIndices, topology.hVertex)
+        self.indices = topology.indexData
+
+        # List all the vertices on the edge of the tile
+        # High water mark encoded?
+        for i in range(0, len(self.indices)):
+            # Use original coordinates
+            indice = self.indices[i]
+            lon = topology.uVertex[indice]
+            lat = topology.vVertex[indice]
+
+            if lon == self._west:
+                self.westI.append(indice)
+            elif lon == self._east:
+                self.eastI.append(indice)
+
+            if lat == self._south:
+                self.southI.append(indice)
+            elif lat == self._north:
+                self.northI.append(indice)
