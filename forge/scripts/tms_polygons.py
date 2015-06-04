@@ -32,13 +32,16 @@ MAXZOOM = 17
 
 geodetic = GlobalGeodetic(True)
 drv = ogr.GetDriverByName('ESRI Shapefile')
+directory = '.tmp/'
+extension = '.shp'
 
 # Generate table with min max tile coordinates for all zoomlevels
 for tz in range(MINZOOM, MAXZOOM + 1):
+    filePathTarget = '%s%s%s' % (directory, tz, extension)
     tminx, tminy = geodetic.LonLatToTile(MINX, MINY, tz)
     tmaxx, tmaxy = geodetic.LonLatToTile(MAXX, MAXY, tz)
 
-    dataSource = drv.CreateDataSource('%s.shp' % tz)
+    dataSource = drv.CreateDataSource(filePathTarget)
     srs = osr.SpatialReference()
     srs.ImportFromEPSG(4326)
     layer = dataSource.CreateLayer('%s' % tz, srs, ogr.wkbPolygon)
