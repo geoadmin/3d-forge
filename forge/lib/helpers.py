@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 
 from osgeo import osr, ogr
+import gzip
+from io import BytesIO
+import cStringIO
 
 
 def zigZagEncode(n):
@@ -30,3 +33,13 @@ def transformCoordinate(wkt, srid_from, srid_to):
     geom.AssignSpatialReference(srid_in)
     geom.TransformTo(srid_out)
     return geom
+
+
+def gzippedFileContent(filePath):
+    content = open(filePath)
+    compressed = cStringIO.StringIO()
+    gz = gzip.GzipFile(fileobj=compressed, mode='w')
+    gz.writelines(content)
+    gz.close()
+    content.close()
+    return BytesIO(compressed.getvalue())
