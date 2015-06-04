@@ -84,9 +84,11 @@ class TerrainTile:
         self._longs = []
         self._lats = []
         self._heights = []
-        # Swiss Grid coordinates
+        # Reprojected coordinates
         self._easts = []
         self._norths = []
+        self._alts = []
+        self.targetEPSG = 4326
 
         self.header = OrderedDict()
         for k, v in TerrainTile.quantizedMeshHeader.iteritems():
@@ -101,11 +103,6 @@ class TerrainTile:
         self.northI = []
 
     def __str__(self):
-        def coords():
-            str = '\nSwis Grid Coordinates ----------------------------\n'
-            for i, east in enumerate(self._easts):
-                str += '[%f, %f, %f]' % (east, self._norths[i], self._alts[i])
-            return str
 
         str = 'Header: %s' % self.header
         str += '\nVertexCount: %s' % len(self.u)
@@ -122,35 +119,58 @@ class TerrainTile:
         str += '\neastIndices: %s' % self.eastI
         str += '\nnorthIndicesCount: %s' % len(self.northI)
         str += '\nnorthIndices: %s' % self.northI
-
         # output coordinates
-        str += '\n%s' % coords()
+        str += '\nCoordinates in EPSG %s ----------------------------\n' % self.targetEPSG
+        str += '\n%s' % self.getVerticesCoordinates(epsg=self.targetEPSG)
 
         str += '\nNumber of triangles: %s' % (len(self.indices) / 3)
         return str
 
+    def getVerticesCoordinates(self, epsg=4326):
+        coordinates = []
+        if epsg == 4326:
+            if len(self._longs) == 0:
+                self.computeVerticesCoordinates()
+            for i, lon in enumerate(self._longs):
+                coordinates.append([lon, self._lats[i], self._heights[i]])
+        elif epsg != 4326:
+            if len(self._easts) == 0:
+                self.computeVerticesCoordinates(epsg=epsg)
+            for i, east in enumerate(self._easts):
+                coordinates.append([east, self._norths[i], self._alts[i]])
+        return coordinates
+
     # This is really slow, so only do it when really needed
-    def _updateCoords(self):
-        self._longs = []
-        self._lats = []
-        self._heights = []
+    def computeVerticesCoordinates(self, epsg=4326):
+        if len(self._longs) == 0:
+            for u in self.u:
+                self._longs.append(lerp(self._west, self._east, float(u) / MAX))
+            for v in self.v:
+                self._lats.append(lerp(self._south, self._north, float(v) / MAX))
+            for h in self.h:
+                self._heights.append(lerp(self.header['minimumHeight'], self.header['maximumHeight'], float(h) / MAX))
+
+        if epsg != 4326:
+            self._reprojectVerticesCoordinates(epsg)
+
+    def _resetReprojectedVerticesCoordinates(self):
         self._easts = []
         self._norths = []
         self._alts = []
-        for u in self.u:
-            self._longs.append(lerp(self._west, self._east, float(u) / MAX))
-        for v in self.v:
-            self._lats.append(lerp(self._south, self._north, float(v) / MAX))
-        for h in self.h:
-            self._heights.append(lerp(self.header['minimumHeight'], self.header['maximumHeight'], float(h) / MAX))
-        for i, lon in enumerate(self._longs):
-            lat = self._lats[i]
-            height = self._heights[i]
-            point = 'POINT (%f %f %f)' % (lon, lat, height)
-            p = transformCoordinate(point, 4326, 21781)
-            self._easts.append(p.GetX())
-            self._norths.append(p.GetY())
-            self._alts.append(p.GetZ())
+
+    def _reprojectVerticesCoordinates(self, epsg):
+        if self.targetEPSG != epsg:
+            self._resetReprojectedVerticesCoordinates()
+        if len(self._easts) == 0:
+            self.targetEPSG = epsg
+            for i, lon in enumerate(self._longs):
+                lat = self._lats[i]
+                height = self._heights[i]
+                point = 'POINT (%f %f %f)' % (lon, lat, height)
+                p = transformCoordinate(point, 4326, epsg)
+                self._easts.append(p.GetX())
+                self._norths.append(p.GetY())
+                self._alts.append(p.GetZ())
 
     def fromFile(self, filePath, west, east, south, north):
         self.__init__(west, east, south, north)
@@ -185,7 +205,7 @@ class TerrainTile:
             self.indices = decodeIndices(ind)
 
             meta = TerrainTile.EdgeIndices16
-            if len(self.u) > TerrainTile.BYTESPLIT:
+            if vertexCount > TerrainTile.BYTESPLIT:
                 meta = TerrainTile.indexData32
             # Edges (vertices on the edge of the tile) indices (are the also high water mark encoded?)
             westIndicesCount = unpackEntry(f, meta['westVertexCount'])
@@ -217,27 +237,27 @@ class TerrainTile:
                 f.write(packEntry(v, self.header[k]))
 
             # Delta decoding
-            verterCount = len(self.u)
+            vertexCount = len(self.u)
             # Vertices
-            f.write(packEntry(TerrainTile.vertexData['vertexCount'], verterCount))
+            f.write(packEntry(TerrainTile.vertexData['vertexCount'], vertexCount))
             # Move the initial value
             f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.u[0])))
-            for i in range(0, verterCount - 1):
+            for i in range(0, vertexCount - 1):
                 ud = self.u[i + 1] - self.u[i]
                 f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(ud)))
             f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.v[0])))
-            for i in range(0, verterCount - 1):
+            for i in range(0, vertexCount - 1):
                 vd = self.v[i + 1] - self.v[i]
                 f.write(packEntry(TerrainTile.vertexData['vVertexCount'], zigZagEncode(vd)))
             f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.h[0])))
-            for i in range(0, verterCount - 1):
+            for i in range(0, vertexCount - 1):
                 hd = self.h[i + 1] - self.h[i]
                 f.write(packEntry(TerrainTile.vertexData['heightVertexCount'], zigZagEncode(hd)))
 
             # Indices
             # TODO: verify padding
             meta = TerrainTile.indexData16
-            if len(self.u) > TerrainTile.BYTESPLIT:
+            if vertexCount > TerrainTile.BYTESPLIT:
                 meta = TerrainTile.indexData32
 
             f.write(packEntry(meta['triangleCount'], len(self.indices) / 3))
@@ -245,7 +265,7 @@ class TerrainTile:
             packIndices(f, meta['indices'], ind)
 
             meta = TerrainTile.EdgeIndices16
-            if len(self.u) > TerrainTile.BYTESPLIT:
+            if vertexCount > TerrainTile.BYTESPLIT:
                 meta = TerrainTile.indexData32
 
             f.write(packEntry(meta['westVertexCount'], len(self.westI)))
@@ -274,8 +294,8 @@ class TerrainTile:
 
         if len(self.indices) == 0:
             raise Exception('No indices, you must first generate the topology')
-        elif len(self._lats) == 0:
-            self._updateCoords()
+
+        coords = self.getVerticesCoordinates(epsg=epsg)
 
         baseName = os.path.split(filePath)[1]
         drv = ogr.GetDriverByName('ESRI Shapefile')
@@ -284,13 +304,15 @@ class TerrainTile:
         srs.ImportFromEPSG(epsg)
         layer = dataSource.CreateLayer(baseName, srs, ogr.wkbPolygon25D)
         for i in range(0, len(self.indices), 3):
-            j = i + 1
-            k = i + 2
+            # Indices of triangle a,b,c
+            a = self.indices[i]
+            b = self.indices[i + 1]
+            c = self.indices[i + 2]
             ring = ogr.Geometry(ogr.wkbLinearRing)
-            ring.AddPoint(self._longs[self.indices[i]], self._lats[self.indices[i]], self._heights[self.indices[i]])
-            ring.AddPoint(self._longs[self.indices[j]], self._lats[self.indices[j]], self._heights[self.indices[j]])
-            ring.AddPoint(self._longs[self.indices[k]], self._lats[self.indices[k]], self._heights[self.indices[k]])
-            ring.AddPoint(self._longs[self.indices[i]], self._lats[self.indices[i]], self._heights[self.indices[i]])
+            ring.AddPoint(coords[a][0], coords[a][1], coords[a][2])
+            ring.AddPoint(coords[b][0], coords[b][1], coords[c][2])
+            ring.AddPoint(coords[c][0], coords[c][1], coords[c][2])
+            ring.AddPoint(coords[a][0], coords[a][0], coords[a][2])
             polygon = ogr.Geometry(ogr.wkbPolygon)
             polygon.AddGeometry(ring)
 
@@ -371,12 +393,12 @@ class TerrainTile:
             elif k == 'horizonOcclusionPointZ':
                 self.header[k] = occlusionPCoords[2]
 
-        bLon = MAX / (topology.maxLon - topology.minLon)
-        bLat = MAX / (topology.maxLat - topology.minLat)
-        bHeight = MAX / (topology.maxHeight - topology.minHeight)
-        quantizeLonIndices = lambda x: int(round((x - topology.minLon) * bLon))
-        quantizeLatIndices = lambda x: int(round((x - topology.minLat) * bLat))
-        quantizeHeightIndices = lambda x: int(round((x - topology.minHeight) * bHeight))
+        bLon = MAX / (self._east - self._west)
+        bLat = MAX / (self._north - self._south)
+        bHeight = MAX / (self.header['maximumHeight'] - self.header['minimumHeight'])
+        quantizeLonIndices = lambda x: int(round((x - self._west) * bLon))
+        quantizeLatIndices = lambda x: int(round((x - self._south) * bLat))
+        quantizeHeightIndices = lambda x: int(round((x - self.header['minimumHeight']) * bHeight))
 
         # High watermark encoding performed during toFile
         self.u = map(quantizeLonIndices, topology.uVertex)
