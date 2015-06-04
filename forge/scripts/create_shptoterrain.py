@@ -21,7 +21,8 @@ terrainTopo = TerrainTopology(features)
 terrainTopo.create()
 terrainFormat = TerrainTile()
 terrainFormat.fromTerrainTopology(terrainTopo)
-terrainFormat._updateCoords()
-print terrainFormat
-
 terrainFormat.toFile(filePathTarget)
+
+# Display SwissCoordinates
+terrainFormat.computeVerticesCoordinates(epsg=21781)
+print terrainFormat

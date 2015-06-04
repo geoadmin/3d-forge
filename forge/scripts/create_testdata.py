@@ -12,4 +12,7 @@ filePathTarget = '%s/%s%s' % (directory, basename, extension)
 ter = TerrainTile()
 ter.fromFile(filePathSource, 7.80938, 7.81773, 46.30261, 46.30799)
 ter.toShapefile(filePathTarget)
+
+# In order to display swiss coordinates
+ter.computeVerticesCoordinates(epsg=21781)
 print ter
