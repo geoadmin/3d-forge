@@ -392,12 +392,12 @@ class TerrainTile:
             lon = topology.uVertex[indice]
             lat = topology.vVertex[indice]
 
-            if lon == self._west:
+            if lon == self._west and indice not in self.westI:
                 self.westI.append(indice)
-            elif lon == self._east:
+            elif lon == self._east and indice not in self.eastI:
                 self.eastI.append(indice)
 
-            if lat == self._south:
+            if lat == self._south and indice not in self.southI:
                 self.southI.append(indice)
-            elif lat == self._north:
+            elif lat == self._north and indice not in self.northI:
                 self.northI.append(indice)
