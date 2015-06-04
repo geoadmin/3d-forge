@@ -220,12 +220,16 @@ class TerrainTile:
             verterCount = len(self.u)
             # Vertices
             f.write(packEntry(TerrainTile.vertexData['vertexCount'], verterCount))
+            # Move the initial value
+            f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.u[0])))
             for i in range(0, verterCount - 1):
                 ud = self.u[i + 1] - self.u[i]
                 f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(ud)))
+            f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.v[0])))
             for i in range(0, verterCount - 1):
                 vd = self.v[i + 1] - self.v[i]
                 f.write(packEntry(TerrainTile.vertexData['vVertexCount'], zigZagEncode(vd)))
+            f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.h[0])))
             for i in range(0, verterCount - 1):
                 hd = self.h[i + 1] - self.h[i]
                 f.write(packEntry(TerrainTile.vertexData['heightVertexCount'], zigZagEncode(hd)))
@@ -388,12 +392,12 @@ class TerrainTile:
             lon = topology.uVertex[indice]
             lat = topology.vVertex[indice]
 
-            if lon == self._west:
+            if lon == self._west and indice not in self.westI:
                 self.westI.append(indice)
-            elif lon == self._east:
+            elif lon == self._east and indice not in self.eastI:
                 self.eastI.append(indice)
 
-            if lat == self._south:
+            if lat == self._south and indice not in self.southI:
                 self.southI.append(indice)
-            elif lat == self._north:
+            elif lat == self._north and indice not in self.northI:
                 self.northI.append(indice)
