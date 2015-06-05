@@ -9,6 +9,7 @@ requires = [
         'nose',
         'mako',
         'boto',
+        'awscli>=1.7.31',
     ]
 
 setup(name='3d-forge',

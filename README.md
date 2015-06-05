@@ -32,3 +32,7 @@ To clone use the --recursive option to get all submodules.
 #### Fix styling (only pep8 errors)
 
     make autolint
+
+### Copy a file to S3 from command line
+
+    aws --profile tms3d_filestorage s3 cp layer.json  s3://tms3d.geo.admin.ch/
