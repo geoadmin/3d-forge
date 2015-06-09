@@ -2,7 +2,9 @@
 
 import unittest
 from decimal import Decimal
+from forge.models.terrain import TerrainTile
 from forge.lib.bounding_sphere import BoundingSphere
+from forge.lib.llh_ecef import LLH2ECEF
 
 
 class TestBoundingSphere(unittest.TestCase):
@@ -36,3 +38,16 @@ class TestBoundingSphere(unittest.TestCase):
         pointOutside = [1000.0, 1000.0, 1000.0]
         distance = sphere.distance(sphere.center, pointOutside)
         self.failUnless(distance > sphere.radius)
+
+    def testBoundingSpherePrecision(self):
+        tilePath = 'forge/data/quantized-mesh/raron.flat.1.terrain'
+        ter = TerrainTile()
+        ter.fromFile(tilePath, 7.80938, 7.81773, 46.30261, 46.30799)
+        coords = ter.getVerticesCoordinates()
+        llh2ecef = lambda x: LLH2ECEF(x[0], x[1], x[2])
+        coords = map(llh2ecef, coords)
+        sphere = BoundingSphere()
+        sphere.fromPoints(coords)
+        for coord in coords:
+            distance = sphere.distance(sphere.center, coord)
+            self.failUnless(distance <= sphere.radius)
