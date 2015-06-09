@@ -3,20 +3,20 @@
 from boto import connect_s3
 
 
-def _get_s3_conn(profileName='3dforge_filestorage'):
+def _getS3Conn(profileName='tms3d_filestorage'):
     try:
         conn = connect_s3(profile_name=profileName)
     except Exception as e:
-        raise 'S3: Error during connection %s' % e
+        raise Exception('S3: Error during connection %s' % e)
     return conn
 
 
-conn_s3 = _get_s3_conn()
+connS3 = _getS3Conn()
 
 
-def get_bucket(bucketName='wroathiesiuxiefriepl-vectortiles'):
+def getBucket(bucketName='tms3d.geo.admin.ch'):
     try:
-        bucket = conn_s3.get_bucket(bucketName)
+        bucket = connS3.get_bucket(bucketName)
     except Exception as e:
-        raise 'Error during connection %s' % e
+        raise Exception('Error during connection %s' % e)
     return bucket
