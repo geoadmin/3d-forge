@@ -43,3 +43,7 @@ def gzippedFileContent(filePath):
     gz.close()
     content.close()
     return BytesIO(compressed.getvalue())
+
+
+def isShapefile(filePath):
+    return filePath.endswith('.shp')
