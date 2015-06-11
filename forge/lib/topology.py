@@ -89,7 +89,7 @@ class TerrainTopology(object):
 
     def _findVertexIndex(self, coord):
         # Naive approach for now
-        for i in range(0, len(self.uVertex)):
+        for i in xrange(0, len(self.uVertex)):
             if self.uVertex[i] == coord[0] and self.vVertex[i] == coord[1] and \
                     self.hVertex[i] == coord[2]:
                 return i

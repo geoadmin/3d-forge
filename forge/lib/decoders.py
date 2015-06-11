@@ -18,7 +18,7 @@ def packIndices(f, type, indices):
 
 def unpackIndices(f, indicesCount, indicesType):
     indices = []
-    for i in range(0, indicesCount):
+    for i in xrange(0, indicesCount):
         indices.append(
             unpackEntry(f, indicesType)
         )

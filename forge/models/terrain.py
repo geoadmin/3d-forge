@@ -185,13 +185,13 @@ class TerrainTile:
             hd = 0
             # Vertices
             vertexCount = unpackEntry(f, TerrainTile.vertexData['vertexCount'])
-            for i in range(0, vertexCount):
+            for i in xrange(0, vertexCount):
                 ud += zigZagDecode(unpackEntry(f, TerrainTile.vertexData['uVertexCount']))
                 self.u.append(ud)
-            for i in range(0, vertexCount):
+            for i in xrange(0, vertexCount):
                 vd += zigZagDecode(unpackEntry(f, TerrainTile.vertexData['vVertexCount']))
                 self.v.append(vd)
-            for i in range(0, vertexCount):
+            for i in xrange(0, vertexCount):
                 hd += zigZagDecode(unpackEntry(f, TerrainTile.vertexData['heightVertexCount']))
                 self.h.append(hd)
 
@@ -242,15 +242,15 @@ class TerrainTile:
             f.write(packEntry(TerrainTile.vertexData['vertexCount'], vertexCount))
             # Move the initial value
             f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.u[0])))
-            for i in range(0, vertexCount - 1):
+            for i in xrange(0, vertexCount - 1):
                 ud = self.u[i + 1] - self.u[i]
                 f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(ud)))
             f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.v[0])))
-            for i in range(0, vertexCount - 1):
+            for i in xrange(0, vertexCount - 1):
                 vd = self.v[i + 1] - self.v[i]
                 f.write(packEntry(TerrainTile.vertexData['vVertexCount'], zigZagEncode(vd)))
             f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.h[0])))
-            for i in range(0, vertexCount - 1):
+            for i in xrange(0, vertexCount - 1):
                 hd = self.h[i + 1] - self.h[i]
                 f.write(packEntry(TerrainTile.vertexData['heightVertexCount'], zigZagEncode(hd)))
 
@@ -303,7 +303,7 @@ class TerrainTile:
         srs = osr.SpatialReference()
         srs.ImportFromEPSG(epsg)
         layer = dataSource.CreateLayer(baseName, srs, ogr.wkbPolygon25D)
-        for i in range(0, len(self.indices), 3):
+        for i in xrange(0, len(self.indices), 3):
             # Indices of triangle a,b,c
             a = self.indices[i]
             b = self.indices[i + 1]
@@ -408,7 +408,7 @@ class TerrainTile:
 
         # List all the vertices on the edge of the tile
         # High water mark encoded?
-        for i in range(0, len(self.indices)):
+        for i in xrange(0, len(self.indices)):
             # Use original coordinates
             indice = self.indices[i]
             lon = topology.uVertex[indice]
