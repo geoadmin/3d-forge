@@ -17,7 +17,7 @@ class TerrainTopology(object):
                 raise Exception('The list must contain at least one feature')
 
         if ringsCoordinates is not None:
-            if not isinstance(ringsCoordinates):
+            if not isinstance(ringsCoordinates, list):
                 raise TypeError('Please provide a list of rings coordinates')
             if len(ringsCoordinates) == 0:
                 raise Exception('The list must contain at least one ring')
