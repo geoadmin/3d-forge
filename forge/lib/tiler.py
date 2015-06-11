@@ -52,7 +52,7 @@ class GlobalGeodeticTiler:
                     clipPath = self._clip(dataSourcePath, bounds)
                     shapefile = ShpToGDALFeatures(shpFilePath=clipPath)
                     features = shapefile.__read__()
-                    features = self._splitAndRemoveRectangles(features)
+                    features = self._splitAndRemoveNonTriangles(features)
                     terrainTopo = TerrainTopology(features)
                     terrainTopo.create()
                     terrainFormat = TerrainTile()
@@ -76,7 +76,7 @@ class GlobalGeodeticTiler:
         headers['Content-Encoding'] = 'gzip'
         k.set_contents_from_file(content, headers=headers)
 
-    def _splitAndRemoveRectangles(self, features):
+    def _splitAndRemoveNonTriangles(self, features):
         baseName = '.tmp/processed_clip'
         extensions = ['.shp', '.shx', '.prj', '.dbf']
         self._cleanup('%s%s' % (baseName, extensions[0]), baseName, extensions)
@@ -89,8 +89,10 @@ class GlobalGeodeticTiler:
         for feature in features:
             geometry = feature.GetGeometryRef()
             ring = geometry.GetGeometryRef(0)
+            # Retrieves all the coordinates of the ring
             points = ring.GetPoints()
-            if len(points) == 5:
+            nbPoints = len(points)
+            if nbPoints == 5 or nbPoints == 6:
                 triangles = self._createTrianglesFromPoints(points)
                 for triangle in triangles:
                     pA = triangle[0]
@@ -117,16 +119,46 @@ class GlobalGeodeticTiler:
         return newShapefile.__read__()
 
     def _createTrianglesFromPoints(self, points):
-        def distanceSquared(p1, p2):
-            return (p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2
-
         coords = points[0: len(points) - 1]
-        if len(coords) != 4:
-            raise Exception('Error while processing geometries of a clipped shapefile: %s have been found' % len(coords))
+        nbCoords = len(coords)
+        if nbCoords != 4 or nbCoords != 5:
+            raise Exception('Error while processing geometries of a clipped shapefile: %s have been found' % nbCoords)
+
+        # TODO Create a more general algo
+        if nbCoords == 4:
+            return self._createTrianglesFromRectangle(coords)
+        else:
+            # Create all possible pairs of coordinates
+            distances = []
+            coordsPairA = [coords[0], coords[2]]
+            coordsPairB = [coords[1], coords[3]]
+            coordsPairC = [coords[2], coords[4]]
+            coordsPairD = [coords[3], coords[0]]
+            coordsPairE = [coords[4], coords[1]]
+            distances.append(self._distanceSquared(coordsPairA[0], coordsPairA[1]))
+            distances.append(self._distanceSquared(coordsPairB[0], coordsPairB[1]))
+            distances.append(self._distanceSquared(coordsPairC[0], coordsPairC[1]))
+            distances.append(self._distanceSquared(coordsPairD[0], coordsPairD[1]))
+            distances.append(self._distanceSquared(coordsPairE[0], coordsPairE[1]))
+            index = distances.index(max(distances))
+            if index == 0:
+                tr = coordsPairA + coords[1]
+            elif index == 1:
+                tr = coordsPairB + coords[2]
+            elif index == 2:
+                tr = coordsPairC + coords[3]
+            elif index == 3:
+                tr = coordsPairD + coords[4]
+            elif index == 4:
+                tr = coordsPairE + coords[0]
+
+            return tr + self._createTrianglesFromRectangle(list(set(coords) - set(tr)))
+
+    def _createTrianglesFromRectangle(self, coords):
         coordsPairA = [coords[0], coords[2]]
         coordsPairB = [coords[1], coords[3]]
-        distanceSquaredA = distanceSquared(coordsPairA[0], coordsPairA[1])
-        distanceSquaredB = distanceSquared(coordsPairB[0], coordsPairB[1])
+        distanceSquaredA = self._distanceSquared(coordsPairA[0], coordsPairA[1])
+        distanceSquaredB = self._distanceSquared(coordsPairB[0], coordsPairB[1])
         if distanceSquaredA > distanceSquaredB:
             triangle1 = coordsPairA + coords[1]
             triangle2 = coordsPairA + coords[3]
@@ -134,6 +166,9 @@ class GlobalGeodeticTiler:
             triangle1 = coordsPairB + coords[0]
             triangle2 = coordsPairB + coords[2]
         return [triangle1, triangle2]
+
+    def _distanceSquared(self, p1, p2):
+        return (p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2
 
     def _clip(self, inFile, bounds):
         baseName = '.tmp/clip'
