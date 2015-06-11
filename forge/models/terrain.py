@@ -323,16 +323,23 @@ class TerrainTile:
         dataSource.Destroy()
         print '%s has been created successfully' % filePath
 
-    def fromTerrainTopology(self, topology):
+    def fromTerrainTopology(self, topology, bounds=None):
         if not isinstance(topology, TerrainTopology):
             raise Exception('topology object must be an instance of TerrainTopology')
 
-        # Set tile bounds
-        # TODO handle borders transitions
-        self._west = topology.minLon
-        self._east = topology.maxLon
-        self._south = topology.minLat
-        self._north = topology.maxLat
+        # If the bounds are not provided use
+        # topology extent instead
+        if bounds is not None:
+            self._west = bounds[0]
+            self._east = bounds[2]
+            self._south = bounds[1]
+            self._north = bounds[3]
+        else:
+            # Set tile bounds
+            self._west = topology.minLon
+            self._east = topology.maxLon
+            self._south = topology.minLat
+            self._north = topology.maxLat
 
         llh2ecef = lambda x: LLH2ECEF(x[0], x[1], x[2])
         ecefCoords = map(llh2ecef, topology.coords)

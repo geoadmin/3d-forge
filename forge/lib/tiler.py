@@ -53,7 +53,7 @@ class GlobalGeodeticTiler:
                     terrainTopo = TerrainTopology(ringsCoordinates=rings)
                     terrainTopo.fromRingsCoordinates()
                     terrainFormat = TerrainTile()
-                    terrainFormat.fromTerrainTopology(terrainTopo)
+                    terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
                     terrainFormat.toFile(tempFileTarget)
                     compressedContent = gzippedFileContent(tempFileTarget)
                     bucketKey = '%s/%s/%s.terrain' % (tileZ, tileX, tileY)
