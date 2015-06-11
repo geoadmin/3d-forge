@@ -366,7 +366,7 @@ class TerrainTile:
             ecefMinZ + (ecefMaxZ - ecefMinZ) * 0.5
         ]
         # TODO just for now
-        occlusionPCoords = [0.0, 0.0, 0.0]
+        occlusionPCoords = [0.5, 0.5, 0.5]
         for k, v in TerrainTile.quantizedMeshHeader.iteritems():
             if k == 'centerX':
                 self.header[k] = centerCoords[0]
