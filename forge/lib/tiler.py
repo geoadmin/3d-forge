@@ -4,8 +4,6 @@ import os
 import time
 import datetime
 import subprocess
-import osgeo.ogr as ogr
-import osgeo.osr as osr
 from boto.s3.key import Key
 from forge.lib.boto_conn import getBucket
 from forge.lib.helpers import isShapefile, gzippedFileContent
@@ -52,9 +50,9 @@ class GlobalGeodeticTiler:
                     clipPath = self._clip(dataSourcePath, bounds)
                     shapefile = ShpToGDALFeatures(shpFilePath=clipPath)
                     features = shapefile.__read__()
-                    features = self._splitAndRemoveNonTriangles(features)
-                    terrainTopo = TerrainTopology(features)
-                    terrainTopo.create()
+                    rings = self._splitAndRemoveNonTriangles(features)
+                    terrainTopo = TerrainTopology(ringsCoordinates=rings)
+                    terrainTopo.fromRingsCoordinates()
                     terrainFormat = TerrainTile()
                     terrainFormat.fromTerrainTopology(terrainTopo)
                     terrainFormat.toFile(tempFileTarget)
@@ -77,15 +75,7 @@ class GlobalGeodeticTiler:
         k.set_contents_from_file(content, headers=headers)
 
     def _splitAndRemoveNonTriangles(self, features):
-        baseName = '.tmp/processed_clip'
-        extensions = ['.shp', '.shx', '.prj', '.dbf']
-        self._cleanup('%s%s' % (baseName, extensions[0]), baseName, extensions)
-        drv = ogr.GetDriverByName('ESRI Shapefile')
-        dataSource = drv.CreateDataSource('%s%s' % (baseName, extensions[0]))
-        srs = osr.SpatialReference()
-        srs.ImportFromEPSG(4326)
-        layer = dataSource.CreateLayer('%s%s' % (baseName, extensions[0]), srs, ogr.wkbPolygon25D)
-
+        rings = []
         for feature in features:
             geometry = feature.GetGeometryRef()
             ring = geometry.GetGeometryRef(0)
@@ -94,29 +84,10 @@ class GlobalGeodeticTiler:
             nbPoints = len(points)
             if nbPoints == 5 or nbPoints == 6:
                 triangles = self._createTrianglesFromPoints(points)
-                for triangle in triangles:
-                    pA = triangle[0]
-                    pB = triangle[1]
-                    pC = triangle[2]
-
-                    ring = ogr.Geometry(ogr.wkbLinearRinig)
-                    ring.AddPoint(pA[0], pA[1], pA[2])
-                    ring.AddPoint(pB[0], pB[1], pB[2])
-                    ring.AddPoint(pC[0], pC[1], pC[2])
-                    ring.AddPoint(pA[0], pA[1], pA[2])
-                    polygon = ogr.Geometry(ogr.wkbPolygon)
-                    polygon.AddGeometry(ring)
-
-                    feat = ogr.Feature(layer.GetLayerDefn())
-                    feat.SetGeometry(polygon)
-                    layer.CreateFeature(feat)
-                    feat.Destroy()
+                rings += triangles
             else:
-                layer.CreateFeature(feature)
-                feature.Destroy()
-        dataSource.Destroy()
-        newShapefile = ShpToGDALFeatures(shpFilePath='%s%s' % (baseName, extensions[0]))
-        return newShapefile.__read__()
+                rings += points[0: len(points) - 1]
+        return rings
 
     def _createTrianglesFromPoints(self, points):
         coords = points[0: len(points) - 1]

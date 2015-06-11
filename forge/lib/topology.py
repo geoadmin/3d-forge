@@ -6,12 +6,24 @@ from osgeo import ogr
 
 class TerrainTopology(object):
 
-    def __init__(self, features=None):
-        if not isinstance(features, list):
-            raise TypeError('Please provide a list of GDAL features')
-        if len(features) == 0:
-            raise Exception('The list must contain at least one feature')
+    def __init__(self, features=None, ringsCoordinates=None):
+        if features is None and ringsCoordinates is None:
+            raise Exception('Please provide a list of GDAL features or rings coordinates')
+
+        if features is not None:
+            if not isinstance(features, list):
+                raise TypeError('Please provide a list of GDAL features')
+            if len(features) == 0:
+                raise Exception('The list must contain at least one feature')
+
+        if ringsCoordinates is not None:
+            if not isinstance(ringsCoordinates):
+                raise TypeError('Please provide a list of rings coordinates')
+            if len(ringsCoordinates) == 0:
+                raise Exception('The list must contain at least one ring')
+
         self.features = features
+        self.ringsCoordinates = ringsCoordinates
         self.uVertex = []
         self.vVertex = []
         self.hVertex = []
@@ -48,44 +60,63 @@ class TerrainTopology(object):
         str += '\nNumber of triangles: %s' % (len(self.indexData) / 3)
         return str
 
-    def create(self):
-        index = 0
+    def fromRingsCoordinates(self):
+        self.index = 0
+        for coords in self.ringsCoordinates:
+            # At this point we expect that the last redundant coord from the ring
+            # has been removed
+            nbCoords = len(coords)
+            if nbCoords != 3:
+                Exception('A ring with %s coordinates has been found.' % nbCoords)
+            self._buildTopologyFromRingCoordinates(coords)
+
+    def fromFeatures(self):
+        self.index = 0
         for feature in self.features:
             if not isinstance(feature, ogr.Feature):
                 raise TypeError('Only GDAL features are supported')
             geometry = feature.GetGeometryRef()
-            assert geometry.GetCoordinateDimension() == 3, 'A feature with an unexpected dimension has been found.'
-            # 0 refers to the ring
-            ring = geometry.GetGeometryRef(0)
-            points = ring.GetPoints()
-            # Remove last point of the polygon and keep only 3 coordinates
-            coords = points[0: len(points) - 1]
-            for coord in coords:
-                indexData = self._findVertexIndex(coord)
-                if indexData is not None:
-                    self.indexData.append(indexData)
-                else:
-                    self.uVertex.append(coord[0])
-                    self.vVertex.append(coord[1])
-                    self.hVertex.append(coord[2])
+            dim = geometry.GetCoordinateDimension()
+            if dim != 3:
+                raise TypeError('A feature with a dimension of %s has been found.' % dim)
 
-                    if coord[0] < self.minLon:
-                        self.minLon = coord[0]
-                    if coord[1] < self.minLat:
-                        self.minLat = coord[1]
-                    if coord[2] < self.minHeight:
-                        self.minHeight = coord[2]
-                    if coord[0] > self.maxLon:
-                        self.maxLon = coord[0]
-                    if coord[1] > self.maxLat:
-                        self.maxLat = coord[1]
-                    if coord[2] > self.maxHeight:
-                        self.maxHeight = coord[2]
+            coords = self._ringCoordinatesFromGDALGeometry(geometry)
+            self._buildTopologyFromRingCoordinates(coords)
 
-                    self.indexData.append(index)
-                    # Keep track of coordinates for bbsphere and friends
-                    self.coords.append(coord)
-                    index += 1
+    def _ringCoordinatesFromGDALGeometry(self, geometry):
+        # 0 refers to the ring
+        ring = geometry.GetGeometryRef(0)
+        points = ring.GetPoints()
+        # Remove last point of the polygon and keep only 3 coordinates
+        return points[0: len(points) - 1]
+
+    def _buildTopologyFromRingCoordinates(self, coords):
+        for coord in coords:
+            indexData = self._findVertexIndex(coord)
+            if indexData is not None:
+                self.indexData.append(indexData)
+            else:
+                self.uVertex.append(coord[0])
+                self.vVertex.append(coord[1])
+                self.hVertex.append(coord[2])
+
+                if coord[0] < self.minLon:
+                    self.minLon = coord[0]
+                if coord[1] < self.minLat:
+                    self.minLat = coord[1]
+                if coord[2] < self.minHeight:
+                    self.minHeight = coord[2]
+                if coord[0] > self.maxLon:
+                    self.maxLon = coord[0]
+                if coord[1] > self.maxLat:
+                    self.maxLat = coord[1]
+                if coord[2] > self.maxHeight:
+                    self.maxHeight = coord[2]
+
+                self.indexData.append(self.index)
+                # Keep track of coordinates for bbsphere and friends
+                self.coords.append(coord)
+                self.index += 1
 
     def _findVertexIndex(self, coord):
         # Naive approach for now
