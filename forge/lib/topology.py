@@ -61,14 +61,17 @@ class TerrainTopology(object):
         return str
 
     def fromRingsCoordinates(self):
-        print 'Building topology for %s objects' % len(self.ringsCoordinates)
+        print 'Building topology for %s rings' % len(self.ringsCoordinates)
         self.index = 0
-        self._buildTopologyFromRingCoordinates(self.ringsCoordinates)
+        # In order to optimize this a bit we might want to deal only with flat
+        # coordinates as an input
+        for ring in self.ringsCoordinates:
+            self._buildTopologyFromRing(ring)
         del self.ringsCoordinates
         print 'Terrain topology has been created'
 
     def fromFeatures(self):
-        print 'Building topology for %s objects' % len(self.features)
+        print 'Building topology for %s features' % len(self.features)
         self.index = 0
         for feature in self.features:
             if not isinstance(feature, ogr.Feature):
@@ -78,20 +81,20 @@ class TerrainTopology(object):
             if dim != 3:
                 raise TypeError('A feature with a dimension of %s has been found.' % dim)
 
-            coords = self._ringCoordinatesFromGDALGeometry(geometry)
-            self._buildTopologyFromRingCoordinates(coords)
+            ring = self._ringFromGDALGeometry(geometry)
+            self._buildTopologyFromRing(ring)
         del self.features
         print 'Terrain topology has been created'
 
-    def _ringCoordinatesFromGDALGeometry(self, geometry):
+    def _ringFromGDALGeometry(self, geometry):
         # 0 refers to the ring
         ring = geometry.GetGeometryRef(0)
         points = ring.GetPoints()
         # Remove last point of the polygon and keep only 3 coordinates
         return points[0: len(points) - 1]
 
-    def _buildTopologyFromRingCoordinates(self, coords):
-        for coord in coords:
+    def _buildTopologyFromRing(self, ring):
+        for coord in ring:
             indexData = self._findVertexIndex(coord)
             if indexData is not None:
                 self.indexData.append(indexData)
@@ -124,5 +127,4 @@ class TerrainTopology(object):
             if self.uVertex[i] == coord[0] and self.vVertex[i] == coord[1] and \
                     self.hVertex[i] == coord[2]:
                 return i
-        # Index doesn't exist yet
         return None

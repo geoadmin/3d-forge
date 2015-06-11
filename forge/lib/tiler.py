@@ -4,8 +4,7 @@ import os
 import time
 import datetime
 import subprocess
-from boto.s3.key import Key
-from forge.lib.boto_conn import getBucket
+from forge.lib.boto_conn import getBucket, writeToS3
 from forge.lib.helpers import isShapefile, gzippedFileContent
 from forge.models.terrain import TerrainTile
 from forge.lib.loaders import ShpToGDALFeatures
@@ -59,20 +58,13 @@ class GlobalGeodeticTiler:
                     compressedContent = gzippedFileContent(tempFileTarget)
                     bucketKey = '%s/%s/%s.terrain' % (tileZ, tileX, tileY)
                     print 'Uploading %s to S3' % bucketKey
-                    self.writeToS3(bucket, bucketKey, compressedContent)
+                    writeToS3(bucket, bucketKey, compressedContent)
                     t1 = time.time()
                     ti = t1 - self.t0
                     print 'It took %s HH:MM:SS to write %s tiles' % (str(datetime.timedelta(seconds=ti)), count)
                     count += 1
 
             self.dataSourceIndex += 1
-
-    def _writeToS3(b, path, content, contentType='application/octet-stream'):
-        headers = {'Content-Type': contentType}
-        k = Key(b)
-        k.key = path
-        headers['Content-Encoding'] = 'gzip'
-        k.set_contents_from_file(content, headers=headers)
 
     def _splitAndRemoveNonTriangles(self, features):
         rings = []
@@ -82,18 +74,22 @@ class GlobalGeodeticTiler:
             # Retrieves all the coordinates of the ring
             points = ring.GetPoints()
             nbPoints = len(points)
-            if nbPoints == 5 or nbPoints == 6:
+            if nbPoints >= 5:
                 triangles = self._createTrianglesFromPoints(points)
                 rings += triangles
             else:
-                rings += points[0: len(points) - 1]
+                rings += [points[0: len(points) - 1]]
         return rings
 
     def _createTrianglesFromPoints(self, points):
-        coords = points[0: len(points) - 1]
+        # Transform tuples into lists and remove redundant coord
+        def listit(t):
+            return list(map(listit, t)) if isinstance(t, (list, tuple)) else t
+        coords = listit(points[0: len(points) - 1])
+
         nbCoords = len(coords)
-        if nbCoords != 4 or nbCoords != 5:
-            raise Exception('Error while processing geometries of a clipped shapefile: %s have been found' % nbCoords)
+        if nbCoords not in (4, 5):
+            raise Exception('Error while processing geometries of a clipped shapefile: %s coords have been found' % nbCoords)
 
         # TODO Create a more general algo
         if nbCoords == 4:
@@ -111,19 +107,28 @@ class GlobalGeodeticTiler:
             distances.append(self._distanceSquared(coordsPairC[0], coordsPairC[1]))
             distances.append(self._distanceSquared(coordsPairD[0], coordsPairD[1]))
             distances.append(self._distanceSquared(coordsPairE[0], coordsPairE[1]))
+
             index = distances.index(max(distances))
             if index == 0:
-                tr = coordsPairA + coords[1]
+                tr = coordsPairA + [coords[1]]
+                opposedP = coords.index(coords[1])
             elif index == 1:
-                tr = coordsPairB + coords[2]
+                tr = coordsPairB + [coords[2]]
+                opposedP = coords.index(coords[2])
             elif index == 2:
-                tr = coordsPairC + coords[3]
+                tr = coordsPairC + [coords[3]]
+                opposedP = coords.index(coords[3])
             elif index == 3:
-                tr = coordsPairD + coords[4]
+                tr = coordsPairD + [coords[4]]
+                opposedP = coords.index(coords[4])
             elif index == 4:
-                tr = coordsPairE + coords[0]
+                tr = coordsPairE + [coords[0]]
+                opposedP = coords.index(coords[0])
 
-            return tr + self._createTrianglesFromRectangle(list(set(coords) - set(tr)))
+            # Remove the converging point
+            coords.pop(opposedP)
+
+            return [tr] + self._createTrianglesFromRectangle(coords)
 
     def _createTrianglesFromRectangle(self, coords):
         coordsPairA = [coords[0], coords[2]]
@@ -131,11 +136,11 @@ class GlobalGeodeticTiler:
         distanceSquaredA = self._distanceSquared(coordsPairA[0], coordsPairA[1])
         distanceSquaredB = self._distanceSquared(coordsPairB[0], coordsPairB[1])
         if distanceSquaredA > distanceSquaredB:
-            triangle1 = coordsPairA + coords[1]
-            triangle2 = coordsPairA + coords[3]
+            triangle1 = coordsPairA + [coords[1]]
+            triangle2 = coordsPairA + [coords[3]]
         else:
-            triangle1 = coordsPairB + coords[0]
-            triangle2 = coordsPairB + coords[2]
+            triangle1 = coordsPairB + [coords[0]]
+            triangle2 = coordsPairB + [coords[2]]
         return [triangle1, triangle2]
 
     def _distanceSquared(self, p1, p2):
@@ -148,10 +153,15 @@ class GlobalGeodeticTiler:
 
         self._cleanup(outFile, baseName, extensions)
 
+        t0 = time.time()
+        print 'Clipping tile...'
         try:
             subprocess.call('ogr2ogr -f "ESRI Shapefile" -clipsrc %s %s %s' % (' '.join(map(str, bounds)), outFile, inFile), shell=True)
         except Exception as e:
             raise Exception('An error occured while clipping the shapefile %s' % e)
+        t1 = time.time()
+        ti = t1 - t0
+        print 'It took %s HH:MM:SS to clip the tile.' % str(datetime.timedelta(seconds=ti))
         return outFile
 
     def _cleanup(self, outFile, baseName, extensions):

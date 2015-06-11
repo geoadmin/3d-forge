@@ -3,20 +3,12 @@
 import os
 import time
 import datetime
-from boto.s3.key import Key
 from forge.models.terrain import TerrainTile
 from forge.lib.loaders import ShpToGDALFeatures
 from forge.lib.topology import TerrainTopology
 from forge.lib.helpers import gzippedFileContent
-from forge.lib.boto_conn import getBucket
+from forge.lib.boto_conn import getBucket, writeToS3
 
-
-def writeToS3(b, path, content, contentType='application/octet-stream'):
-    headers = {'Content-Type': contentType}
-    k = Key(b)
-    k.key = path
-    headers['Content-Encoding'] = 'gzip'
-    k.set_contents_from_file(content, headers=headers)
 
 basePath = '/var/local/cartoweb/tmp/3dpoc/swissalti3d/Interlaken_Pyr17/'
 tempFolder = '.tmp/'
