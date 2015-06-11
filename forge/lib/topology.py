@@ -61,6 +61,7 @@ class TerrainTopology(object):
         return str
 
     def fromRingsCoordinates(self):
+        print 'Building topology for %s object' % len(self.ringsCoordinates)
         self.index = 0
         for coords in self.ringsCoordinates:
             # At this point we expect that the last redundant coord from the ring
@@ -69,8 +70,10 @@ class TerrainTopology(object):
             if nbCoords != 3:
                 Exception('A ring with %s coordinates has been found.' % nbCoords)
             self._buildTopologyFromRingCoordinates(coords)
+        print 'Terrain topology has been created'
 
     def fromFeatures(self):
+        print 'Building topology for %s object' % len(self.features)
         self.index = 0
         for feature in self.features:
             if not isinstance(feature, ogr.Feature):
@@ -82,6 +85,7 @@ class TerrainTopology(object):
 
             coords = self._ringCoordinatesFromGDALGeometry(geometry)
             self._buildTopologyFromRingCoordinates(coords)
+        print 'Terrain topology has been created'
 
     def _ringCoordinatesFromGDALGeometry(self, geometry):
         # 0 refers to the ring

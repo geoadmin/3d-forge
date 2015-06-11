@@ -22,24 +22,24 @@ class TestBoundingSphere(unittest.TestCase):
         self.failUnless(len(sphere.center) == 0)
         self.failUnless(sphere.radius == 0.0)
 
-        self.failUnless(sphere.minPointX[0] == float('Infinity'))
-        self.failUnless(sphere.minPointY[1] == float('Infinity'))
-        self.failUnless(sphere.minPointZ[2] == float('Infinity'))
+        self.failUnless(sphere.minPointX[0] == float('inf'))
+        self.failUnless(sphere.minPointY[1] == float('inf'))
+        self.failUnless(sphere.minPointZ[2] == float('inf'))
 
-        self.failUnless(sphere.maxPointX[0] == float('-Infinity'))
-        self.failUnless(sphere.maxPointY[1] == float('-Infinity'))
-        self.failUnless(sphere.maxPointZ[2] == float('-Infinity'))
+        self.failUnless(sphere.maxPointX[0] == float('-inf'))
+        self.failUnless(sphere.maxPointY[1] == float('-inf'))
+        self.failUnless(sphere.maxPointZ[2] == float('-inf'))
 
         points = [[1.1, 3.2, 4.9], [3.1, 1.0, 21.4], [9.1, 3.2, 2.0], [2.0, 4.0, 9.5]]
         sphere.fromPoints(points)
 
-        self.failUnless(sphere.minPointX[0] != float('Infinity'))
-        self.failUnless(sphere.minPointY[1] != float('Infinity'))
-        self.failUnless(sphere.minPointZ[2] != float('Infinity'))
+        self.failUnless(sphere.minPointX[0] != float('inf'))
+        self.failUnless(sphere.minPointY[1] != float('inf'))
+        self.failUnless(sphere.minPointZ[2] != float('inf'))
 
-        self.failUnless(sphere.maxPointX[0] != float('-Infinity'))
-        self.failUnless(sphere.maxPointY[1] != float('-Infinity'))
-        self.failUnless(sphere.maxPointZ[2] != float('-Infinity'))
+        self.failUnless(sphere.maxPointX[0] != float('-inf'))
+        self.failUnless(sphere.maxPointY[1] != float('-inf'))
+        self.failUnless(sphere.maxPointZ[2] != float('-inf'))
 
         for point in points:
             distance = sphere.distance(sphere.center, point)
