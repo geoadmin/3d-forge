@@ -12,6 +12,17 @@ from forge.lib.topology import TerrainTopology
 from forge.lib.global_geodetic import GlobalGeodetic
 
 
+def grid(bounds, zoomLevels):
+    geodetic = GlobalGeodetic(True)
+
+    for tileZ in zoomLevels:
+        tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], tileZ)
+        tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], tileZ)
+        for tileX in xrange(tileMinX, tileMaxX + 1):
+            for tileY in xrange(tileMinY, tileMaxY + 1):
+                yield (geodetic.TileBounds(tileX, tileY, tileZ), (tileX, tileY, tileZ))
+
+
 class GlobalGeodeticTiler:
 
     def __init__(self, minLon, maxLon, minLat, maxLat, tileMinZ, tileMaxZ, dataSourcePaths):
@@ -20,8 +31,6 @@ class GlobalGeodeticTiler:
         self.maxLon = float(maxLon)
         self.minLat = float(minLat)
         self.maxLat = float(maxLat)
-
-        self.geodetic = GlobalGeodetic(True)
 
         self.tileMinZ = int(tileMinZ)
         self.tileMaxZ = int(tileMaxZ)
@@ -35,36 +44,40 @@ class GlobalGeodeticTiler:
         extension = '.terrain'
         bucket = getBucket()
         count = 1
-        for tileZ in xrange(self.tileMinZ, self.tileMaxZ + 1):
-            dataSourcePath = self.dataSourcePaths[self.dataSourceIndex]
-            tileMinX, tileMinY = self.geodetic.LonLatToTile(self.minLon, self.minLat, tileZ)
-            tileMaxX, tileMaxY = self.geodetic.LonLatToTile(self.maxLon, self.maxLat, tileZ)
+        previousTileZ = self.tileMinZ
+        dataSourcePath = self.dataSourcePaths[self.dataSourceIndex]
 
-            for tileX in xrange(tileMinX, tileMaxX + 1):
-                for tileY in xrange(tileMinY, tileMaxY + 1):
-                    self._cleanup('%s%s' % (baseName, extension), baseName, [extension])
-                    tempFileTarget = '%s%s' % (baseName, extension)
+        for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), range(self.tileMinZ, self.tileMaxZ + 1)):
+            # Handle file index
+            if tileXYZ[2] != previousTileZ:
+                previousTileZ = tileXYZ[2]
+                self.dataSourceIndex += 1
+                dataSourcePath = self.dataSourcePaths[self.dataSourceIndex]
 
-                    bounds = self.geodetic.TileBounds(tileX, tileY, tileZ)
-                    clipPath = self._clip(dataSourcePath, bounds)
-                    shapefile = ShpToGDALFeatures(shpFilePath=clipPath)
-                    features = shapefile.__read__()
-                    rings = self._splitAndRemoveNonTriangles(features)
-                    terrainTopo = TerrainTopology(ringsCoordinates=rings)
-                    terrainTopo.fromRingsCoordinates()
-                    terrainFormat = TerrainTile()
-                    terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
-                    terrainFormat.toFile(tempFileTarget)
-                    compressedContent = gzippedFileContent(tempFileTarget)
-                    bucketKey = '%s/%s/%s.terrain' % (tileZ, tileX, tileY)
-                    print 'Uploading %s to S3' % bucketKey
-                    writeToS3(bucket, bucketKey, compressedContent)
-                    t1 = time.time()
-                    ti = t1 - self.t0
-                    print 'It took %s HH:MM:SS to write %s tiles' % (str(datetime.timedelta(seconds=ti)), count)
-                    count += 1
+            self._cleanup('%s%s' % (baseName, extension), baseName, [extension])
+            tempFileTarget = '%s%s' % (baseName, extension)
 
-            self.dataSourceIndex += 1
+            # Prepare geoms
+            clipPath = self._clip(dataSourcePath, bounds)
+            shapefile = ShpToGDALFeatures(shpFilePath=clipPath)
+            features = shapefile.__read__()
+            rings = self._splitAndRemoveNonTriangles(features)
+
+            # Prepare terrain tile
+            terrainTopo = TerrainTopology(ringsCoordinates=rings)
+            terrainTopo.fromRingsCoordinates()
+            terrainFormat = TerrainTile()
+            terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
+            terrainFormat.toFile(tempFileTarget)
+            compressedContent = gzippedFileContent(tempFileTarget)
+
+            bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
+            print 'Uploading %s to S3' % bucketKey
+            writeToS3(bucket, bucketKey, compressedContent)
+            t1 = time.time()
+            ti = t1 - self.t0
+            print 'It took %s HH:MM:SS to write %s tiles' % (str(datetime.timedelta(seconds=ti)), count)
+            count += 1
 
     def _splitAndRemoveNonTriangles(self, features):
         rings = []
