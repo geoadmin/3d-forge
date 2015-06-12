@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import unittest
-from decimal import Decimal
 from forge.models.terrain import TerrainTile
 from forge.lib.bounding_sphere import BoundingSphere
 from forge.lib.llh_ecef import LLH2ECEF
@@ -22,13 +21,25 @@ class TestBoundingSphere(unittest.TestCase):
         sphere = BoundingSphere()
         self.failUnless(len(sphere.center) == 0)
         self.failUnless(sphere.radius == 0.0)
-        self.failUnless(sphere.minPoint[0] == Decimal('Infinity'))
-        self.failUnless(sphere.maxPoint[1] == Decimal('-Infinity'))
+
+        self.failUnless(sphere.minPointX[0] == float('inf'))
+        self.failUnless(sphere.minPointY[1] == float('inf'))
+        self.failUnless(sphere.minPointZ[2] == float('inf'))
+
+        self.failUnless(sphere.maxPointX[0] == float('-inf'))
+        self.failUnless(sphere.maxPointY[1] == float('-inf'))
+        self.failUnless(sphere.maxPointZ[2] == float('-inf'))
 
         points = [[1.1, 3.2, 4.9], [3.1, 1.0, 21.4], [9.1, 3.2, 2.0], [2.0, 4.0, 9.5]]
         sphere.fromPoints(points)
-        self.failUnless(sphere.minPoint[0] != Decimal('Infinity'))
-        self.failUnless(sphere.maxPoint[1] != Decimal('-Infinity'))
+
+        self.failUnless(sphere.minPointX[0] != float('inf'))
+        self.failUnless(sphere.minPointY[1] != float('inf'))
+        self.failUnless(sphere.minPointZ[2] != float('inf'))
+
+        self.failUnless(sphere.maxPointX[0] != float('-inf'))
+        self.failUnless(sphere.maxPointY[1] != float('-inf'))
+        self.failUnless(sphere.maxPointZ[2] != float('-inf'))
 
         for point in points:
             distance = sphere.distance(sphere.center, point)

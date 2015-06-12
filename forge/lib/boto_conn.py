@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from boto import connect_s3
+from boto.s3.key import Key
 
 
 def _getS3Conn(profileName='tms3d_filestorage'):
@@ -20,3 +21,11 @@ def getBucket(bucketName='tms3d.geo.admin.ch'):
     except Exception as e:
         raise Exception('Error during connection %s' % e)
     return bucket
+
+
+def writeToS3(b, path, content, contentType='application/octet-stream'):
+    headers = {'Content-Type': contentType}
+    k = Key(b)
+    k.key = path
+    headers['Content-Encoding'] = 'gzip'
+    k.set_contents_from_file(content, headers=headers)
