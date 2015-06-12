@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import cStringIO
 import osgeo.ogr as ogr
 import osgeo.osr as osr
 from collections import OrderedDict
@@ -15,6 +16,7 @@ MAX = 32767.0
 
 def lerp(p, q, time):
     return ((1.0 - time) * p) + (time * q)
+
 
 # http://cesiumjs.org/data-and-assets/terrain/formats/quantized-mesh-1.0.html
 
@@ -224,6 +226,11 @@ class TerrainTile:
             if data:
                 raise Exception('Should have reached end of file, but didn\'t')
 
+    def toStringIO(self):
+        f = cStringIO.StringIO()
+        self._writeTo(f)
+        return f
+
     def toFile(self, filePath):
         if not filePath.endswith('.terrain'):
             raise Exception('Wrong file extension')
@@ -232,58 +239,61 @@ class TerrainTile:
             raise IOError('File %s already exists' % filePath)
 
         with open(filePath, 'wb') as f:
-            # Header
-            for k, v in TerrainTile.quantizedMeshHeader.iteritems():
-                f.write(packEntry(v, self.header[k]))
-
-            # Delta decoding
-            vertexCount = len(self.u)
-            # Vertices
-            f.write(packEntry(TerrainTile.vertexData['vertexCount'], vertexCount))
-            # Move the initial value
-            f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.u[0])))
-            for i in xrange(0, vertexCount - 1):
-                ud = self.u[i + 1] - self.u[i]
-                f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(ud)))
-            f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.v[0])))
-            for i in xrange(0, vertexCount - 1):
-                vd = self.v[i + 1] - self.v[i]
-                f.write(packEntry(TerrainTile.vertexData['vVertexCount'], zigZagEncode(vd)))
-            f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.h[0])))
-            for i in xrange(0, vertexCount - 1):
-                hd = self.h[i + 1] - self.h[i]
-                f.write(packEntry(TerrainTile.vertexData['heightVertexCount'], zigZagEncode(hd)))
-
-            # Indices
-            # TODO: verify padding
-            meta = TerrainTile.indexData16
-            if vertexCount > TerrainTile.BYTESPLIT:
-                meta = TerrainTile.indexData32
-
-            f.write(packEntry(meta['triangleCount'], len(self.indices) / 3))
-            ind = encodeIndices(self.indices)
-            packIndices(f, meta['indices'], ind)
-
-            meta = TerrainTile.EdgeIndices16
-            if vertexCount > TerrainTile.BYTESPLIT:
-                meta = TerrainTile.indexData32
-
-            f.write(packEntry(meta['westVertexCount'], len(self.westI)))
-            for wi in self.westI:
-                f.write(packEntry(meta['westIndices'], wi))
-
-            f.write(packEntry(meta['southVertexCount'], len(self.southI)))
-            for si in self.southI:
-                f.write(packEntry(meta['southIndices'], si))
-
-            f.write(packEntry(meta['eastVertexCount'], len(self.eastI)))
-            for ei in self.eastI:
-                f.write(packEntry(meta['eastIndices'], ei))
-
-            f.write(packEntry(meta['northVertexCount'], len(self.northI)))
-            for ni in self.northI:
-                f.write(packEntry(meta['northIndices'], ni))
+            self._writeTo(f)
         print '%s has been created successfully' % filePath
+
+    def _writeTo(self, f):
+        # Header
+        for k, v in TerrainTile.quantizedMeshHeader.iteritems():
+            f.write(packEntry(v, self.header[k]))
+
+        # Delta decoding
+        vertexCount = len(self.u)
+        # Vertices
+        f.write(packEntry(TerrainTile.vertexData['vertexCount'], vertexCount))
+        # Move the initial value
+        f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.u[0])))
+        for i in xrange(0, vertexCount - 1):
+            ud = self.u[i + 1] - self.u[i]
+            f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(ud)))
+        f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.v[0])))
+        for i in xrange(0, vertexCount - 1):
+            vd = self.v[i + 1] - self.v[i]
+            f.write(packEntry(TerrainTile.vertexData['vVertexCount'], zigZagEncode(vd)))
+        f.write(packEntry(TerrainTile.vertexData['uVertexCount'], zigZagEncode(self.h[0])))
+        for i in xrange(0, vertexCount - 1):
+            hd = self.h[i + 1] - self.h[i]
+            f.write(packEntry(TerrainTile.vertexData['heightVertexCount'], zigZagEncode(hd)))
+
+        # Indices
+        # TODO: verify padding
+        meta = TerrainTile.indexData16
+        if vertexCount > TerrainTile.BYTESPLIT:
+            meta = TerrainTile.indexData32
+
+        f.write(packEntry(meta['triangleCount'], len(self.indices) / 3))
+        ind = encodeIndices(self.indices)
+        packIndices(f, meta['indices'], ind)
+
+        meta = TerrainTile.EdgeIndices16
+        if vertexCount > TerrainTile.BYTESPLIT:
+            meta = TerrainTile.indexData32
+
+        f.write(packEntry(meta['westVertexCount'], len(self.westI)))
+        for wi in self.westI:
+            f.write(packEntry(meta['westIndices'], wi))
+
+        f.write(packEntry(meta['southVertexCount'], len(self.southI)))
+        for si in self.southI:
+            f.write(packEntry(meta['southIndices'], si))
+
+        f.write(packEntry(meta['eastVertexCount'], len(self.eastI)))
+        for ei in self.eastI:
+            f.write(packEntry(meta['eastIndices'], ei))
+
+        f.write(packEntry(meta['northVertexCount'], len(self.northI)))
+        for ni in self.northI:
+            f.write(packEntry(meta['northIndices'], ni))
 
     def toShapefile(self, filePath, epsg=4326):
         if not filePath.endswith('.shp'):

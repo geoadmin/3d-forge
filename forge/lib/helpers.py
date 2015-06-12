@@ -2,7 +2,6 @@
 
 from osgeo import osr, ogr
 import gzip
-from io import BytesIO
 import cStringIO
 
 
@@ -35,14 +34,24 @@ def transformCoordinate(wkt, srid_from, srid_to):
     return geom
 
 
-def gzippedFileContent(filePath):
+def gzipFileContent(filePath):
     content = open(filePath)
     compressed = cStringIO.StringIO()
     gz = gzip.GzipFile(fileobj=compressed, mode='w')
     gz.writelines(content)
     gz.close()
+    compressed.seek(0)
     content.close()
-    return BytesIO(compressed.getvalue())
+    return compressed
+
+
+def gzipFileObject(data):
+    compressed = cStringIO.StringIO()
+    gz = gzip.GzipFile(fileobj=compressed, mode='w', compresslevel=5)
+    gz.write(data.getvalue())
+    gz.close()
+    compressed.seek(0)
+    return compressed
 
 
 def isShapefile(filePath):

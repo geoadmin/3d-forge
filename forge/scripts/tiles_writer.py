@@ -6,12 +6,11 @@ import datetime
 from forge.models.terrain import TerrainTile
 from forge.lib.loaders import ShpToGDALFeatures
 from forge.lib.topology import TerrainTopology
-from forge.lib.helpers import gzippedFileContent
+from forge.lib.helpers import gzipFileObject
 from forge.lib.boto_conn import getBucket, writeToS3
 
 
 basePath = '/var/local/cartoweb/tmp/3dpoc/swissalti3d/Interlaken_Pyr17/'
-tempFolder = '.tmp/'
 extension = '.terrain'
 
 i = 0
@@ -22,22 +21,22 @@ bucket = getBucket()
 
 for f in shapefilesNames:
     filePathSource = basePath + f
-    tempFileTarget = '%stempfile%s' % (tempFolder, extension)
     shapefile = ShpToGDALFeatures(shpFilePath=filePathSource)
     features = shapefile.__read__()
+
     terrainTopo = TerrainTopology(features=features)
     terrainTopo.fromFeatures()
     terrainFormat = TerrainTile()
     terrainFormat.fromTerrainTopology(terrainTopo)
-    terrainFormat.toFile(tempFileTarget)
-    compressedContent = gzippedFileContent(tempFileTarget)
+
+    fileObject = terrainFormat.toStringIO()
+    compressedFile = gzipFileObject(fileObject)
 
     # Hardcoded scheme because we don't have any separators in the names
     # for now
     keyPath = f[1:3] + '/' + f[3:9] + '/' + f[9:14] + extension
     print 'Writing %s to S3' % keyPath
-    writeToS3(bucket, keyPath, compressedContent)
-    os.remove(tempFileTarget)
+    writeToS3(bucket, keyPath, compressedFile)
     i += 1
     t1 = time.time()
     ti = t1 - t0

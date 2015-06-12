@@ -5,7 +5,7 @@ import time
 import datetime
 import subprocess
 from forge.lib.boto_conn import getBucket, writeToS3
-from forge.lib.helpers import isShapefile, gzippedFileContent
+from forge.lib.helpers import isShapefile, gzipFileObject
 from forge.models.terrain import TerrainTile
 from forge.lib.loaders import ShpToGDALFeatures
 from forge.lib.topology import TerrainTopology
@@ -40,8 +40,6 @@ class GlobalGeodeticTiler:
         self.dataSourceIndex = 0
 
     def createTiles(self):
-        baseName = '.tmp/temp_mesh'
-        extension = '.terrain'
         bucket = getBucket()
         count = 1
         previousTileZ = self.tileMinZ
@@ -54,9 +52,6 @@ class GlobalGeodeticTiler:
                 self.dataSourceIndex += 1
                 dataSourcePath = self.dataSourcePaths[self.dataSourceIndex]
 
-            self._cleanup('%s%s' % (baseName, extension), baseName, [extension])
-            tempFileTarget = '%s%s' % (baseName, extension)
-
             # Prepare geoms
             clipPath = self._clip(dataSourcePath, bounds)
             shapefile = ShpToGDALFeatures(shpFilePath=clipPath)
@@ -68,12 +63,14 @@ class GlobalGeodeticTiler:
             terrainTopo.fromRingsCoordinates()
             terrainFormat = TerrainTile()
             terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
-            terrainFormat.toFile(tempFileTarget)
-            compressedContent = gzippedFileContent(tempFileTarget)
+
+            # Bytes manipulation and compression
+            fileObject = terrainFormat.toStringIO()
+            compressedFile = gzipFileObject(fileObject)
 
             bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
             print 'Uploading %s to S3' % bucketKey
-            writeToS3(bucket, bucketKey, compressedContent)
+            writeToS3(bucket, bucketKey, compressedFile)
             t1 = time.time()
             ti = t1 - self.t0
             print 'It took %s HH:MM:SS to write %s tiles' % (str(datetime.timedelta(seconds=ti)), count)
