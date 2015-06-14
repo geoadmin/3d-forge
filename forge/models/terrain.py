@@ -277,7 +277,7 @@ class TerrainTile:
 
         meta = TerrainTile.EdgeIndices16
         if vertexCount > TerrainTile.BYTESPLIT:
-            meta = TerrainTile.indexData32
+            meta = TerrainTile.EdgeIndices32
 
         f.write(packEntry(meta['westVertexCount'], len(self.westI)))
         for wi in self.westI:
