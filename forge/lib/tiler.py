@@ -56,25 +56,31 @@ class GlobalGeodeticTiler:
             clipPath = self._clip(dataSourcePath, bounds)
             shapefile = ShpToGDALFeatures(shpFilePath=clipPath)
             features = shapefile.__read__()
-            rings = self._splitAndRemoveNonTriangles(features)
-
-            # Prepare terrain tile
-            terrainTopo = TerrainTopology(ringsCoordinates=rings)
-            terrainTopo.fromRingsCoordinates()
-            terrainFormat = TerrainTile()
-            terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
-
-            # Bytes manipulation and compression
-            fileObject = terrainFormat.toStringIO()
-            compressedFile = gzipFileObject(fileObject)
 
             bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
-            print 'Uploading %s to S3' % bucketKey
-            writeToS3(bucket, bucketKey, compressedFile)
-            t1 = time.time()
-            ti = t1 - self.t0
-            print 'It took %s HH:MM:SS to write %s tiles' % (str(datetime.timedelta(seconds=ti)), count)
-            count += 1
+            # Skip empty tiles for now, we should instead write an empty tile to S3
+            if len(features) > 0:
+                rings = self._splitAndRemoveNonTriangles(features)
+
+                # Prepare terrain tile
+                terrainTopo = TerrainTopology(ringsCoordinates=rings)
+                terrainTopo.fromRingsCoordinates()
+                terrainFormat = TerrainTile()
+                terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
+
+                # Bytes manipulation and compression
+                fileObject = terrainFormat.toStringIO()
+                compressedFile = gzipFileObject(fileObject)
+
+                print 'Uploading %s to S3' % bucketKey
+                writeToS3(bucket, bucketKey, compressedFile)
+                t1 = time.time()
+                ti = t1 - self.t0
+                print 'It took %s HH:MM:SS to write %s tiles' % (str(datetime.timedelta(seconds=ti)), count)
+                count += 1
+          else:
+                print 'Skipping %s because no features have been found for this tile' % bucketKey
+
 
     def _splitAndRemoveNonTriangles(self, features):
         rings = []

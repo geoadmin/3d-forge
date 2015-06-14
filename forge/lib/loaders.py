@@ -25,7 +25,8 @@ class ShpToGDALFeatures(object):
         layer = dataSource.GetLayer()
         features = [feature for feature in layer]
         if len(features) == 0:
-            raise Exception('Empty shapefile')
+            return features
+            #raise Exception('Empty shapefile')
 
         geometryType = features[0].GetGeometryRef().GetGeometryName()
         if geometryType != 'POLYGON':
