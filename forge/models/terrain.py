@@ -412,10 +412,17 @@ class TerrainTile:
 
         bLon = MAX / (self._east - self._west)
         bLat = MAX / (self._north - self._south)
-        bHeight = MAX / (self.header['maximumHeight'] - self.header['minimumHeight'])
+
         quantizeLonIndices = lambda x: int(round((x - self._west) * bLon))
         quantizeLatIndices = lambda x: int(round((x - self._south) * bLat))
-        quantizeHeightIndices = lambda x: int(round((x - self.header['minimumHeight']) * bHeight))
+
+        deniv = self.header['maximumHeight'] - self.header['minimumHeight']
+        # In case a tile is completely flat
+        if deniv == 0:
+            quantizeHeightIndices = lambda x: 0
+        else:
+            bHeight = MAX / deniv
+            quantizeHeightIndices = lambda x: int(round((x - self.header['minimumHeight']) * bHeight))
 
         # High watermark encoding performed during toFile
         self.u = map(quantizeLonIndices, topology.uVertex)

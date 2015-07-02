@@ -81,7 +81,6 @@ class GlobalGeodeticTiler:
             else:
                 print 'Skipping %s because no features have been found for this tile' % bucketKey
 
-
     def _splitAndRemoveNonTriangles(self, features):
         rings = []
         for feature in features:
