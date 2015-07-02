@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 
-import logging
-import logging.config
 import ConfigParser
 import sqlalchemy
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import ProgrammingError, OperationalError
 from contextlib import contextmanager
+from forge.lib.logs import getLogger
 
 
 class DB:
@@ -13,47 +12,31 @@ class DB:
     class Server:
 
         def __init__(self, config):
-            self.logger = logging.getLogger('forge.DB.Server')
             self.host = config.get('Server', 'host')
             self.port = config.getint('Server', 'port')
 
     class Admin:
 
         def __init__(self, config):
-            self.logger = logging.getLogger('forge.DB.Admin')
             self.user = config.get('Admin', 'user')
             self.password = config.get('Admin', 'password')
 
     class Database:
 
         def __init__(self, config):
-            self.logger = logging.getLogger('forge.DB.Database')
             self.name = config.get('Database', 'name')
             self.user = config.get('Database', 'user')
             self.password = config.get('Database', 'password')
-
-    class Logging:
-
-        def __init__(self, config):
-            self.configFile = config.get('Logging', 'config')
-            self.logFile = config.get('Logging', 'logfile')
-            self.sqlLogFile = config.get('Logging', 'sqlLogfile')
-            logging.config.fileConfig(self.configFile, defaults=dict(
-                logfile=self.logFile,
-                sqlLogFile=self.sqlLogFile
-            ))
-            self.logger = logging.getLogger('forge.DB.Logging')
 
     def __init__(self, configFile):
         config = ConfigParser.RawConfigParser()
         config.read(configFile)
 
-        self.loggingConf = DB.Logging(config)
         self.serverConf = DB.Server(config)
         self.adminConf = DB.Admin(config)
         self.databaseConf = DB.Database(config)
 
-        self.logger = logging.getLogger('forge.DB')
+        self.logger = getLogger(config, __name__, 'db')
 
         self.superEngine = sqlalchemy.create_engine(
             'postgresql+psycopg2://%(user)s:%(password)s@%(host)s:%(port)d/%(database)s' % dict(
@@ -117,7 +100,7 @@ class DB:
                     )
                 )
             except ProgrammingError as e:
-                self.logger.warning('Could not create user %(role)s: %(err)s' % dict(
+                self.logger.error('Could not create user %(role)s: %(err)s' % dict(
                     role=self.databaseConf.user,
                     err=str(e)
                 ))
@@ -132,7 +115,7 @@ class DB:
                     )
                 )
             except ProgrammingError as e:
-                self.logger.warning('Could not drop user %(role)s: %(err)s' % dict(
+                self.logger.error('Could not drop user %(role)s: %(err)s' % dict(
                     role=self.databaseConf.user,
                     err=str(e)
                 ))
@@ -148,7 +131,7 @@ class DB:
                     )
                 )
             except ProgrammingError as e:
-                self.logger.warning('Could not create database %(name)s with owner %(role)s: %(err)s' % dict(
+                self.logger.error('Could not create database %(name)s with owner %(role)s: %(err)s' % dict(
                     name=self.databaseConf.name,
                     role=self.databaseConf.user,
                     err=str(e)
@@ -164,7 +147,7 @@ class DB:
                     )
                 )
             except ProgrammingError as e:
-                self.logger.warning('Could not drop database %(name)s: %(err)s' % dict(
+                self.logger.error('Could not drop database %(name)s: %(err)s' % dict(
                     name=self.databaseConf.name,
                     err=str(e)
                 ))
@@ -179,7 +162,13 @@ class DB:
                     ALTER TABLE public.spatial_ref_sys OWNER TO %(role)s;
                 """ % dict(role=self.databaseConf.user))
             except ProgrammingError as e:
-                self.logger.warning('Could not setup postgis on %(name)s: %(err)' % dict(
+                self.logger.error('Could not setup postgis on %(name)s: %(err)s' % dict(
+                    name=self.databaseConf.name,
+                    err=str(e)
+                ))
+            except OperationalError as e:
+                self.logger.warning('Please make sure POSTGIS is correctly installed')
+                self.logger.error('Could not setup postgis on %(name)s: %(err)s' % dict(
                     name=self.databaseConf.name,
                     err=str(e)
                 ))

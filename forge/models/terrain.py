@@ -240,7 +240,6 @@ class TerrainTile:
 
         with open(filePath, 'wb') as f:
             self._writeTo(f)
-        print '%s has been created successfully' % filePath
 
     def _writeTo(self, f):
         # Header
@@ -331,7 +330,6 @@ class TerrainTile:
             layer.CreateFeature(feature)
             feature.Destroy()
         dataSource.Destroy()
-        print '%s has been created successfully' % filePath
 
     def fromTerrainTopology(self, topology, bounds=None):
         if not isinstance(topology, TerrainTopology):
