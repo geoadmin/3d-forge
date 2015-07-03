@@ -125,7 +125,7 @@ class DB:
         with self.superConnection() as conn:
             try:
                 conn.execute(
-                    "CREATE DATABASE %(name)s WITH OWNER %(role)s ENCODING 'SQL_ASCII'" % dict(
+                    "CREATE DATABASE %(name)s WITH OWNER %(role)s ENCODING 'UTF8' TEMPLATE template_postgis" % dict(
                         name=self.databaseConf.name,
                         role=self.databaseConf.user
                     )
@@ -152,32 +152,10 @@ class DB:
                     err=str(e)
                 ))
 
-    def setupPostgis(self):
-        self.logger.info('Action: setupPostgis()')
-        with self.adminConnection() as conn:
-            try:
-                conn.execute("""
-                    CREATE EXTENSION postgis;
-                    ALTER SCHEMA public OWNER TO %(role)s;
-                    ALTER TABLE public.spatial_ref_sys OWNER TO %(role)s;
-                """ % dict(role=self.databaseConf.user))
-            except ProgrammingError as e:
-                self.logger.error('Could not setup postgis on %(name)s: %(err)s' % dict(
-                    name=self.databaseConf.name,
-                    err=str(e)
-                ))
-            except OperationalError as e:
-                self.logger.warning('Please make sure POSTGIS is correctly installed')
-                self.logger.error('Could not setup postgis on %(name)s: %(err)s' % dict(
-                    name=self.databaseConf.name,
-                    err=str(e)
-                ))
-
     def create(self):
         self.logger.info('Action: create()')
         self.createUser()
         self.createDatabase()
-        self.setupPostgis()
 
     def destroy(self):
         self.logger.info('Action: destroy()')
