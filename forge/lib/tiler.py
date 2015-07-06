@@ -8,7 +8,7 @@ import ConfigParser
 from forge.lib.boto_conn import getBucket, writeToS3
 from forge.lib.helpers import isShapefile, gzipFileObject, timestamp
 from forge.models.terrain import TerrainTile
-from forge.lib.loaders import ShpToGDALFeatures
+from forge.lib.shapefile_utils import ShpToGDALFeatures
 from forge.lib.topology import TerrainTopology
 from forge.lib.global_geodetic import GlobalGeodetic
 from forge.lib.logs import getLogger

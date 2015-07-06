@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
 
+import os
+import sys
 import ConfigParser
 import sqlalchemy
-from sqlalchemy.exc import ProgrammingError, OperationalError
+from geoalchemy2 import WKBElement
+from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.exc import ProgrammingError
 from contextlib import contextmanager
 from forge.lib.logs import getLogger
+from forge.lib.shapefile_utils import ShpToGDALFeatures
+from forge.lib.helpers import BulkInsert
+from forge.models.tables import Base, models
 
 
 class DB:
@@ -89,6 +96,12 @@ class DB:
         conn.connection.connection.set_isolation_level(isolation)
         conn.close()
 
+    @contextmanager
+    def userConnection(self):
+        conn = self.userEngine.connect()
+        yield conn
+        conn.close()
+
     def createUser(self):
         self.logger.info('Action: createUser()')
         with self.superConnection() as conn:
@@ -101,21 +114,6 @@ class DB:
                 )
             except ProgrammingError as e:
                 self.logger.error('Could not create user %(role)s: %(err)s' % dict(
-                    role=self.databaseConf.user,
-                    err=str(e)
-                ))
-
-    def dropUser(self):
-        self.logger.info('Action: dropUser()')
-        with self.superConnection() as conn:
-            try:
-                conn.execute(
-                    "DROP ROLE %(role)s" % dict(
-                        role=self.databaseConf.user
-                    )
-                )
-            except ProgrammingError as e:
-                self.logger.error('Could not drop user %(role)s: %(err)s' % dict(
                     role=self.databaseConf.user,
                     err=str(e)
                 ))
@@ -137,6 +135,38 @@ class DB:
                     err=str(e)
                 ))
 
+    def setupDatabase(self):
+        self.logger.info('Action: setupDatabase()')
+        try:
+            Base.metadata.create_all(self.userEngine)
+        except ProgrammingError as e:
+            self.logger.warning('Could not setup database on %(name)s: %(err)s' % dict(
+                name=self.databaseConf.name,
+                err=str(e)
+            ))
+
+    def populateTables(self):
+        self.logger.info('Action: populateTables()')
+        session = scoped_session(sessionmaker(bind=self.userEngine))
+        for model in models:
+            shpFile = model.__shapefile__
+            if not os.path.exists(shpFile):
+                self.logger.error('Shapefile %s does not exists' % shpFile)
+                sys.exit(1)
+            features = ShpToGDALFeatures(shpFile).__read__()
+            count = 1
+            bulk = BulkInsert(model, session, withAutoCommit=1000)
+            for feature in features:
+                polygon = feature.GetGeometryRef()
+                bulk.add(dict(
+                    id=count,
+                    geom=WKBElement(polygon.ExportToWkb(), 4326)
+                ))
+                count += 1
+            bulk.commit()
+            self.logger.info('Commit features for %s.' % shpFile)
+        self.logger.info('All tables have been created.')
+
     def dropDatabase(self):
         self.logger.info('Action: dropDatabase()')
         with self.superConnection() as conn:
@@ -152,10 +182,27 @@ class DB:
                     err=str(e)
                 ))
 
+    def dropUser(self):
+        self.logger.info('Action: dropUser()')
+        with self.superConnection() as conn:
+            try:
+                conn.execute(
+                    "DROP ROLE %(role)s" % dict(
+                        role=self.databaseConf.user
+                    )
+                )
+            except ProgrammingError as e:
+                self.logger.error('Could not drop user %(role)s: %(err)s' % dict(
+                    role=self.databaseConf.user,
+                    err=str(e)
+                ))
+
     def create(self):
         self.logger.info('Action: create()')
         self.createUser()
         self.createDatabase()
+        self.setupDatabase()
+        self.populateTables()
 
     def destroy(self):
         self.logger.info('Action: destroy()')
