@@ -4,7 +4,7 @@ import os
 import sys
 import ConfigParser
 import sqlalchemy
-from geoalchemy2 import WKBElement
+from geoalchemy2 import WKTElement
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.exc import ProgrammingError
 from contextlib import contextmanager
@@ -135,6 +135,23 @@ class DB:
                     err=str(e)
                 ))
 
+        with self.adminConnection() as conn:
+            try:
+                conn.execute("""
+                    ALTER SCHEMA public OWNER TO %(role)s;
+                    ALTER TABLE public.spatial_ref_sys OWNER TO %(role)s;
+                    ALTER TABLE public.geometry_columns OWNER TO %(role)s
+                """ % dict(
+                    role=self.databaseConf.user
+                )
+                )
+            except ProgrammingError as e:
+                self.logger.error('Could not create database %(name)s with owner %(role)s: %(err)s' % dict(
+                    name=self.databaseConf.name,
+                    role=self.databaseConf.user,
+                    err=str(e)
+                ))
+
     def setupDatabase(self):
         self.logger.info('Action: setupDatabase()')
         try:
@@ -160,7 +177,7 @@ class DB:
                 polygon = feature.GetGeometryRef()
                 bulk.add(dict(
                     id=count,
-                    geom=WKBElement(polygon.ExportToWkb(), 4326)
+                    the_geom=WKTElement(polygon.ExportToWkt(), 4326)
                 ))
                 count += 1
             bulk.commit()

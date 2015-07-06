@@ -2,23 +2,29 @@
 
 import ConfigParser
 from geoalchemy2 import Geometry
+from sqlalchemy import event
+from sqlalchemy.schema import CreateSchema
 from sqlalchemy import Column, Integer
 from sqlalchemy.ext.declarative import declarative_base
+from forge.models import Vector
 
 
 Base = declarative_base()
+event.listen(Base.metadata, 'before_create', CreateSchema('data'))
+
 models = []
-table_args = {'schema': 'public'}
-WGS84Polygon = Geometry(geometry_type='POLYGON', srid=4326, dimension=3, spatial_index=True)
+table_args = {'schema': 'data'}
+# management to true only for postgis 1.5
+WGS84Polygon = Geometry(geometry_type='POLYGON', srid=4326, dimension=3, spatial_index=True, management=True)
 
 
 def modelFactory(BaseClass, tablename, shapefile, classname):
-    class NewClass(BaseClass):
+    class NewClass(BaseClass, Vector):
         __tablename__ = tablename
         __table_args__ = table_args
         __shapefile__ = shapefile
         id = Column(Integer(), nullable=False, primary_key=True)
-        geom = WGS84Polygon
+        the_geom = Column('the_geom', WGS84Polygon)
     NewClass.__name__ = classname
     return NewClass
 
