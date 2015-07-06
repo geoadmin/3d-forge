@@ -4,7 +4,7 @@ import os
 import time
 import datetime
 from forge.models.terrain import TerrainTile
-from forge.lib.loaders import ShpToGDALFeatures
+from forge.lib.shapefile_utils import ShpToGDALFeatures
 from forge.lib.topology import TerrainTopology
 from forge.lib.helpers import gzipFileObject
 from forge.lib.boto_conn import getBucket, writeToS3

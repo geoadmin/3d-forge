@@ -2,7 +2,7 @@
 
 import os
 from forge.models.terrain import TerrainTile
-from forge.lib.loaders import ShpToGDALFeatures
+from forge.lib.shapefile_utils import ShpToGDALFeatures
 from forge.lib.topology import TerrainTopology
 
 

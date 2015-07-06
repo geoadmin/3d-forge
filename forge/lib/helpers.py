@@ -63,3 +63,50 @@ def isShapefile(filePath):
 def timestamp():
     ts = time.time()
     return datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d%H%M%S')
+
+
+class Bulk:
+
+    def __init__(self, rows=None):
+        self.rows = list() if rows is None else rows
+        self.n = len(self.rows)
+
+    def add(self, row):
+        self.n = self.n + 1
+        self.rows.append(row)
+
+    def commit(self, model, session):
+        if self.n > 0:
+            session.bulk_insert_mappings(
+                model,
+                self.rows
+            )
+            session.commit()
+            self.n = 0
+            self.rows = list()
+
+
+class BulkInsert:
+
+    NO_LIMIT = float('inf')
+
+    def __init__(self, model, session, withAutoCommit=None):
+        self.model = model
+        self.session = session
+        self.autoCommit = withAutoCommit if withAutoCommit is not None else BulkInsert.NO_LIMIT
+        self.bulk = Bulk()
+
+    def add(self, row):
+        if self.bulk.n < self.autoCommit:
+            self.bulk.add(row)
+        else:
+            self.bulk.commit(self.model, self.session)
+            self.bulk = Bulk([row])
+
+    def addN(self, rows):
+        for row in rows:
+            self.add(row)
+
+    def commit(self):
+        self.bulk.commit(self.model, self.session)
+        self.bulk = Bulk([])
