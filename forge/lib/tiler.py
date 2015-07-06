@@ -14,6 +14,10 @@ from forge.lib.global_geodetic import GlobalGeodetic
 from forge.lib.logs import getLogger
 
 
+def distanceSquared(p1, p2):
+    return (p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2
+
+
 def grid(bounds, zoomLevels):
     geodetic = GlobalGeodetic(True)
 
@@ -113,59 +117,73 @@ class GlobalGeodeticTiler:
         return rings
 
     def _createTrianglesFromPoints(self, points):
-        # Transform tuples into lists and remove redundant coord
         def listit(t):
             return list(map(listit, t)) if isinstance(t, (list, tuple)) else t
+
+        def getCoordsIndex(n, i):
+            return i + 1 if n - 1 != i else 0
+
+        # Creates all the potential pairs of coords
+        def createCoordsPairs(l):
+            coordsPairs = []
+            for i in xrange(0, len(l)):
+                coordsPairs.append([l[i], l[(i + 2) % len(l)]])
+            return coordsPairs
+
+        def squaredDistances(coordsPairs):
+            sDistances = []
+            for coordsPair in coordsPairs:
+                sDistances.append(distanceSquared(coordsPair[0], coordsPair[1]))
+            return sDistances
+
+        # Transform tuples into lists and remove redundant coord
         coords = listit(points[0: len(points) - 1])
 
         nbCoords = len(coords)
-        if nbCoords not in (4, 5):
+        if nbCoords not in (4, 5, 6):
             raise Exception('Error while processing geometries of a clipped shapefile: %s coords have been found' % nbCoords)
 
-        # TODO Create a more general algo
         if nbCoords == 4:
             return self._createTrianglesFromRectangle(coords)
-        else:
+        elif nbCoords == 5:
             # Create all possible pairs of coordinates
-            distances = []
-            coordsPairA = [coords[0], coords[2]]
-            coordsPairB = [coords[1], coords[3]]
-            coordsPairC = [coords[2], coords[4]]
-            coordsPairD = [coords[3], coords[0]]
-            coordsPairE = [coords[4], coords[1]]
-            distances.append(self._distanceSquared(coordsPairA[0], coordsPairA[1]))
-            distances.append(self._distanceSquared(coordsPairB[0], coordsPairB[1]))
-            distances.append(self._distanceSquared(coordsPairC[0], coordsPairC[1]))
-            distances.append(self._distanceSquared(coordsPairD[0], coordsPairD[1]))
-            distances.append(self._distanceSquared(coordsPairE[0], coordsPairE[1]))
+            coordsPairs = createCoordsPairs(coords)
+            sDistances = squaredDistances(coordsPairs)
 
-            index = distances.index(max(distances))
-            if index == 0:
-                tr = coordsPairA + [coords[1]]
-                opposedP = coords.index(coords[1])
-            elif index == 1:
-                tr = coordsPairB + [coords[2]]
-                opposedP = coords.index(coords[2])
-            elif index == 2:
-                tr = coordsPairC + [coords[3]]
-                opposedP = coords.index(coords[3])
-            elif index == 3:
-                tr = coordsPairD + [coords[4]]
-                opposedP = coords.index(coords[4])
-            elif index == 4:
-                tr = coordsPairE + [coords[0]]
-                opposedP = coords.index(coords[0])
-
-            # Remove the converging point
+            index = sDistances.index(max(sDistances))
+            j = getCoordsIndex(nbCoords, index)
+            tr = coordsPairs[index] + [coords[j]]
+            # Remove the converging point / not available anymore to create a triangle
+            opposedP = coords.index(coords[j])
             coords.pop(opposedP)
 
             return [tr] + self._createTrianglesFromRectangle(coords)
+        elif nbCoords == 6:
+            coordsPairs = createCoordsPairs(coords)
+            sDistances = squaredDistances(coordsPairs)
+
+            index = sDistances.index(max(sDistances))
+            j = getCoordsIndex(nbCoords, index)
+            tr1 = coordsPairs[index] + [coords[j]]
+            opposedP = coords.index(coords[j])
+            coords.pop(opposedP)
+
+            coordsPairs = createCoordsPairs(coords)
+            sDistances = squaredDistances(coordsPairs)
+
+            index = sDistances.index(max(sDistances))
+            j = getCoordsIndex(len(coords), index)
+            tr2 = coordsPairs[index] + [coords[j]]
+            opposedP = coords.index(coords[j])
+            coords.pop(opposedP)
+
+            return [tr1] + [tr2] + self._createTrianglesFromRectangle(coords)
 
     def _createTrianglesFromRectangle(self, coords):
         coordsPairA = [coords[0], coords[2]]
         coordsPairB = [coords[1], coords[3]]
-        distanceSquaredA = self._distanceSquared(coordsPairA[0], coordsPairA[1])
-        distanceSquaredB = self._distanceSquared(coordsPairB[0], coordsPairB[1])
+        distanceSquaredA = distanceSquared(coordsPairA[0], coordsPairA[1])
+        distanceSquaredB = distanceSquared(coordsPairB[0], coordsPairB[1])
         if distanceSquaredA > distanceSquaredB:
             triangle1 = coordsPairA + [coords[1]]
             triangle2 = coordsPairA + [coords[3]]
@@ -173,9 +191,6 @@ class GlobalGeodeticTiler:
             triangle1 = coordsPairB + [coords[0]]
             triangle2 = coordsPairB + [coords[2]]
         return [triangle1, triangle2]
-
-    def _distanceSquared(self, p1, p2):
-        return (p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2
 
     def _clip(self, inFile, bounds):
         baseName = '.tmp/clip'
