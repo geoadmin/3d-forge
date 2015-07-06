@@ -1,11 +1,17 @@
 # -*- coding: utf-8 -*-
 
+import os
+import sys
 import ConfigParser
 import sqlalchemy
+from geoalchemy2 import WKBElement
+from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.exc import ProgrammingError
 from contextlib import contextmanager
 from forge.lib.logs import getLogger
-from forge.models.tables import Base
+from forge.lib.shapefile_utils import ShpToGDALFeatures
+from forge.lib.helpers import BulkInsert
+from forge.models.tables import Base, models
 
 
 class DB:
@@ -139,6 +145,28 @@ class DB:
                 err=str(e)
             ))
 
+    def populateTables(self):
+        self.logger.info('Action: populateTables()')
+        session = scoped_session(sessionmaker(bind=self.userEngine))
+        for model in models:
+            shpFile = model.__shapefile__
+            if not os.path.exists(shpFile):
+                self.logger.error('Shapefile %s does not exists' % shpFile)
+                sys.exit(1)
+            features = ShpToGDALFeatures(shpFile).__read__()
+            count = 1
+            bulk = BulkInsert(model, session, withAutoCommit=1000)
+            for feature in features:
+                polygon = feature.GetGeometryRef()
+                bulk.add(dict(
+                    id=count,
+                    geom=WKBElement(polygon.ExportToWkb(), 4326)
+                ))
+                count += 1
+            bulk.commit()
+            self.logger.info('Commit features for %s.' % shpFile)
+        self.logger.info('All tables have been created.')
+
     def dropDatabase(self):
         self.logger.info('Action: dropDatabase()')
         with self.superConnection() as conn:
@@ -174,6 +202,7 @@ class DB:
         self.createUser()
         self.createDatabase()
         self.setupDatabase()
+        self.populateTables()
 
     def destroy(self):
         self.logger.info('Action: destroy()')
