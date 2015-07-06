@@ -19,6 +19,7 @@ help:
 	@echo "- serve              Serve examples in localhost (usage make serve PORT=9005)"
 	@echo "- createdb           Create the database"
 	@echo "- dropdb             Drop the database"
+	@echo "- tmspyramid         Create the TMS pyramid base on the config file tms.cfg"
 	@echo "- clean              Clean all generated files and folders"
 	@echo
 	@echo "Variables:"
@@ -68,6 +69,10 @@ createdb:
 .PHONY: dropdb
 dropdb:
 	$(PYTHON_CMD) forge/scripts/db_management.py destroy
+
+.PHONY: tmspyramid
+tmspyramid:
+	$(PYTHON_CMD) forge/scripts/tms_writer.py create
 
 .PHONY: clean
 clean:

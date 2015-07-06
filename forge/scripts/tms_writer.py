@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
 
+import os
 import sys
 import getopt
 from textwrap import dedent
-from forge import DB
+from forge.lib.tiler import GlobalGeodeticTiler
 from forge.lib.helpers import error
 
 
 def usage():
     print(dedent('''\
-        Usage: venv/bin/python forge/script/db_management.py [-c database.cfg|--config=database.cfg] <command>')
+        Usage: venv/bin/python forge/script/tms_writer.py [-c tms.cfg|--config=tms.cfg] <command>')
 
         Commands:
-            create:             create the database. Fails if already exist.
-            destroy:            destroy the database.
+            create:            create the tiles and write them to S3.
+            stats:             provides a report containing the stats for a given TMS config
     '''))
 
 
@@ -23,23 +24,27 @@ def main():
     except getopt.GetoptError as err:
         error(str(err), 2, usage=usage)
 
-    config = 'database.cfg'
+    config = 'tms.cfg'
     for o, a in opts:
         if o in ('-c', '--config'):
             config = a
 
+    if not os.path.exists(config):
+        error('config file does not exists', 1, usage=usage)
+
     if len(args) < 1:
         error('you must specify a command', 3, usage=usage)
-
-    db = DB(config)
+    print config
+    tiler = GlobalGeodeticTiler(config)
 
     command = args[0]
     if command == 'create':
-        db.create()
-    elif command == 'destroy':
-        db.destroy()
+        tiler.createTiles()
+    elif command == 'stats':
+        tiler.stats()
     else:
         error("unknown command '%(command)s'" % {'command': command}, 4, usage=usage)
+
 
 if __name__ == '__main__':
     main()

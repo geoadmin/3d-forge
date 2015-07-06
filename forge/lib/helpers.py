@@ -2,6 +2,7 @@
 
 from osgeo import osr, ogr
 import gzip
+import sys
 import time
 import datetime
 import cStringIO
@@ -63,6 +64,14 @@ def isShapefile(filePath):
 def timestamp():
     ts = time.time()
     return datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d%H%M%S')
+
+
+def error(msg, exitCode=1, usage=None):
+    print('Error: %(msg)s.' % {'msg': msg})
+    print('')
+    if usage is not None:
+        usage()
+    sys.exit(exitCode)
 
 
 class Bulk:

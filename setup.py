@@ -12,6 +12,7 @@ requires = [
         'boto>=2.38',
         'psycopg2',
         'sqlalchemy',
+        'shapely',
     ]
 
 setup(name='3d-forge',

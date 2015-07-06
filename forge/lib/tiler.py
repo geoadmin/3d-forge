@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 
-import os
 import time
 import datetime
-import subprocess
 import ConfigParser
-from forge.lib.boto_conn import getBucket, writeToS3
-from forge.lib.helpers import isShapefile, gzipFileObject, timestamp
+from sqlalchemy.orm import scoped_session, sessionmaker
+from geoalchemy2.shape import to_shape
+from forge import DB
 from forge.models.terrain import TerrainTile
-from forge.lib.shapefile_utils import ShpToGDALFeatures
+from forge.models.tables import models
+from forge.lib.boto_conn import getBucket, writeToS3
+from forge.lib.helpers import gzipFileObject, timestamp
 from forge.lib.topology import TerrainTopology
 from forge.lib.global_geodetic import GlobalGeodetic
 from forge.lib.logs import getLogger
@@ -31,48 +32,51 @@ def grid(bounds, zoomLevels):
 
 class GlobalGeodeticTiler:
 
-    def __init__(self, minLon, maxLon, minLat, maxLat, tileMinZ, tileMaxZ, dataSourcePaths):
+    def __init__(self, configFile):
         self.t0 = time.time()
-        self.minLon = float(minLon)
-        self.maxLon = float(maxLon)
-        self.minLat = float(minLat)
-        self.maxLat = float(maxLat)
+        config = ConfigParser.RawConfigParser()
+        config.read(configFile)
 
-        self.tileMinZ = int(tileMinZ)
-        self.tileMaxZ = int(tileMaxZ)
+        self.minLon = float(config.get('Extent', 'minLon'))
+        self.maxLon = float(config.get('Extent', 'maxLon'))
+        self.minLat = float(config.get('Extent', 'minLat'))
+        self.maxLat = float(config.get('Extent', 'maxLat'))
+        self.tileMinZ = int(config.get('Zooms', 'tileMinZ'))
+        self.tileMaxZ = int(config.get('Zooms', 'tileMaxZ'))
+
+        # Perpare models
+        self.models = {}
+        for i in range(self.tileMinZ, self.tileMaxZ + 1):
+            for model in models:
+                if model.__tablename__ == config.get(str(i), 'tablename'):
+                    self.models[str(i)] = model
+                    break
 
         # Init logging
         config = ConfigParser.RawConfigParser()
         config.read('database.cfg')
         self.logger = getLogger(config, __name__, suffix=timestamp())
 
-        # Here we excpect a list of shapefiles
-        self.dataSourcePaths = self._validateDataSources(dataSourcePaths)
-        self.dataSourceIndex = 0
-
     def createTiles(self):
         bucket = getBucket()
+        # Keep of the overall number of tiles that have been created
         count = 1
-        previousTileZ = self.tileMinZ
-        dataSourcePath = self.dataSourcePaths[self.dataSourceIndex]
+        # DB session
+        db = DB('database.cfg')
+        DBSession = scoped_session(sessionmaker(bind=db.userEngine))
 
         for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), range(self.tileMinZ, self.tileMaxZ + 1)):
-            # Handle file index
-            if tileXYZ[2] != previousTileZ:
-                previousTileZ = tileXYZ[2]
-                self.dataSourceIndex += 1
-                dataSourcePath = self.dataSourcePaths[self.dataSourceIndex]
-
-            # Prepare geoms
-            clipPath = self._clip(dataSourcePath, bounds)
-            shapefile = ShpToGDALFeatures(shpFilePath=clipPath)
-            features = shapefile.__read__()
+            model = self.models[str(tileXYZ[2])]
+            clippedGeometry = model.bboxClippedGeom(bounds)
+            query = DBSession.query(clippedGeometry)
+            query = query.filter(model.bboxIntersects(bounds))
+            ringsCoordinates = [list(to_shape(q[0]).exterior.coords) for q in query]
 
             bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
             # Skip empty tiles for now, we should instead write an empty tile to S3
-            if len(features) > 0:
+            if len(ringsCoordinates) > 0:
                 try:
-                    rings = self._splitAndRemoveNonTriangles(features)
+                    rings = self._splitAndRemoveNonTriangles(ringsCoordinates)
                 except Exception as e:
                     msg = 'An error occured while collapsing non triangular shapes\n'
                     msg += '%s' % e
@@ -101,19 +105,18 @@ class GlobalGeodeticTiler:
             else:
                 self.logger.info('Skipping %s because no features have been found for this tile' % bucketKey)
 
-    def _splitAndRemoveNonTriangles(self, features):
+    def stats(self):
+        raise NotImplemented()
+
+    def _splitAndRemoveNonTriangles(self, ringsCoordinates):
         rings = []
-        for feature in features:
-            geometry = feature.GetGeometryRef()
-            ring = geometry.GetGeometryRef(0)
-            # Retrieves all the coordinates of the ring
-            points = ring.GetPoints()
-            nbPoints = len(points)
+        for ring in ringsCoordinates:
+            nbPoints = len(ring)
             if nbPoints >= 5:
-                triangles = self._createTrianglesFromPoints(points)
+                triangles = self._createTrianglesFromPoints(ring)
                 rings += triangles
             else:
-                rings += [points[0: len(points) - 1]]
+                rings += [ring[0: len(ring) - 1]]
         return rings
 
     def _createTrianglesFromPoints(self, points):
@@ -191,49 +194,3 @@ class GlobalGeodeticTiler:
             triangle1 = coordsPairB + [coords[0]]
             triangle2 = coordsPairB + [coords[2]]
         return [triangle1, triangle2]
-
-    def _clip(self, inFile, bounds):
-        baseName = '.tmp/clip'
-        extensions = ['.shp', '.shx', '.prj', '.dbf']
-        outFile = '%s%s' % (baseName, extensions[0])
-
-        self._cleanup(outFile, baseName, extensions)
-
-        t0 = time.time()
-        self.logger.info('Clipping tile...')
-        try:
-            subprocess.call('ogr2ogr -f "ESRI Shapefile" -clipsrc %s %s %s' % (' '.join(map(str, bounds)), outFile, inFile), shell=True)
-        except Exception as e:
-            msg = 'An error occured while clipping the shapefile %s' % e
-            self.logger.error(msg)
-            raise Exception(msg)
-        t1 = time.time()
-        ti = t1 - t0
-        self.logger.info('It took %s HH:MM:SS to clip the tile.' % str(datetime.timedelta(seconds=ti)))
-        return outFile
-
-    def _cleanup(self, outFile, baseName, extensions):
-        if os.path.isfile(outFile):
-            for ext in extensions:
-                os.remove('%s%s' % (baseName, ext))
-
-    def _validateDataSources(self, paths):
-        if (self.tileMaxZ - self.tileMinZ + 1) != len(paths):
-            msg = 'Invalid length for dataSourcePaths %s' % paths
-            self.logger.error(msg)
-            raise Exception(msg)
-
-        if not isinstance(paths, list):
-            msg = 'A list of paths to shapefiles is expected'
-            self.logger.error(msg)
-            raise Exception(msg)
-        for path in paths:
-            if not os.path.isfile(path):
-                msg = '%s does not exists' % path
-                self.logger.error(msg)
-                raise Exception(msg)
-            if not isShapefile(path):
-                msg = 'Only shapefiles are supported. Provided path %s' % path
-                self.logger.error(msg)
-                raise Exception(msg)
-        return paths
