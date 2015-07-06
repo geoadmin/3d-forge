@@ -9,7 +9,7 @@ def getLogger(config, name, suffix=''):
     logFile = config.get('Logging', 'logfile')
     sqlLogFile = config.get('Logging', 'sqlLogfile')
     logging.config.fileConfig(configFile, defaults=dict(
-        logfile='%s_%s' % (logFile, suffix),
-        sqlLogFile='%s_%s' % (sqlLogFile, suffix)
+        logfile=logFile % dict(timestamp=suffix),
+        sqlLogFile=sqlLogFile % dict(timestamp=suffix)
     ))
     return logging.getLogger(name)
