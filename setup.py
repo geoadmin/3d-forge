@@ -12,7 +12,7 @@ requires = [
         'boto>=2.38',
         'psycopg2',
         'sqlalchemy',
-        'geoalchemy',
+        'geoalchemy2',
     ]
 
 setup(name='3d-forge',

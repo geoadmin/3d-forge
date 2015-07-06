@@ -2,9 +2,10 @@
 
 import ConfigParser
 import sqlalchemy
-from sqlalchemy.exc import ProgrammingError, OperationalError
+from sqlalchemy.exc import ProgrammingError
 from contextlib import contextmanager
 from forge.lib.logs import getLogger
+from forge.models.tables import Base
 
 
 class DB:
@@ -89,6 +90,12 @@ class DB:
         conn.connection.connection.set_isolation_level(isolation)
         conn.close()
 
+    @contextmanager
+    def userConnection(self):
+        conn = self.userEngine.connect()
+        yield conn
+        conn.close()
+
     def createUser(self):
         self.logger.info('Action: createUser()')
         with self.superConnection() as conn:
@@ -101,21 +108,6 @@ class DB:
                 )
             except ProgrammingError as e:
                 self.logger.error('Could not create user %(role)s: %(err)s' % dict(
-                    role=self.databaseConf.user,
-                    err=str(e)
-                ))
-
-    def dropUser(self):
-        self.logger.info('Action: dropUser()')
-        with self.superConnection() as conn:
-            try:
-                conn.execute(
-                    "DROP ROLE %(role)s" % dict(
-                        role=self.databaseConf.user
-                    )
-                )
-            except ProgrammingError as e:
-                self.logger.error('Could not drop user %(role)s: %(err)s' % dict(
                     role=self.databaseConf.user,
                     err=str(e)
                 ))
@@ -137,6 +129,16 @@ class DB:
                     err=str(e)
                 ))
 
+    def setupDatabase(self):
+        self.logger.info('Action: setupDatabase()')
+        try:
+            Base.metadata.create_all(self.userEngine)
+        except ProgrammingError as e:
+            self.logger.warning('Could not setup database on %(name)s: %(err)s' % dict(
+                name=self.databaseConf.name,
+                err=str(e)
+            ))
+
     def dropDatabase(self):
         self.logger.info('Action: dropDatabase()')
         with self.superConnection() as conn:
@@ -152,10 +154,26 @@ class DB:
                     err=str(e)
                 ))
 
+    def dropUser(self):
+        self.logger.info('Action: dropUser()')
+        with self.superConnection() as conn:
+            try:
+                conn.execute(
+                    "DROP ROLE %(role)s" % dict(
+                        role=self.databaseConf.user
+                    )
+                )
+            except ProgrammingError as e:
+                self.logger.error('Could not drop user %(role)s: %(err)s' % dict(
+                    role=self.databaseConf.user,
+                    err=str(e)
+                ))
+
     def create(self):
         self.logger.info('Action: create()')
         self.createUser()
         self.createDatabase()
+        self.setupDatabase()
 
     def destroy(self):
         self.logger.info('Action: destroy()')
