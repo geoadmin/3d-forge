@@ -4,12 +4,14 @@ import os
 import time
 import datetime
 import subprocess
+import ConfigParser
 from forge.lib.boto_conn import getBucket, writeToS3
-from forge.lib.helpers import isShapefile, gzipFileObject
+from forge.lib.helpers import isShapefile, gzipFileObject, timestamp
 from forge.models.terrain import TerrainTile
 from forge.lib.loaders import ShpToGDALFeatures
 from forge.lib.topology import TerrainTopology
 from forge.lib.global_geodetic import GlobalGeodetic
+from forge.lib.logs import getLogger
 
 
 def grid(bounds, zoomLevels):
@@ -34,6 +36,11 @@ class GlobalGeodeticTiler:
 
         self.tileMinZ = int(tileMinZ)
         self.tileMaxZ = int(tileMaxZ)
+
+        # Init logging
+        config = ConfigParser.RawConfigParser()
+        config.read('database.cfg')
+        self.logger = getLogger(config, __name__, suffix=timestamp())
 
         # Here we excpect a list of shapefiles
         self.dataSourcePaths = self._validateDataSources(dataSourcePaths)
@@ -60,26 +67,35 @@ class GlobalGeodeticTiler:
             bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
             # Skip empty tiles for now, we should instead write an empty tile to S3
             if len(features) > 0:
-                rings = self._splitAndRemoveNonTriangles(features)
+                try:
+                    rings = self._splitAndRemoveNonTriangles(features)
+                except Exception as e:
+                    msg = 'An error occured while collapsing non triangular shapes\n'
+                    msg += '%s' % e
+                    self.logger.error(msg)
 
                 # Prepare terrain tile
                 terrainTopo = TerrainTopology(ringsCoordinates=rings)
+                self.logger.info('Building topology for %s rings' % len(rings))
                 terrainTopo.fromRingsCoordinates()
+                self.logger.info('Terrain topology has been created')
                 terrainFormat = TerrainTile()
+                self.logger.info('Creating terrain tile')
                 terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
+                self.logger.info('Terrain tile has been created')
 
                 # Bytes manipulation and compression
                 fileObject = terrainFormat.toStringIO()
                 compressedFile = gzipFileObject(fileObject)
 
-                print 'Uploading %s to S3' % bucketKey
+                self.logger.info('Uploading %s to S3' % bucketKey)
                 writeToS3(bucket, bucketKey, compressedFile)
                 t1 = time.time()
                 ti = t1 - self.t0
-                print 'It took %s HH:MM:SS to write %s tiles' % (str(datetime.timedelta(seconds=ti)), count)
+                self.logger.info('It took %s HH:MM:SS to write %s tiles' % (str(datetime.timedelta(seconds=ti)), count))
                 count += 1
             else:
-                print 'Skipping %s because no features have been found for this tile' % bucketKey
+                self.logger.info('Skipping %s because no features have been found for this tile' % bucketKey)
 
     def _splitAndRemoveNonTriangles(self, features):
         rings = []
@@ -169,14 +185,16 @@ class GlobalGeodeticTiler:
         self._cleanup(outFile, baseName, extensions)
 
         t0 = time.time()
-        print 'Clipping tile...'
+        self.logger.info('Clipping tile...')
         try:
             subprocess.call('ogr2ogr -f "ESRI Shapefile" -clipsrc %s %s %s' % (' '.join(map(str, bounds)), outFile, inFile), shell=True)
         except Exception as e:
-            raise Exception('An error occured while clipping the shapefile %s' % e)
+            msg = 'An error occured while clipping the shapefile %s' % e
+            self.logger.error(msg)
+            raise Exception(msg)
         t1 = time.time()
         ti = t1 - t0
-        print 'It took %s HH:MM:SS to clip the tile.' % str(datetime.timedelta(seconds=ti))
+        self.logger.info('It took %s HH:MM:SS to clip the tile.' % str(datetime.timedelta(seconds=ti)))
         return outFile
 
     def _cleanup(self, outFile, baseName, extensions):
@@ -186,13 +204,21 @@ class GlobalGeodeticTiler:
 
     def _validateDataSources(self, paths):
         if (self.tileMaxZ - self.tileMinZ + 1) != len(paths):
-            raise Exception('Invalid length for dataSourcePaths %s' % paths)
+            msg = 'Invalid length for dataSourcePaths %s' % paths
+            self.logger.error(msg)
+            raise Exception(msg)
 
         if not isinstance(paths, list):
-            raise Exception('A list of paths to shapefiles is expected')
+            msg = 'A list of paths to shapefiles is expected'
+            self.logger.error(msg)
+            raise Exception(msg)
         for path in paths:
             if not os.path.isfile(path):
-                raise Exception('%s does not exists')
+                msg = '%s does not exists' % path
+                self.logger.error(msg)
+                raise Exception(msg)
             if not isShapefile(path):
-                raise Exception('Only shapefiles are supported. Provided path %s' % path)
+                msg = 'Only shapefiles are supported. Provided path %s' % path
+                self.logger.error(msg)
+                raise Exception(msg)
         return paths

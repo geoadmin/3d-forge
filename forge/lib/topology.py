@@ -61,17 +61,14 @@ class TerrainTopology(object):
         return str
 
     def fromRingsCoordinates(self):
-        print 'Building topology for %s rings' % len(self.ringsCoordinates)
         self.index = 0
         # In order to optimize this a bit we might want to deal only with flat
         # coordinates as an input
         for ring in self.ringsCoordinates:
             self._buildTopologyFromRing(ring)
         del self.ringsCoordinates
-        print 'Terrain topology has been created'
 
     def fromFeatures(self):
-        print 'Building topology for %s features' % len(self.features)
         self.index = 0
         for feature in self.features:
             if not isinstance(feature, ogr.Feature):
@@ -84,7 +81,6 @@ class TerrainTopology(object):
             ring = self._ringFromGDALGeometry(geometry)
             self._buildTopologyFromRing(ring)
         del self.features
-        print 'Terrain topology has been created'
 
     def _ringFromGDALGeometry(self, geometry):
         # 0 refers to the ring

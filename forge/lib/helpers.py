@@ -2,6 +2,8 @@
 
 from osgeo import osr, ogr
 import gzip
+import time
+import datetime
 import cStringIO
 
 
@@ -56,3 +58,8 @@ def gzipFileObject(data):
 
 def isShapefile(filePath):
     return filePath.endswith('.shp')
+
+
+def timestamp():
+    ts = time.time()
+    return datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d%H%M%S')

@@ -36,3 +36,15 @@ To clone use the --recursive option to get all submodules.
 ### Copy a file to S3 from command line
 
     aws --profile tms3d_filestorage s3 cp layer.json  s3://tms3d.geo.admin.ch/
+
+## Setup postgres on a new instance
+
+    vim /etc/postgresql/9.1/main/postgresql.conf
+
+Comment out
+
+    #ssl = true
+
+Start postgresql
+
+    sudo /etc/init.d/postgresql start

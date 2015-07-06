@@ -17,6 +17,8 @@ help:
 	@echo "- autolint           Auto lint code styling"
 	@echo "- updatesubmodule    Update 3d testapp"
 	@echo "- serve              Serve examples in localhost (usage make serve PORT=9005)"
+	@echo "- createdb           Create the database"
+	@echo "- dropdb             Drop the database"
 	@echo "- clean              Clean all generated files and folders"
 	@echo
 	@echo "Variables:"
@@ -57,6 +59,14 @@ updatesubmodule:
 .PHONY: serve
 serve:
 	$(PYTHON_CMD) forge/scripts/http_server.py $(PORT)
+
+.PHONY: createdb
+createdb:
+	$(PYTHON_CMD) forge/scripts/db_management.py create
+
+.PHONY: dropdb
+dropdb:
+	$(PYTHON_CMD) forge/scripts/db_management.py destroy
 
 .PHONY: clean
 clean:
