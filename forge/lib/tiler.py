@@ -143,7 +143,7 @@ class GlobalGeodeticTiler:
         coords = listit(points[0: len(points) - 1])
 
         nbCoords = len(coords)
-        if nbCoords not in (4, 5, 6):
+        if nbCoords not in (4, 5, 6, 7):
             raise Exception('Error while processing geometries of a clipped shapefile: %s coords have been found' % nbCoords)
 
         if nbCoords == 4:
@@ -181,6 +181,34 @@ class GlobalGeodeticTiler:
             coords.pop(opposedP)
 
             return [tr1] + [tr2] + self._createTrianglesFromRectangle(coords)
+        elif nbCoords == 7:
+            coordsPairs = createCoordsPairs(coords)
+            sDistances = squaredDistances(coordsPairs)
+
+            index = sDistances.index(max(sDistances))
+            j = getCoordsIndex(nbCoords, index)
+            tr1 = coordsPairs[index] + [coords[j]]
+            opposedP = coords.index(coords[j])
+            coords.pop(opposedP)
+
+            coordsPairs = createCoordsPairs(coords)
+            sDistances = squaredDistances(coordsPairs)
+
+            index = sDistances.index(max(sDistances))
+            j = getCoordsIndex(len(coords), index)
+            tr2 = coordsPairs[index] + [coords[j]]
+            opposedP = coords.index(coords[j])
+            coords.pop(opposedP)
+
+            coordsPairs = createCoordsPairs(coords)
+            sDistances = squaredDistances(coordsPairs)
+
+            index = sDistances.index(max(sDistances))
+            j = getCoordsIndex(len(coords), index)
+            tr3 = coordsPairs[index] + [coords[j]]
+            opposedP = coords.index(coords[j])
+            coords.pop(opposedP)
+            return [tr1] + [tr2] + [tr3] + self._createTrianglesFromRectangle(coords)
 
     def _createTrianglesFromRectangle(self, coords):
         coordsPairA = [coords[0], coords[2]]
