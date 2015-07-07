@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import unittest
+import forge.lib.cartesian3d as c3d
 from forge.models.terrain import TerrainTile
 from forge.lib.bounding_sphere import BoundingSphere
 from forge.lib.llh_ecef import LLH2ECEF
@@ -42,12 +43,12 @@ class TestBoundingSphere(unittest.TestCase):
         self.failUnless(sphere.maxPointZ[2] != float('-inf'))
 
         for point in points:
-            distance = sphere.distance(sphere.center, point)
+            distance = c3d.distance(sphere.center, point)
             self.failUnless(distance <= sphere.radius)
 
         # Point outside the sphere
         pointOutside = [1000.0, 1000.0, 1000.0]
-        distance = sphere.distance(sphere.center, pointOutside)
+        distance = c3d.distance(sphere.center, pointOutside)
         self.failUnless(distance > sphere.radius)
 
     def testBoundingSpherePrecision(self):
@@ -60,5 +61,5 @@ class TestBoundingSphere(unittest.TestCase):
         sphere = BoundingSphere()
         sphere.fromPoints(coords)
         for coord in coords:
-            distance = sphere.distance(sphere.center, coord)
+            distance = c3d.distance(sphere.center, coord)
             self.failUnless(distance <= sphere.radius)
