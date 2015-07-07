@@ -39,7 +39,7 @@ def main():
 
     command = args[0]
     if command == 'create':
-        tiler.createTiles()
+        tiler.create()
     elif command == 'stats':
         tiler.stats()
     else:
