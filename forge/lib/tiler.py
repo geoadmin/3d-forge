@@ -15,6 +15,7 @@ from forge.lib.boto_conn import getBucket, writeToS3
 from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate
 from forge.lib.topology import TerrainTopology
 from forge.lib.global_geodetic import GlobalGeodetic
+from forge.lib.collapse_geom import processRingsCoordinates
 from forge.lib.logs import getLogger
 
 
@@ -29,7 +30,7 @@ def grid(bounds, zoomLevels):
                 yield (geodetic.TileBounds(tileX, tileY, tileZ), (tileX, tileY, tileZ))
 
 
-class GlobalGeodeticTiler:
+class TilerManager:
 
     def __init__(self, configFile):
         self.t0 = time.time()
@@ -76,7 +77,7 @@ class GlobalGeodeticTiler:
             # Skip empty tiles for now, we should instead write an empty tile to S3
             if len(ringsCoordinates) > 0:
                 try:
-                    rings = self._splitAndRemoveNonTriangles(ringsCoordinates)
+                    rings = processRingsCoordinates(ringsCoordinates)
                 except Exception as e:
                     msg = 'An error occured while collapsing non triangular shapes\n'
                     msg += '%s' % e
@@ -103,6 +104,7 @@ class GlobalGeodeticTiler:
                 self.logger.info('It took %s HH:MM:SS to write %s tiles' % (str(datetime.timedelta(seconds=ti)), count))
                 count += 1
             else:
+                # One should write an empyt tile
                 self.logger.info('Skipping %s because no features have been found for this tile' % bucketKey)
 
     def stats(self):
@@ -136,118 +138,3 @@ class GlobalGeodeticTiler:
             msg += '\n'
 
         self.logger.info(msg)
-
-    def _splitAndRemoveNonTriangles(self, ringsCoordinates):
-        rings = []
-        for ring in ringsCoordinates:
-            nbPoints = len(ring)
-            if nbPoints >= 5:
-                triangles = self._createTrianglesFromPoints(ring)
-                rings += triangles
-            else:
-                rings += [ring[0: len(ring) - 1]]
-        return rings
-
-    def _createTrianglesFromPoints(self, points):
-        def listit(t):
-            return list(map(listit, t)) if isinstance(t, (list, tuple)) else t
-
-        def getCoordsIndex(n, i):
-            return i + 1 if n - 1 != i else 0
-
-        # Creates all the potential pairs of coords
-        def createCoordsPairs(l):
-            coordsPairs = []
-            for i in xrange(0, len(l)):
-                coordsPairs.append([l[i], l[(i + 2) % len(l)]])
-            return coordsPairs
-
-        def squaredDistances(coordsPairs):
-            sDistances = []
-            for coordsPair in coordsPairs:
-                sDistances.append(c3d.distanceSquared(coordsPair[0], coordsPair[1]))
-            return sDistances
-
-        # Transform tuples into lists and remove redundant coord
-        coords = listit(points[0: len(points) - 1])
-
-        nbCoords = len(coords)
-        if nbCoords not in (4, 5, 6, 7):
-            raise Exception('Error while processing geometries of a clipped shapefile: %s coords have been found' % nbCoords)
-
-        if nbCoords == 4:
-            return self._createTrianglesFromRectangle(coords)
-        elif nbCoords == 5:
-            # Create all possible pairs of coordinates
-            coordsPairs = createCoordsPairs(coords)
-            sDistances = squaredDistances(coordsPairs)
-
-            index = sDistances.index(max(sDistances))
-            j = getCoordsIndex(nbCoords, index)
-            tr = coordsPairs[index] + [coords[j]]
-            # Remove the converging point / not available anymore to create a triangle
-            opposedP = coords.index(coords[j])
-            coords.pop(opposedP)
-
-            return [tr] + self._createTrianglesFromRectangle(coords)
-        elif nbCoords == 6:
-            coordsPairs = createCoordsPairs(coords)
-            sDistances = squaredDistances(coordsPairs)
-
-            index = sDistances.index(max(sDistances))
-            j = getCoordsIndex(nbCoords, index)
-            tr1 = coordsPairs[index] + [coords[j]]
-            opposedP = coords.index(coords[j])
-            coords.pop(opposedP)
-
-            coordsPairs = createCoordsPairs(coords)
-            sDistances = squaredDistances(coordsPairs)
-
-            index = sDistances.index(max(sDistances))
-            j = getCoordsIndex(len(coords), index)
-            tr2 = coordsPairs[index] + [coords[j]]
-            opposedP = coords.index(coords[j])
-            coords.pop(opposedP)
-
-            return [tr1] + [tr2] + self._createTrianglesFromRectangle(coords)
-        elif nbCoords == 7:
-            coordsPairs = createCoordsPairs(coords)
-            sDistances = squaredDistances(coordsPairs)
-
-            index = sDistances.index(max(sDistances))
-            j = getCoordsIndex(nbCoords, index)
-            tr1 = coordsPairs[index] + [coords[j]]
-            opposedP = coords.index(coords[j])
-            coords.pop(opposedP)
-
-            coordsPairs = createCoordsPairs(coords)
-            sDistances = squaredDistances(coordsPairs)
-
-            index = sDistances.index(max(sDistances))
-            j = getCoordsIndex(len(coords), index)
-            tr2 = coordsPairs[index] + [coords[j]]
-            opposedP = coords.index(coords[j])
-            coords.pop(opposedP)
-
-            coordsPairs = createCoordsPairs(coords)
-            sDistances = squaredDistances(coordsPairs)
-
-            index = sDistances.index(max(sDistances))
-            j = getCoordsIndex(len(coords), index)
-            tr3 = coordsPairs[index] + [coords[j]]
-            opposedP = coords.index(coords[j])
-            coords.pop(opposedP)
-            return [tr1] + [tr2] + [tr3] + self._createTrianglesFromRectangle(coords)
-
-    def _createTrianglesFromRectangle(self, coords):
-        coordsPairA = [coords[0], coords[2]]
-        coordsPairB = [coords[1], coords[3]]
-        distanceSquaredA = c3d.distanceSquared(coordsPairA[0], coordsPairA[1])
-        distanceSquaredB = c3d.distanceSquared(coordsPairB[0], coordsPairB[1])
-        if distanceSquaredA > distanceSquaredB:
-            triangle1 = coordsPairA + [coords[1]]
-            triangle2 = coordsPairA + [coords[3]]
-        else:
-            triangle1 = coordsPairB + [coords[0]]
-            triangle2 = coordsPairB + [coords[2]]
-        return [triangle1, triangle2]
