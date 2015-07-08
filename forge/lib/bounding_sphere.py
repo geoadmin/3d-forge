@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import math
+import forge.lib.cartesian3d as c3d
 
 
 class BoundingSphere(object):
@@ -48,9 +49,9 @@ class BoundingSphere(object):
                 self.maxPointZ = point
 
         # Squared distance between each component min and max
-        xSpan = self.magnitudeSquared(self.subtract(self.maxPointX, self.minPointX))
-        ySpan = self.magnitudeSquared(self.subtract(self.maxPointY, self.minPointY))
-        zSpan = self.magnitudeSquared(self.subtract(self.maxPointZ, self.minPointZ))
+        xSpan = c3d.magnitudeSquared(c3d.subtract(self.maxPointX, self.minPointX))
+        ySpan = c3d.magnitudeSquared(c3d.subtract(self.maxPointY, self.minPointY))
+        zSpan = c3d.magnitudeSquared(c3d.subtract(self.maxPointZ, self.minPointZ))
 
         diameter1 = self.minPointX
         diameter2 = self.maxPointX
@@ -70,25 +71,25 @@ class BoundingSphere(object):
             (diameter1[2] + diameter2[2]) * 0.5
         ]
 
-        radiusSquared = self.magnitudeSquared(self.subtract(diameter2, ritterCenter))
+        radiusSquared = c3d.magnitudeSquared(c3d.subtract(diameter2, ritterCenter))
         ritterRadius = math.sqrt(radiusSquared)
 
         # Initial center and radius (naive) get min and max box
         minBoxPt = [self.minPointX[0], self.minPointY[1], self.minPointZ[2]]
         maxBoxPt = [self.maxPointX[0], self.maxPointY[1], self.maxPointZ[2]]
-        naiveCenter = self.multiplyByScalar(self.add(minBoxPt, maxBoxPt), 0.5)
+        naiveCenter = c3d.multiplyByScalar(c3d.add(minBoxPt, maxBoxPt), 0.5)
         naiveRadius = 0.0
 
         for i in xrange(0, nbPositions):
             currentP = points[i]
 
             # Find the furthest point from the naive center to calculate the naive radius.
-            r = self.magnitude(self.subtract(currentP, naiveCenter))
+            r = c3d.magnitude(c3d.subtract(currentP, naiveCenter))
             if r > naiveRadius:
                 naiveRadius = r
 
             # Make adjustments to the Ritter Sphere to include all points.
-            oldCenterToPointSquared = self.magnitudeSquared(self.subtract(currentP, ritterCenter))
+            oldCenterToPointSquared = c3d.magnitudeSquared(c3d.subtract(currentP, ritterCenter))
             if oldCenterToPointSquared > radiusSquared:
                 oldCenterToPoint = math.sqrt(oldCenterToPointSquared)
                 ritterRadius = (ritterRadius + oldCenterToPoint) * 0.5
@@ -107,24 +108,3 @@ class BoundingSphere(object):
         else:
             self.radius = naiveRadius
             self.center = naiveCenter
-
-    def magnitudeSquared(self, p):
-        return p[0] ** 2 + p[1] ** 2 + p[2] ** 2
-
-    def magnitude(self, p):
-        return math.sqrt(self.magnitudeSquared(p))
-
-    def add(self, left, right):
-        return [left[0] + right[0], left[1] + right[1], left[2] + right[2]]
-
-    def subtract(self, left, right):
-        return [left[0] - right[0], left[1] - right[1], left[2] - right[2]]
-
-    def distanceSquared(self, p1, p2):
-        return (p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2
-
-    def distance(self, p1, p2):
-        return math.sqrt(self.distanceSquared(p1, p2))
-
-    def multiplyByScalar(self, p, scalar):
-        return [p[0] * scalar, p[1] * scalar, p[2] * scalar]

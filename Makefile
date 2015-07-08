@@ -74,6 +74,10 @@ dropdb:
 tmspyramid:
 	$(PYTHON_CMD) forge/scripts/tms_writer.py create
 
+.PHONY: tmsstats
+tmsstats:
+	$(PYTHON_CMD) forge/scripts/tms_writer.py stats
+
 .PHONY: clean
 clean:
 	rm -rf venv

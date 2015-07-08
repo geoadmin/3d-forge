@@ -5,18 +5,17 @@ import datetime
 import ConfigParser
 from sqlalchemy.orm import scoped_session, sessionmaker
 from geoalchemy2.shape import to_shape
+
 from forge import DB
+import forge.lib.cartesian2d as c2d
+import forge.lib.cartesian3d as c3d
 from forge.models.terrain import TerrainTile
 from forge.models.tables import models
 from forge.lib.boto_conn import getBucket, writeToS3
-from forge.lib.helpers import gzipFileObject, timestamp
+from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate
 from forge.lib.topology import TerrainTopology
 from forge.lib.global_geodetic import GlobalGeodetic
 from forge.lib.logs import getLogger
-
-
-def distanceSquared(p1, p2):
-    return (p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2
 
 
 def grid(bounds, zoomLevels):
@@ -52,23 +51,24 @@ class GlobalGeodeticTiler:
                     self.models[str(i)] = model
                     break
 
+        # DB session
+        db = DB('database.cfg')
+        self.DBSession = scoped_session(sessionmaker(bind=db.userEngine))
+
         # Init logging
         config = ConfigParser.RawConfigParser()
         config.read('database.cfg')
         self.logger = getLogger(config, __name__, suffix=timestamp())
 
-    def createTiles(self):
+    def create(self):
         bucket = getBucket()
         # Keep of the overall number of tiles that have been created
         count = 1
-        # DB session
-        db = DB('database.cfg')
-        DBSession = scoped_session(sessionmaker(bind=db.userEngine))
 
         for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), range(self.tileMinZ, self.tileMaxZ + 1)):
             model = self.models[str(tileXYZ[2])]
             clippedGeometry = model.bboxClippedGeom(bounds)
-            query = DBSession.query(clippedGeometry)
+            query = self.DBSession.query(clippedGeometry)
             query = query.filter(model.bboxIntersects(bounds))
             ringsCoordinates = [list(to_shape(q[0]).exterior.coords) for q in query]
 
@@ -106,7 +106,36 @@ class GlobalGeodeticTiler:
                 self.logger.info('Skipping %s because no features have been found for this tile' % bucketKey)
 
     def stats(self):
-        raise NotImplemented()
+        msg = '\n'
+        geodetic = GlobalGeodetic(True)
+        bounds = (self.minLon, self.minLat, self.maxLon, self.maxLat)
+        zooms = range(self.tileMinZ, self.tileMaxZ + 1)
+
+        for i in xrange(0, len(zooms)):
+            zoom = zooms[i]
+            model = self.models[str(zoom)]
+            nbObjects = self.DBSession.query(model).filter(model.bboxIntersects(bounds)).count()
+            tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], zoom)
+            tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], zoom)
+            xCount = tileMaxX - tileMinX
+            yCount = tileMaxY - tileMinY
+            nbTiles = xCount * yCount
+            tileBounds = geodetic.TileBounds(tileMinX, tileMinY, zoom)
+            pointA = transformCoordinate('POINT(%s %s)' % (tileBounds[0], tileBounds[1]), 4326, 21781).GetPoints()[0]
+            pointB = transformCoordinate('POINT(%s %s)' % (tileBounds[2], tileBounds[3]), 4326, 21781).GetPoints()[0]
+            length = c2d.distance(pointA, pointB)
+            msg += 'At zoom %s:\n' % zoom
+            msg += 'We expect %s tiles overall\n' % nbTiles
+            msg += 'Min X is %s, Max X is %s\n' % (tileMinX, tileMaxX)
+            msg += '%s columns over X\n' % xCount
+            msg += 'Min Y is %s, Max Y is %s\n' % (tileMinY, tileMaxY)
+            msg += '%s rows over Y\n' % yCount
+            msg += '\n'
+            msg += 'A tile side is around %s meters long\n' % int(round(length))
+            msg += 'We have an average of about %s triangles per tile\n' % int(round(nbObjects / nbTiles))
+            msg += '\n'
+
+        self.logger.info(msg)
 
     def _splitAndRemoveNonTriangles(self, ringsCoordinates):
         rings = []
@@ -136,7 +165,7 @@ class GlobalGeodeticTiler:
         def squaredDistances(coordsPairs):
             sDistances = []
             for coordsPair in coordsPairs:
-                sDistances.append(distanceSquared(coordsPair[0], coordsPair[1]))
+                sDistances.append(c3d.distanceSquared(coordsPair[0], coordsPair[1]))
             return sDistances
 
         # Transform tuples into lists and remove redundant coord
@@ -213,8 +242,8 @@ class GlobalGeodeticTiler:
     def _createTrianglesFromRectangle(self, coords):
         coordsPairA = [coords[0], coords[2]]
         coordsPairB = [coords[1], coords[3]]
-        distanceSquaredA = distanceSquared(coordsPairA[0], coordsPairA[1])
-        distanceSquaredB = distanceSquared(coordsPairB[0], coordsPairB[1])
+        distanceSquaredA = c3d.distanceSquared(coordsPairA[0], coordsPairA[1])
+        distanceSquaredB = c3d.distanceSquared(coordsPairB[0], coordsPairB[1])
         if distanceSquaredA > distanceSquaredB:
             triangle1 = coordsPairA + [coords[1]]
             triangle2 = coordsPairA + [coords[3]]
