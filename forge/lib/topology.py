@@ -61,7 +61,6 @@ class TerrainTopology(object):
         return str
 
     def fromRingsCoordinates(self):
-        self.index = 0
         # In order to optimize this a bit we might want to deal only with flat
         # coordinates as an input
         for ring in self.ringsCoordinates:
@@ -69,7 +68,6 @@ class TerrainTopology(object):
         del self.ringsCoordinates
 
     def fromFeatures(self):
-        self.index = 0
         for feature in self.features:
             if not isinstance(feature, ogr.Feature):
                 raise TypeError('Only GDAL features are supported')
@@ -86,6 +84,8 @@ class TerrainTopology(object):
         # 0 refers to the ring
         ring = geometry.GetGeometryRef(0)
         points = ring.GetPoints()
+        if points[0] != points[len(points) - 1]:
+            raise Exception('Last coord %s is not equal to the first coord %s' % (points[0], points[len(points) - 1]))
         # Remove last point of the polygon and keep only 3 coordinates
         return points[0: len(points) - 1]
 
@@ -112,15 +112,17 @@ class TerrainTopology(object):
                 if coord[2] > self.maxHeight:
                     self.maxHeight = coord[2]
 
-                self.indexData.append(self.index)
+                self.indexData.append(len(self.uVertex) - 1)
                 # Keep track of coordinates for bbsphere and friends
                 self.coords.append(coord)
-                self.index += 1
 
     def _findVertexIndex(self, coord):
-        # Naive approach for now
-        for i in xrange(0, len(self.uVertex)):
-            if self.uVertex[i] == coord[0] and self.vVertex[i] == coord[1] and \
-                    self.hVertex[i] == coord[2]:
-                return i
+        try:
+            uI = self.uVertex.index(coord[0])
+            vI = self.vVertex.index(coord[1])
+            hI = self.hVertex.index(coord[2])
+            if uI == vI == hI:
+                return uI
+        except ValueError:
+            pass
         return None

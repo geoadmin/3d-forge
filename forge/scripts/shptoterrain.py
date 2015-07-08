@@ -4,9 +4,10 @@ import os
 from forge.models.terrain import TerrainTile
 from forge.lib.shapefile_utils import ShpToGDALFeatures
 from forge.lib.topology import TerrainTopology
+from forge.lib.global_geodetic import GlobalGeodetic
 
 
-basename = 'raron.flat.1'
+basename = '7_133_98'
 directory = '.tmp'
 extension = '.terrain'
 
@@ -20,7 +21,12 @@ features = shapefile.__read__()
 terrainTopo = TerrainTopology(features=features)
 terrainTopo.fromFeatures()
 terrainFormat = TerrainTile()
-terrainFormat.fromTerrainTopology(terrainTopo)
+
+geodetic = GlobalGeodetic(True)
+zxy = basename.split('_')
+bounds = geodetic.TileBounds(float(zxy[1]), float(zxy[2]), float(zxy[0]))
+
+terrainFormat.fromTerrainTopology(terrainTopo, bounds)
 terrainFormat.toFile(filePathTarget)
 
 # Display SwissCoordinates
