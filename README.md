@@ -47,17 +47,17 @@ To clone use the --recursive option to get all submodules.
 
 - sudo su postgres
 
--- edit /etc/postgresql/9.1/main/postgresql.conf
+  * edit /etc/postgresql/9.1/main/postgresql.conf
 
--- uncommend `ssl=true` line
+  * uncommend `ssl=true` line
 
--- restart postgresql with `/etc/init.d/postgresql restart`
+  * restart postgresql with `/etc/init.d/postgresql restart`
 
--- connect to postgress with `psql postgres`
+  * connect to postgress with `psql postgres`
 
--- change passwrod to xxx with \password
+  * change passwrod to xxx with \password
 
--- exit sudo
+  * exit sudo
 
 - add credentials to .boto file
 
