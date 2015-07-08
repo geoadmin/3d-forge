@@ -19,7 +19,8 @@ help:
 	@echo "- serve              Serve examples in localhost (usage make serve PORT=9005)"
 	@echo "- createdb           Create the database"
 	@echo "- dropdb             Drop the database"
-	@echo "- tmspyramid         Create the TMS pyramid base on the config file tms.cfg"
+	@echo "- tmspyramid         Create the TMS pyramid based on the config file tms.cfg"
+	@echo "- tmsstats           Provide statistics about the TMS pyramid"
 	@echo "- clean              Clean all generated files and folders"
 	@echo
 	@echo "Variables:"
