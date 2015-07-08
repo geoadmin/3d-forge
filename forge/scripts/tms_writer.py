@@ -4,7 +4,7 @@ import os
 import sys
 import getopt
 from textwrap import dedent
-from forge.lib.tiler import GlobalGeodeticTiler
+from forge.lib.tiler import TilerManager
 from forge.lib.helpers import error
 
 
@@ -34,8 +34,7 @@ def main():
 
     if len(args) < 1:
         error('you must specify a command', 3, usage=usage)
-    print config
-    tiler = GlobalGeodeticTiler(config)
+    tiler = TilerManager(config)
 
     command = args[0]
     if command == 'create':
