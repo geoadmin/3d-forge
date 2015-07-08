@@ -8,7 +8,6 @@ from geoalchemy2.shape import to_shape
 
 from forge import DB
 import forge.lib.cartesian2d as c2d
-import forge.lib.cartesian3d as c3d
 from forge.models.terrain import TerrainTile
 from forge.models.tables import models
 from forge.lib.boto_conn import getBucket, writeToS3
