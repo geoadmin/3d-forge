@@ -319,9 +319,9 @@ class TerrainTile:
             c = self.indices[i + 2]
             ring = ogr.Geometry(ogr.wkbLinearRing)
             ring.AddPoint(coords[a][0], coords[a][1], coords[a][2])
-            ring.AddPoint(coords[b][0], coords[b][1], coords[c][2])
+            ring.AddPoint(coords[b][0], coords[b][1], coords[b][2])
             ring.AddPoint(coords[c][0], coords[c][1], coords[c][2])
-            ring.AddPoint(coords[a][0], coords[a][0], coords[a][2])
+            ring.AddPoint(coords[a][0], coords[a][1], coords[a][2])
             polygon = ogr.Geometry(ogr.wkbPolygon)
             polygon.AddGeometry(ring)
 
