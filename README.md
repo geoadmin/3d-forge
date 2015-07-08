@@ -37,14 +37,41 @@ To clone use the --recursive option to get all submodules.
 
     aws --profile tms3d_filestorage s3 cp layer.json  s3://tms3d.geo.admin.ch/
 
-## Setup postgres on a new instance
+## Create 3d-tiling instance
 
-    vim /etc/postgresql/9.1/main/postgresql.conf
+- Create instance here: https://tilegenmanager.prod.bgdi.ch/index/index
 
-Comment out
+- Connect to created instance with user `tileforge`
 
-    #ssl = true
+- Adapt your configurations (.bashrc, .vim, .screenrc) if desired
 
-Start postgresql
+- sudo su postgres
 
-    sudo /etc/init.d/postgresql start
+-- edit /etc/postgresql/9.1/main/postgresql.conf
+
+-- uncommend `ssl=true` line
+
+-- restart postgresql with `/etc/init.d/postgresql restart`
+
+-- connect to postgress with `psql postgres`
+
+-- change passwrod to xxx with \password
+
+-- exit sudo
+
+- add credentials to .boto file
+
+- add configuration to .aws/config
+
+- add credentials to .aws/credentials
+
+- mount zadara with `sudo -u root /bin/mount /var/local/cartoweb`
+
+- get project with `git clone --recursive https://github.com/geoadmin/3d-forge`
+
+- install with `make install`
+
+- create db with `make createdb`, adapt `database.cfg` for different data sets
+
+- create tiles with `tmspyramid`, adapt `tms.cfg` for different tiler
+  configurations
