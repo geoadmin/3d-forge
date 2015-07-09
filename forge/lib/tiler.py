@@ -3,6 +3,10 @@
 import time
 import datetime
 import ConfigParser
+import multiprocessing
+import sys
+import os
+import traceback
 from sqlalchemy.orm import scoped_session, sessionmaker
 from geoalchemy2.shape import to_shape
 
@@ -17,6 +21,11 @@ from forge.lib.global_geodetic import GlobalGeodetic
 from forge.lib.collapse_geom import processRingsCoordinates
 from forge.lib.logs import getLogger
 
+NUMBER_POOL_PROCESSES = multiprocessing.cpu_count()
+# Init logging
+config = ConfigParser.RawConfigParser()
+config.read('database.cfg')
+logger = getLogger(config, __name__, suffix=timestamp())
 
 def grid(bounds, zoomLevels):
     geodetic = GlobalGeodetic(True)
@@ -27,6 +36,91 @@ def grid(bounds, zoomLevels):
         for tileX in xrange(tileMinX, tileMaxX + 1):
             for tileY in xrange(tileMinY, tileMaxY + 1):
                 yield (geodetic.TileBounds(tileX, tileY, tileZ), (tileX, tileY, tileZ))
+count = 1
+created_con = 0
+
+def worker(job):
+    global count, created_con
+    session = None
+    pid = os.getpid()
+    retval = 0
+
+    try:
+        (config, tileMinZ, tileMaxZ, bounds, tileXYZ, t0, bucket, lock) = job
+
+        # Prepare models
+        loc_models = {}
+        for i in range(tileMinZ, tileMaxZ + 1):
+            for model in models:
+                if model.__tablename__ == config.get(str(i), 'tablename'):
+                    loc_models[str(i)] = model
+                    break
+
+        db = DB('database.cfg')
+        created_con += 1
+        logger.info('Creating db connection number %s' % (created_con))
+        # session = scoped_session(sessionmaker(bind=db.userEngine))
+        session = sessionmaker()(bind=db.userEngine)
+
+        model = loc_models[str(tileXYZ[2])]
+        clippedGeometry = model.bboxClippedGeom(bounds)
+        query = session.query(clippedGeometry)
+        query = query.filter(model.bboxIntersects(bounds))
+        ringsCoordinates = [list(to_shape(q[0]).exterior.coords) for q in query]
+
+        bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
+        # Skip empty tiles for now, we should instead write an empty tile to S3
+        if len(ringsCoordinates) > 0:
+            try:
+                rings = processRingsCoordinates(ringsCoordinates)
+            except Exception as e:
+                msg = '[%s] --------- ERROR ------- occured while collapsing non triangular shapes\n'
+                msg += '%s' % (pid, e)
+                logger.error(msg)
+                session.close_all()
+                db.userEngine.dispose()
+                created_con -= 1
+                logger.info('Closing db connection number %s' % (created_con))
+                retval = 1
+
+            # Prepare terrain tile
+            terrainTopo = TerrainTopology(ringsCoordinates=rings)
+            logger.info('[%s] Building topology for %s rings' % (pid, len(rings)))
+            terrainTopo.fromRingsCoordinates()
+            logger.info('[%s] Terrain topology has been created' % pid)
+            terrainFormat = TerrainTile()
+            logger.info('[%s] Creating terrain tile' % pid)
+            terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
+            logger.info('[%s] Terrain tile has been created' % pid)
+
+            # Bytes manipulation and compression
+            fileObject = terrainFormat.toStringIO()
+            compressedFile = gzipFileObject(fileObject)
+
+            logger.info('[%s] Uploading %s to S3' % (pid, bucketKey))
+            writeToS3(bucket, bucketKey, compressedFile)
+            t1 = time.time()
+            ti = t1 - t0
+            with lock:
+                logger.info('[%s] It took %s HH:MM:SS to write %s tiles' % (pid, str(datetime.timedelta(seconds=ti)), count))
+                count += 1
+        else:
+            # One should write an empyt tile
+            logger.info('[%s] Skipping %s because no features have been found for this tile' % bucketKey)
+
+    except Exception as e:
+        logger.info('[%s] -------- ERROR --------- %s' % (pid, e))
+        retval = 2
+
+    finally:
+        if session is not None:
+            session.close_all()
+            db.userEngine.dispose()
+            created_con -= 1
+            logger.info('Closing db connection number %s' % (created_con))
+
+    return retval
+
 
 
 class TilerManager:
@@ -42,8 +136,10 @@ class TilerManager:
         self.maxLat = float(config.get('Extent', 'maxLat'))
         self.tileMinZ = int(config.get('Zooms', 'tileMinZ'))
         self.tileMaxZ = int(config.get('Zooms', 'tileMaxZ'))
+        self.multiProcessing = int(config.get('General', 'multiProcessing'))
+        self.config = config
 
-        # Perpare models
+        # Prepare models
         self.models = {}
         for i in range(self.tileMinZ, self.tileMaxZ + 1):
             for model in models:
@@ -51,66 +147,52 @@ class TilerManager:
                     self.models[str(i)] = model
                     break
 
-        # DB session
-        db = DB('database.cfg')
-        self.DBSession = scoped_session(sessionmaker(bind=db.userEngine))
-
-        # Init logging
-        config = ConfigParser.RawConfigParser()
-        config.read('database.cfg')
-        self.logger = getLogger(config, __name__, suffix=timestamp())
-
     def create(self):
+        global count
+        lock = multiprocessing.Manager().Lock()
         bucket = getBucket()
         # Keep of the overall number of tiles that have been created
         count = 1
+        jobs = []
 
+        print "preparing jobs, please wait %s" % self.multiProcessing
         for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), range(self.tileMinZ, self.tileMaxZ + 1)):
-            model = self.models[str(tileXYZ[2])]
-            clippedGeometry = model.bboxClippedGeom(bounds)
-            query = self.DBSession.query(clippedGeometry)
-            query = query.filter(model.bboxIntersects(bounds))
-            ringsCoordinates = [list(to_shape(q[0]).exterior.coords) for q in query]
+            job = (self.config, self.tileMinZ, self.tileMaxZ, bounds, tileXYZ, self.t0, bucket, lock)
+            jobs.append(job)
 
-            bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
-            # Skip empty tiles for now, we should instead write an empty tile to S3
-            if len(ringsCoordinates) > 0:
-                try:
-                    rings = processRingsCoordinates(ringsCoordinates)
-                except Exception as e:
-                    msg = 'An error occured while collapsing non triangular shapes\n'
-                    msg += '%s' % e
-                    self.logger.error(msg)
-
-                # Prepare terrain tile
-                terrainTopo = TerrainTopology(ringsCoordinates=rings)
-                self.logger.info('Building topology for %s rings' % len(rings))
-                terrainTopo.fromRingsCoordinates()
-                self.logger.info('Terrain topology has been created')
-                terrainFormat = TerrainTile()
-                self.logger.info('Creating terrain tile')
-                terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
-                self.logger.info('Terrain tile has been created')
-
-                # Bytes manipulation and compression
-                fileObject = terrainFormat.toStringIO()
-                compressedFile = gzipFileObject(fileObject)
-
-                self.logger.info('Uploading %s to S3' % bucketKey)
-                writeToS3(bucket, bucketKey, compressedFile)
-                t1 = time.time()
-                ti = t1 - self.t0
-                self.logger.info('It took %s HH:MM:SS to write %s tiles' % (str(datetime.timedelta(seconds=ti)), count))
-                count += 1
-            else:
-                # One should write an empyt tile
-                self.logger.info('Skipping %s because no features have been found for this tile' % bucketKey)
+        self.multiProcessing = 1
+        if self.multiProcessing > 0:
+            print NUMBER_POOL_PROCESSES
+            pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES)
+            pool.map(worker, jobs)
+            pool.close()
+            try:
+                pool.join()
+                pool.terminate()
+            except Exception as e:
+                for i in reversed(range(len(pool._pool))):
+                    p = pool._pool[i]
+                    if p.exitcode is None:
+                        p.terminate()
+                    del pool._pool[i]
+                log.error('Error while tiles: %s', e)
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                log.debug("*** Traceback:/n" + traceback.print_tb(exc_traceback, limit=1, file=sys.stdout))
+                log.debug("*** Exception:/n" + traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout))
+                return 1
+                    
+        else:
+            for j in jobs:
+                worker(j)
 
     def stats(self):
         msg = '\n'
         geodetic = GlobalGeodetic(True)
         bounds = (self.minLon, self.minLat, self.maxLon, self.maxLat)
         zooms = range(self.tileMinZ, self.tileMaxZ + 1)
+        
+        db = DB('database.cfg')
+        self.DBSession = scoped_session(sessionmaker(bind=db.userEngine))
 
         for i in xrange(0, len(zooms)):
             zoom = zooms[i]
@@ -136,4 +218,4 @@ class TilerManager:
             msg += 'We have an average of about %s triangles per tile\n' % int(round(nbObjects / nbTiles))
             msg += '\n'
 
-        self.logger.info(msg)
+        logger.info(msg)

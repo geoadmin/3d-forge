@@ -7,6 +7,7 @@ import sqlalchemy
 from geoalchemy2 import WKTElement
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.pool import NullPool
 from contextlib import contextmanager
 from forge.lib.logs import getLogger
 from forge.lib.shapefile_utils import ShpToGDALFeatures
@@ -70,7 +71,8 @@ class DB:
                 password=self.databaseConf.password,
                 host=self.serverConf.host,
                 port=self.serverConf.port,
-                database=self.databaseConf.name
+                database=self.databaseConf.name,
+                poolclass=NullPool
             )
         )
         self.logger.info('Database engines ready (server: %(host)s:%(port)d)' % dict(
