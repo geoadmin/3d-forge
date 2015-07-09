@@ -75,10 +75,10 @@ class DB:
                 poolclass=NullPool
             )
         )
-        self.logger.info('Database engines ready (server: %(host)s:%(port)d)' % dict(
-            host=self.serverConf.host,
-            port=self.serverConf.port
-        ))
+#        self.logger.info('Database engines ready (server: %(host)s:%(port)d)' % dict(
+#            host=self.serverConf.host,
+#            port=self.serverConf.port
+#        ))
 
     @contextmanager
     def superConnection(self):

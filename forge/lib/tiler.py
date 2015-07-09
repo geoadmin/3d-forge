@@ -36,17 +36,16 @@ def grid(bounds, zoomLevels):
         for tileX in xrange(tileMinX, tileMaxX + 1):
             for tileY in xrange(tileMinY, tileMaxY + 1):
                 yield (geodetic.TileBounds(tileX, tileY, tileZ), (tileX, tileY, tileZ))
-count = 1
-created_con = 0
 
+tilecount = multiprocessing.Value('i',0)
 def worker(job):
-    global count, created_con
+    tstart = time.time()
     session = None
     pid = os.getpid()
     retval = 0
 
     try:
-        (config, tileMinZ, tileMaxZ, bounds, tileXYZ, t0, bucket, lock) = job
+        (config, tileMinZ, tileMaxZ, bounds, tileXYZ, t0, bucket) = job
 
         # Prepare models
         loc_models = {}
@@ -57,8 +56,6 @@ def worker(job):
                     break
 
         db = DB('database.cfg')
-        created_con += 1
-        logger.info('Creating db connection number %s' % (created_con))
         # session = scoped_session(sessionmaker(bind=db.userEngine))
         session = sessionmaker()(bind=db.userEngine)
 
@@ -79,31 +76,31 @@ def worker(job):
                 logger.error(msg)
                 session.close_all()
                 db.userEngine.dispose()
-                created_con -= 1
-                logger.info('Closing db connection number %s' % (created_con))
                 retval = 1
 
             # Prepare terrain tile
             terrainTopo = TerrainTopology(ringsCoordinates=rings)
-            logger.info('[%s] Building topology for %s rings' % (pid, len(rings)))
+            #logger.info('[%s] Building topology for %s rings' % (pid, len(rings)))
             terrainTopo.fromRingsCoordinates()
-            logger.info('[%s] Terrain topology has been created' % pid)
+            #logger.info('[%s] Terrain topology has been created' % pid)
             terrainFormat = TerrainTile()
-            logger.info('[%s] Creating terrain tile' % pid)
+            #logger.info('[%s] Creating terrain tile' % pid)
             terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
-            logger.info('[%s] Terrain tile has been created' % pid)
+            #logger.info('[%s] Terrain tile has been created' % pid)
 
             # Bytes manipulation and compression
             fileObject = terrainFormat.toStringIO()
             compressedFile = gzipFileObject(fileObject)
 
-            logger.info('[%s] Uploading %s to S3' % (pid, bucketKey))
+            #logger.info('[%s] Uploading %s to S3' % (pid, bucketKey))
             writeToS3(bucket, bucketKey, compressedFile)
-            t1 = time.time()
-            ti = t1 - t0
-            with lock:
-                logger.info('[%s] It took %s HH:MM:SS to write %s tiles' % (pid, str(datetime.timedelta(seconds=ti)), count))
-                count += 1
+            tend = time.time()
+            #logger.info('[%s] It took %s to create %s tile on S3.' % (pid, str(tend-tstart), bucketKey))
+            tilecount.value += 1
+            val = tilecount.value
+            if val % 100 == 0:
+                logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend-t0)), val))
+
         else:
             # One should write an empyt tile
             logger.info('[%s] Skipping %s because no features have been found for this tile' % bucketKey)
@@ -116,8 +113,6 @@ def worker(job):
         if session is not None:
             session.close_all()
             db.userEngine.dispose()
-            created_con -= 1
-            logger.info('Closing db connection number %s' % (created_con))
 
     return retval
 
@@ -148,17 +143,21 @@ class TilerManager:
                     break
 
     def create(self):
-        global count
-        lock = multiprocessing.Manager().Lock()
+
         bucket = getBucket()
         # Keep of the overall number of tiles that have been created
-        count = 1
+        maxtiles = 30
+        maxtiles = 10000000000000
         jobs = []
 
         print "preparing jobs, please wait %s" % self.multiProcessing
         for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), range(self.tileMinZ, self.tileMaxZ + 1)):
-            job = (self.config, self.tileMinZ, self.tileMaxZ, bounds, tileXYZ, self.t0, bucket, lock)
+            job = (self.config, self.tileMinZ, self.tileMaxZ, bounds, tileXYZ, self.t0, bucket)
             jobs.append(job)
+            if len(jobs) >= maxtiles:
+                break
+
+        tstart = time.time()
 
         self.multiProcessing = 1
         if self.multiProcessing > 0:
@@ -184,6 +183,9 @@ class TilerManager:
         else:
             for j in jobs:
                 worker(j)
+        tend = time.time()
+        logger.info('It took %s create %s tiles' % (str(datetime.timedelta(seconds=tend-tstart)), len(jobs)))
+        
 
     def stats(self):
         msg = '\n'
