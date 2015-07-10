@@ -36,9 +36,12 @@ def grid(bounds, zoomLevels):
         for tileX in xrange(tileMinX, tileMaxX + 1):
             for tileY in xrange(tileMinY, tileMaxY + 1):
                 yield (geodetic.TileBounds(tileX, tileY, tileZ), (tileX, tileY, tileZ))
-
+# shared counter
 tilecount = multiprocessing.Value('i',0)
+# per process counter
+count = 0
 def worker(job):
+    global count
     tstart = time.time()
     session = None
     pid = os.getpid()
@@ -97,9 +100,13 @@ def worker(job):
             tend = time.time()
             #logger.info('[%s] It took %s to create %s tile on S3.' % (pid, str(tend-tstart), bucketKey))
             tilecount.value += 1
-            val = tilecount.value
-            if val % 100 == 0:
-                logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend-t0)), val))
+            count += 1
+            if count == 1:
+                logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend-t0)), count))
+
+            #val = tilecount.value
+            #if val % 100 == 0:
+            #    logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend-t0)), val))
 
         else:
             # One should write an empyt tile
@@ -146,20 +153,17 @@ class TilerManager:
 
         bucket = getBucket()
         # Keep of the overall number of tiles that have been created
-        maxtiles = 30
-        maxtiles = 10000000000000
         jobs = []
 
         print "preparing jobs, please wait %s" % self.multiProcessing
         for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), range(self.tileMinZ, self.tileMaxZ + 1)):
             job = (self.config, self.tileMinZ, self.tileMaxZ, bounds, tileXYZ, self.t0, bucket)
             jobs.append(job)
-            if len(jobs) >= maxtiles:
-                break
+
+        print len(jobs)
 
         tstart = time.time()
 
-        self.multiProcessing = 1
         if self.multiProcessing > 0:
             print NUMBER_POOL_PROCESSES
             pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES)
