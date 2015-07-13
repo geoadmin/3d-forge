@@ -413,8 +413,8 @@ class TerrainTile:
         bLon = MAX / (self._east - self._west)
         bLat = MAX / (self._north - self._south)
 
-        quantizeLonIndices = lambda x: int(round((x - self._west) * bLon))
-        quantizeLatIndices = lambda x: int(round((x - self._south) * bLat))
+        quantizeLonIndices = lambda x: int((x - self._west) * bLon)
+        quantizeLatIndices = lambda x: int((x - self._south) * bLat)
 
         deniv = self.header['maximumHeight'] - self.header['minimumHeight']
         # In case a tile is completely flat
@@ -432,6 +432,11 @@ class TerrainTile:
 
         # List all the vertices on the edge of the tile
         # High water mark encoded?
+        latsWest = []
+        latsEast = []
+        lonsSouth = []
+        lonsNorth = []
+
         for i in xrange(0, len(self.indices)):
             # Use original coordinates
             indice = self.indices[i]
@@ -439,11 +444,21 @@ class TerrainTile:
             lat = topology.vVertex[indice]
 
             if lon == self._west and indice not in self.westI:
+                latsWest.append(lat)
                 self.westI.append(indice)
             elif lon == self._east and indice not in self.eastI:
+                latsEast.append(lat)
                 self.eastI.append(indice)
 
             if lat == self._south and indice not in self.southI:
+                lonsSouth.append(lon)
                 self.southI.append(indice)
             elif lat == self._north and indice not in self.northI:
+                lonsNorth.append(lon)
                 self.northI.append(indice)
+
+        # sort indice according to lon or lat
+        latsWest, self.westI = zip(*sorted(zip(latsWest, self.westI), reverse=True))
+        latsEast, self.eastI = zip(*sorted(zip(latsEast, self.eastI)))
+        lonsSouth, self.southI = zip(*sorted(zip(lonsSouth, self.southI), reverse=True))
+        lonsNorth, self.northI = zip(*sorted(zip(lonsNorth, self.northI)))

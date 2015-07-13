@@ -37,6 +37,8 @@ def grid(bounds, zoomLevels):
         for tileX in xrange(tileMinX, tileMaxX + 1):
             for tileY in xrange(tileMinY, tileMaxY + 1):
                 yield (geodetic.TileBounds(tileX, tileY, tileZ), (tileX, tileY, tileZ))
+
+
 # shared counter
 tilecount = multiprocessing.Value('i', 0)
 # per process counter
@@ -102,13 +104,12 @@ def worker(job):
             tend = time.time()
             # logger.info('[%s] It took %s to create %s tile on S3.' % (pid, str(tend-tstart), bucketKey))
             tilecount.value += 1
-            count += 1
-            if count == 1:
-                logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend - t0)), count))
+            logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend - t0)), count))
 
             # val = tilecount.value
             #  if val % 100 == 0:
             #     logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend-t0)), val))
+            count += 1
 
         else:
             # One should write an empyt tile
