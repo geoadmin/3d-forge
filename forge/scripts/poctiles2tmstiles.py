@@ -87,19 +87,13 @@ def main():
 
                     terFromPoc = TerrainTile()
                     terFromPoc.fromFile(tms_file_name, tilebounds[0], tilebounds[2], tilebounds[1], tilebounds[3])
-                    print tilebounds[0], tilebounds[2], tilebounds[1], tilebounds[3]
 
                     terFromShape = TerrainTile()
                     terFromShape.fromTerrainTopology(topology)
-                    # replace header with original
                     terFromShape.toFile(tms_from_shape_file_name)
 
                     # Use this to select what is written to s3
-                    # ter2 = terFromPoc
                     ter2 = terFromShape
-                    ter2.header['horizonOcclusionPointX'] = ter.header['horizonOcclusionPointX']
-                    ter2.header['horizonOcclusionPointY'] = ter.header['horizonOcclusionPointY']
-                    ter2.header['horizonOcclusionPointZ'] = ter.header['horizonOcclusionPointZ']
 
                     fileObject = ter2.toStringIO()
                     compressedFile = gzipFileObject(fileObject)

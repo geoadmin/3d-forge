@@ -11,6 +11,7 @@ requires = [
         'awscli>=1.7.31',
         'boto>=2.38',
         'psycopg2',
+        'numpy',
         'sqlalchemy',
         'shapely',
     ]
