@@ -89,7 +89,47 @@ class TerrainTopology(object):
         # Remove last point of the polygon and keep only 3 coordinates
         return points[0: len(points) - 1]
 
+    def _isRingClockWise(self, ring):
+        '''
+        The below code does not work
+        correctly for sphere coordinates (lon/lat)
+        Therefore, I commented it out.
+
+        We assume that all rings from shapefiles
+        are in clockwise. It turns out, that this
+        assumption is probably correct.
+
+        It would still be good to have a real check
+        for winding order to accomodate for different sources.
+        '''
+        '''
+        area = 0.0
+        for index, coord in enumerate(ring):
+            p1 = coord
+            if index == len(ring) - 1:
+                p2 = ring[0]
+            else:
+                p2 = ring[index + 1]
+
+            area += ((p1[0] * p2[1]) - (p2[0] * p1[1]))
+
+        return area > 0.0
+        '''
+        return True
+
+    def _assureRingCounterClockWise(self, ring):
+        if len(ring) != 3:
+            raise TypeError('A ring must have exactly 3 coordinates.')
+
+        # If clockwise, we make it counterclockwise
+        if self._isRingClockWise(ring):
+            ring[1], ring[2] = ring[2], ring[1]
+
+        return ring
+
     def _buildTopologyFromRing(self, ring):
+        ring = self._assureRingCounterClockWise(ring)
+
         for coord in ring:
             indexData = self._findVertexIndex(coord)
             if indexData is not None:

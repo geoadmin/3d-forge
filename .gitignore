@@ -3,3 +3,4 @@ venv
 *.pyc
 *.swp
 apache/testapp.conf
+tmp/*

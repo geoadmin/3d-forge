@@ -7,6 +7,7 @@ import osgeo.osr as osr
 from collections import OrderedDict
 from forge.lib.topology import TerrainTopology
 from forge.lib.bounding_sphere import BoundingSphere
+import forge.lib.horizon_occlusion_point as occ
 from forge.lib.helpers import zigZagDecode, zigZagEncode, transformCoordinate
 from forge.lib.llh_ecef import LLH2ECEF
 from forge.lib.decoders import unpackEntry, unpackIndices, decodeIndices, packEntry, packIndices, encodeIndices
@@ -380,8 +381,9 @@ class TerrainTile:
             ecefMinY + (ecefMaxY - ecefMinY) * 0.5,
             ecefMinZ + (ecefMaxZ - ecefMinZ) * 0.5
         ]
-        # TODO just for now
-        occlusionPCoords = [0.5, 0.5, 0.5]
+
+        occlusionPCoords = occ.fromPoints(ecefCoords, bSphere)
+
         for k, v in TerrainTile.quantizedMeshHeader.iteritems():
             if k == 'centerX':
                 self.header[k] = centerCoords[0]
