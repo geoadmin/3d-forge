@@ -2,12 +2,17 @@
 
 import math
 
+# Constants taken from http://cesiumjs.org/2013/04/25/Horizon-culling/
+radiusX = 6378137.0
+radiusY = 6378137.0
+radiusZ = 6356752.3142451793
+
 # Stolen from https://github.com/bistromath/gr-air-modes/blob/master/python/mlat.py
 # WGS84 reference ellipsoid constants
 # http://en.wikipedia.org/wiki/Geodetic_datum#Conversion_calculations
 # http://en.wikipedia.org/wiki/File%3aECEF.png
-wgs84_a = 6378137.0               # Semi-major axis
-wgs84_b = 6356752.314245          # Semi-minor axis
+wgs84_a = radiusX               # Semi-major axis
+wgs84_b = radiusZ          # Semi-minor axis
 wgs84_e2 = 0.0066943799901975848  # First eccentricity squared
 wgs84_a2 = wgs84_a ** 2           # To speed things up a bit
 wgs84_b2 = wgs84_b ** 2

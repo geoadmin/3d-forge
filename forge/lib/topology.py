@@ -93,7 +93,7 @@ class TerrainTopology(object):
         '''
         The below code does not work
         correctly for sphere coordinates (lon/lat)
-        Therefore, I commente it out.
+        Therefore, I commented it out.
 
         We assume that all rings from shapefiles
         are in clockwise. It turns out, that this
@@ -123,9 +123,7 @@ class TerrainTopology(object):
 
         # If clockwise, we make it counterclockwise
         if self._isRingClockWise(ring):
-            temp = ring[1]
-            ring[1] = ring[2]
-            ring[2] = temp
+            ring[1], ring[2] = ring[2], ring[1]
 
         return ring
 

@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import math
-import forge.lib.cartesian3d as c3d
 import numpy as np
 
+import forge.lib.cartesian3d as c3d
+import forge.lib.llh_ecef as ecef
+
 # Constants taken from http://cesiumjs.org/2013/04/25/Horizon-culling/
-rX = 1.0 / 6378137.0
-rY = 1.0 / 6378137.0
-rZ = 1.0 / 6356752.3142451793
+rX = 1.0 / ecef.radiusX
+rY = 1.0 / ecef.radiusY
+rZ = 1.0 / ecef.radiusZ
 
 # Functions assumes ellipsoid scaled coordinates
 def computeMagnitude(point, sphereCenter):
