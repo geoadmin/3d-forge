@@ -5,15 +5,13 @@ AliasMatch ^/${user}/3dtest(.*)$ ${directory}/3d-testapp/$1
     Allow from all
 </Directory>
 
-ProxyPassMatch ^/${user}/tiles/([0-9]*)/(.*)$ http://localhost:9014/tiles/$1/$2
-<Proxy http://localhost:9014>
-    Order deny,alloW
-    Allow from all
-</Proxy>
+RewriteRule ^/${user}/tiles/([0-7]?)/(.*)$ http://ec2-54-220-242-89.eu-west-1.compute.amazonaws.com/stk-terrain/tilesets/swisseudem/tiles/$1/$2 [L,P,QSA]
 
-ProxyPassMatch ^/${user}/tiles/(.*)$ http://ec2-54-220-242-89.eu-west-1.compute.amazonaws.com/stk-terrain/tilesets/swisseudem/tiles/$1
-<Proxy http://ec2-54-220-242-89.eu-west-1.compute.amazonaws.com>
-    Order deny,allow
-    Allow from all
-</Proxy>
+RewriteRule ^/${user}/tiles/(8|9|[0-9]{2})/(.*) http://tms3d.geo.admin.ch.s3.amazonaws.com/$1/$2 [L,P,QSA]
 
+RewriteRule ^/${user}/tiles/(.*)$ http://ec2-54-220-242-89.eu-west-1.compute.amazonaws.com/stk-terrain/tilesets/swisseudem/tiles/$1 [P,QSA]
+
+<Location /${user}/tiles>
+  Order deny,allow
+  Allow from all
+</Location>
