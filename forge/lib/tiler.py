@@ -37,6 +37,7 @@ def grid(bounds, zoomLevels):
         for tileX in xrange(tileMinX, tileMaxX + 1):
             for tileY in xrange(tileMinY, tileMaxY + 1):
                 yield (geodetic.TileBounds(tileX, tileY, tileZ), (tileX, tileY, tileZ))
+
 # shared counter
 tilecount = multiprocessing.Value('i', 0)
 # per process counter
@@ -62,7 +63,6 @@ def worker(job):
                     break
 
         db = DB('database.cfg')
-        # session = scoped_session(sessionmaker(bind=db.userEngine))
         session = sessionmaker()(bind=db.userEngine)
 
         model = loc_models[str(tileXYZ[2])]
@@ -86,36 +86,32 @@ def worker(job):
 
             # Prepare terrain tile
             terrainTopo = TerrainTopology(ringsCoordinates=rings)
-            # logger.info('[%s] Building topology for %s rings' % (pid, len(rings)))
             terrainTopo.fromRingsCoordinates()
-            # logger.info('[%s] Terrain topology has been created' % pid)
             terrainFormat = TerrainTile()
-            # logger.info('[%s] Creating terrain tile' % pid)
             terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
-            # logger.info('[%s] Terrain tile has been created' % pid)
 
             # Bytes manipulation and compression
             fileObject = terrainFormat.toStringIO()
             compressedFile = gzipFileObject(fileObject)
 
-            # logger.info('[%s] Uploading %s to S3' % (pid, bucketKey))
             writeToS3(bucket, bucketKey, compressedFile)
             tend = time.time()
-            # logger.info('[%s] It took %s to create %s tile on S3.' % (pid, str(tend-tstart), bucketKey))
             tilecount.value += 1
             count += 1
-            logger.info('[%s] It took %s to create %s tile on S3. (%s total in this process)' % (pid, str(datetime.timedelta(seconds=tend - tstart)), bucketKey, count))
 
             val = tilecount.value
-            if val % 10 == 0:
+            if val % 100 == 0:
+                logger.info('%s last tile address written is S3 was %.' % bucketKey)
                 logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend-t0)), val))
 
         else:
             # One should write an empyt tile
-            logger.info('[%s] Skipping %s because no features have been found for this tile' % bucketKey)
+            logger.info('[%s] Skipping %s because no features have been found for this tile' % (pid, bucketKey))
 
     except Exception as e:
-        logger.info('[%s] -------- ERROR --------- %s' % (pid, e))
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        logger.debug("*** Traceback:/n" + traceback.print_tb(exc_traceback, limit=1, file=sys.stdout))
+        logger.debug("*** Exception:/n" + traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout))
         retval = 2
 
     finally:
