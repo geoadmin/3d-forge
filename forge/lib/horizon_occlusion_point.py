@@ -12,6 +12,8 @@ rY = 1.0 / ecef.radiusY
 rZ = 1.0 / ecef.radiusZ
 
 # Functions assumes ellipsoid scaled coordinates
+
+
 def computeMagnitude(point, sphereCenter):
     magnitudeSquared = c3d.magnitudeSquared(point)
     magnitude = math.sqrt(magnitudeSquared)
@@ -25,7 +27,7 @@ def computeMagnitude(point, sphereCenter):
     cosBeta = 1.0 / magnitude
     sinBeta = math.sqrt(magnitudeSquared - 1.0) * cosBeta
     return 1.0 / (cosAlpha * cosBeta - sinAlpha * sinBeta)
- 
+
 
 # https://cesiumjs.org/2013/05/09/Computing-the-horizon-occlusion-point/
 def fromPoints(points, boundingSphere):

@@ -27,6 +27,7 @@ config = ConfigParser.RawConfigParser()
 config.read('database.cfg')
 logger = getLogger(config, __name__, suffix=timestamp())
 
+
 def grid(bounds, zoomLevels):
     geodetic = GlobalGeodetic(True)
 
@@ -37,12 +38,13 @@ def grid(bounds, zoomLevels):
             for tileY in xrange(tileMinY, tileMaxY + 1):
                 yield (geodetic.TileBounds(tileX, tileY, tileZ), (tileX, tileY, tileZ))
 # shared counter
-tilecount = multiprocessing.Value('i',0)
+tilecount = multiprocessing.Value('i', 0)
 # per process counter
 count = 0
+
+
 def worker(job):
     global count
-    tstart = time.time()
     session = None
     pid = os.getpid()
     retval = 0
@@ -83,30 +85,30 @@ def worker(job):
 
             # Prepare terrain tile
             terrainTopo = TerrainTopology(ringsCoordinates=rings)
-            #logger.info('[%s] Building topology for %s rings' % (pid, len(rings)))
+            # logger.info('[%s] Building topology for %s rings' % (pid, len(rings)))
             terrainTopo.fromRingsCoordinates()
-            #logger.info('[%s] Terrain topology has been created' % pid)
+            # logger.info('[%s] Terrain topology has been created' % pid)
             terrainFormat = TerrainTile()
-            #logger.info('[%s] Creating terrain tile' % pid)
+            # logger.info('[%s] Creating terrain tile' % pid)
             terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
-            #logger.info('[%s] Terrain tile has been created' % pid)
+            # logger.info('[%s] Terrain tile has been created' % pid)
 
             # Bytes manipulation and compression
             fileObject = terrainFormat.toStringIO()
             compressedFile = gzipFileObject(fileObject)
 
-            #logger.info('[%s] Uploading %s to S3' % (pid, bucketKey))
+            # logger.info('[%s] Uploading %s to S3' % (pid, bucketKey))
             writeToS3(bucket, bucketKey, compressedFile)
             tend = time.time()
-            #logger.info('[%s] It took %s to create %s tile on S3.' % (pid, str(tend-tstart), bucketKey))
+            # logger.info('[%s] It took %s to create %s tile on S3.' % (pid, str(tend-tstart), bucketKey))
             tilecount.value += 1
             count += 1
             if count == 1:
-                logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend-t0)), count))
+                logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend - t0)), count))
 
-            #val = tilecount.value
-            #if val % 100 == 0:
-            #    logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend-t0)), val))
+            # val = tilecount.value
+            #  if val % 100 == 0:
+            #     logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend-t0)), val))
 
         else:
             # One should write an empyt tile
@@ -122,7 +124,6 @@ def worker(job):
             db.userEngine.dispose()
 
     return retval
-
 
 
 class TilerManager:
@@ -178,25 +179,24 @@ class TilerManager:
                     if p.exitcode is None:
                         p.terminate()
                     del pool._pool[i]
-                log.error('Error while tiles: %s', e)
+                logger.error('Error while tiles: %s', e)
                 exc_type, exc_value, exc_traceback = sys.exc_info()
-                log.debug("*** Traceback:/n" + traceback.print_tb(exc_traceback, limit=1, file=sys.stdout))
-                log.debug("*** Exception:/n" + traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout))
+                logger.debug("*** Traceback:/n" + traceback.print_tb(exc_traceback, limit=1, file=sys.stdout))
+                logger.debug("*** Exception:/n" + traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout))
                 return 1
-                    
+
         else:
             for j in jobs:
                 worker(j)
         tend = time.time()
-        logger.info('It took %s create %s tiles' % (str(datetime.timedelta(seconds=tend-tstart)), len(jobs)))
-        
+        logger.info('It took %s create %s tiles' % (str(datetime.timedelta(seconds=tend - tstart)), len(jobs)))
 
     def stats(self):
         msg = '\n'
         geodetic = GlobalGeodetic(True)
         bounds = (self.minLon, self.minLat, self.maxLon, self.maxLat)
         zooms = range(self.tileMinZ, self.tileMaxZ + 1)
-        
+
         db = DB('database.cfg')
         self.DBSession = scoped_session(sessionmaker(bind=db.userEngine))
 
