@@ -22,6 +22,7 @@ tms_file_name = "tmp/tms.terrain"
 shape_file_name = "tmp/shape.shp"
 tms_from_shape_file_name = "tmp/tms.from.shape.terrain"
 
+
 def usage():
     print(dedent('''\
         Usage: venv/bin/python forge/script/poctiles2tmstiles.py <file>')
@@ -66,7 +67,7 @@ def main():
 
                     ter = TerrainTile()
                     ter.fromFile(temp_file_name, tilebounds[0], tilebounds[2], tilebounds[1], tilebounds[3])
-            
+
                     if os.path.isfile(tms_file_name):
                         os.remove(tms_file_name)
 
@@ -81,21 +82,24 @@ def main():
 
                     shapefile = ShpToGDALFeatures(shpFilePath=shape_file_name)
                     features = shapefile.__read__()
-                    terrainTopo = TerrainTopology(features=features)
-                    terrainTopo.fromFeatures()
+                    topology = TerrainTopology(features=features)
+                    topology.fromFeatures()
 
                     terFromPoc = TerrainTile()
                     terFromPoc.fromFile(tms_file_name, tilebounds[0], tilebounds[2], tilebounds[1], tilebounds[3])
                     print tilebounds[0], tilebounds[2], tilebounds[1], tilebounds[3]
 
                     terFromShape = TerrainTile()
-                    terFromShape.fromTerrainTopology(terrainTopo)
+                    terFromShape.fromTerrainTopology(topology)
+                    # replace header with original
                     terFromShape.toFile(tms_from_shape_file_name)
-                     
-                    # Use this to select what is written to s3
-                    ter2 = terFromPoc
-                    #ter2 = terFromShape   
 
+                    # Use this to select what is written to s3
+                    # ter2 = terFromPoc
+                    ter2 = terFromShape
+                    ter2.header['horizonOcclusionPointX'] = ter.header['horizonOcclusionPointX']
+                    ter2.header['horizonOcclusionPointY'] = ter.header['horizonOcclusionPointY']
+                    ter2.header['horizonOcclusionPointZ'] = ter.header['horizonOcclusionPointZ']
 
                     fileObject = ter2.toStringIO()
                     compressedFile = gzipFileObject(fileObject)
