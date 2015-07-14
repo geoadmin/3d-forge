@@ -168,22 +168,23 @@ class DB:
         self.logger.info('Action: populateTables()')
         session = scoped_session(sessionmaker(bind=self.userEngine))
         for model in models:
-            shpFile = model.__shapefile__
-            if not os.path.exists(shpFile):
-                self.logger.error('Shapefile %s does not exists' % shpFile)
-                sys.exit(1)
-            features = ShpToGDALFeatures(shpFile).__read__()
             count = 1
-            bulk = BulkInsert(model, session, withAutoCommit=1000)
-            for feature in features:
-                polygon = feature.GetGeometryRef()
-                bulk.add(dict(
-                    id=count,
-                    the_geom=WKTElement(polygon.ExportToWkt(), 4326)
-                ))
-                count += 1
-            bulk.commit()
-            self.logger.info('Commit features for %s.' % shpFile)
+            shpFiles = model.__shapefiles__
+            for shpFile in shpFiles:
+                if not os.path.exists(shpFile):
+                    self.logger.error('Shapefile %s does not exists' % shpFile)
+                    sys.exit(1)
+                features = ShpToGDALFeatures(shpFile).__read__()
+                bulk = BulkInsert(model, session, withAutoCommit=1000)
+                for feature in features:
+                    polygon = feature.GetGeometryRef()
+                    bulk.add(dict(
+                        id=count,
+                        the_geom=WKTElement(polygon.ExportToWkt(), 4326)
+                    ))
+                    count += 1
+                bulk.commit()
+                self.logger.info('Commit features for %s.' % shpFile)
         self.logger.info('All tables have been created.')
 
     def dropDatabase(self):
