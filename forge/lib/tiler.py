@@ -56,7 +56,6 @@ def worker(job):
     session = None
     pid = os.getpid()
     retval = 0
-    tstart = time.time()
 
     try:
         (config, tileMinZ, tileMaxZ, bounds, tileXYZ, t0, bucket) = job
@@ -199,7 +198,7 @@ class TilerManager:
             for j in self.jobs():
                 worker(j)
         tend = time.time()
-        logger.info('It took %s create %s tiles' % (str(datetime.timedelta(seconds=tend - tstart)), len(jobs)))
+        logger.info('It took %s create %s tiles' % (str(datetime.timedelta(seconds=tend - tstart)), len(self.jobs)))
 
     def stats(self):
         msg = '\n'
