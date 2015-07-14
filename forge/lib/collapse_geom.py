@@ -50,7 +50,7 @@ def collapseIntoTriangles(ring):
         coordsPairs = createCoordsPairs(coords)
         sDistances = squaredDistances(coordsPairs)
 
-        index = sDistances.index(max(sDistances))
+        index = sDistances.index(min(sDistances))
         i = getCoordsIndex(len(coords), index)
         triangle = coordsPairs[index] + [coords[i]]
         triangles.append(triangle)
