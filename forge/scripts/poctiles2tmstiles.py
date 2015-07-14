@@ -13,8 +13,8 @@ from forge.lib.helpers import error
 from forge.models.terrain import TerrainTile
 from forge.lib.helpers import gzipFileObject
 from forge.lib.boto_conn import getBucket, writeToS3
-from forge.lib.shapefile_utils import ShpToGDALFeatures
-from forge.lib.topology import TerrainTopology
+# from forge.lib.shapefile_utils import ShpToGDALFeatures
+# from forge.lib.topology import TerrainTopology
 
 
 poc_base_url = "http://ec2-54-220-242-89.eu-west-1.compute.amazonaws.com/stk-terrain/tilesets/swisseudem/tiles/"
@@ -33,7 +33,7 @@ def usage():
         - t (to zoom level, as read from top-level layers.json
 
         The <file> contains tiles to transform in the form /z/x/y
-        
+
         <file> and -f/-t are mutually exclusive (can't have both at same time)
 
         Script will
@@ -63,7 +63,7 @@ def main():
         if len(args) != 1:
             error("Please specify a file.", 4, usage=usage)
         ffile = args[0]
-    
+
     tiles = []
 
     # We have file, so we get the tiles from the file
@@ -93,7 +93,7 @@ def main():
     for tile in tiles:
         req = None
         tilebounds = g.TileBounds(tile[1], tile[2], tile[0])
-        tilestring = str(tile[0]) + "/" + str(tile[1]) + "/" +  str(tile[2])
+        tilestring = str(tile[0]) + "/" + str(tile[1]) + "/" + str(tile[2])
         try:
             url = poc_base_url + tilestring + ".terrain?v=2.0.0"
             req = urlopen(url)
