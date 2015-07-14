@@ -48,6 +48,7 @@ def worker(job):
     session = None
     pid = os.getpid()
     retval = 0
+    tstart = time.time()
 
     try:
         (config, tileMinZ, tileMaxZ, bounds, tileXYZ, t0, bucket) = job
@@ -103,12 +104,11 @@ def worker(job):
             # logger.info('[%s] It took %s to create %s tile on S3.' % (pid, str(tend-tstart), bucketKey))
             tilecount.value += 1
             count += 1
-            if count == 1:
-                logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend - t0)), count))
+            logger.info('[%s] It took %s to create %s tile on S3. (%s total in this process)' % (pid, str(datetime.timedelta(seconds=tend - tstart)), bucketKey, count))
 
-            # val = tilecount.value
-            #  if val % 100 == 0:
-            #     logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend-t0)), val))
+            val = tilecount.value
+            if val % 10 == 0:
+                logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend-t0)), val))
 
         else:
             # One should write an empyt tile
