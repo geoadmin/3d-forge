@@ -108,7 +108,7 @@ def worker(job):
 
             val = tilecount.value
             if val % 10 == 0:
-                logger.info('%s last tile address written is S3 was %.' % bucketKey)
+                logger.info('The last tile address written is S3 was %s.' % bucketKey)
                 logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend - t0)), val))
 
         else:
@@ -153,26 +153,21 @@ class TilerManager:
                     self.models[str(i)] = model
                     break
 
-    def create(self):
+    def __iter__(self):
+        return self.jobs()
 
+    def jobs(self):
         bucket = getBucket()
-        # Keep of the overall number of tiles that have been created
-        jobs = []
-
-        print "preparing jobs, please wait %s" % self.multiProcessing
         for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), range(self.tileMinZ, self.tileMaxZ + 1)):
-            job = (self.config, self.tileMinZ, self.tileMaxZ, bounds, tileXYZ, self.t0, bucket)
-            jobs.append(job)
+            yield (self.config, self.tileMinZ, self.tileMaxZ, bounds, tileXYZ, self.t0, bucket)
 
-        print len(jobs)
-
+    def create(self):
         tstart = time.time()
 
         if self.multiProcessing > 0:
-            print NUMBER_POOL_PROCESSES
             pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES, init_worker)
             # Async needed to catch keyboard interrupt
-            async = pool.map_async(worker, jobs)
+            async = pool.map_async(worker, self)
             close = True
             try:
                 while not async.ready():
@@ -201,7 +196,7 @@ class TilerManager:
                 return 1
 
         else:
-            for j in jobs:
+            for j in self.jobs():
                 worker(j)
         tend = time.time()
         logger.info('It took %s create %s tiles' % (str(datetime.timedelta(seconds=tend - tstart)), len(jobs)))
