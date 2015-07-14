@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-
+import math
 from osgeo import ogr
 
 
@@ -89,42 +89,18 @@ class TerrainTopology(object):
         # Remove last point of the polygon and keep only 3 coordinates
         return points[0: len(points) - 1]
 
-    def _isRingClockWise(self, ring):
-        '''
-        The below code does not work
-        correctly for sphere coordinates (lon/lat)
-        Therefore, I commented it out.
-
-        We assume that all rings from shapefiles
-        are in clockwise. It turns out, that this
-        assumption is probably correct.
-
-        It would still be good to have a real check
-        for winding order to accomodate for different sources.
-        '''
-        '''
-        area = 0.0
-        for index, coord in enumerate(ring):
-            p1 = coord
-            if index == len(ring) - 1:
-                p2 = ring[0]
-            else:
-                p2 = ring[index + 1]
-
-            area += ((p1[0] * p2[1]) - (p2[0] * p1[1]))
-
-        return area > 0.0
-        '''
-        return True
-
+    # Inspired by http://stackoverflow.com/questions/1709283/how-can-i-sort-a-coordinate-list-for-a-rectangle-counterclockwise
     def _assureRingCounterClockWise(self, ring):
         if len(ring) != 3:
             raise TypeError('A ring must have exactly 3 coordinates.')
 
-        # If clockwise, we make it counterclockwise
-        if self._isRingClockWise(ring):
-            ring[1], ring[2] = ring[2], ring[1]
+        mlat = sum(coord[0] for coord in ring) / float(len(ring))
+        mlon = sum(coord[1] for coord in ring) / float(len(ring))
 
+        def algo(coord):
+            return (math.atan2(coord[0] - mlat, coord[1] - mlon) + 2 * math.pi) % (2 * math.pi)
+
+        ring.sort(key=algo, reverse=True)
         return ring
 
     def _buildTopologyFromRing(self, ring):
