@@ -4,6 +4,7 @@ import time
 import datetime
 import ConfigParser
 import multiprocessing
+import signal
 import sys
 import os
 import traceback
@@ -42,6 +43,12 @@ def grid(bounds, zoomLevels):
 tilecount = multiprocessing.Value('i', 0)
 # per process counter
 count = 0
+
+
+# Worker processes won't recieve KeyboradInterrupts. It's parents
+# responsibility to handle those (mainly Ctlr-C)
+def init_worker():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
 def worker(job):
@@ -100,9 +107,9 @@ def worker(job):
             count += 1
 
             val = tilecount.value
-            if val % 100 == 0:
+            if val % 10 == 0:
                 logger.info('%s last tile address written is S3 was %.' % bucketKey)
-                logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend-t0)), val))
+                logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend - t0)), val))
 
         else:
             # One should write an empyt tile
@@ -163,9 +170,21 @@ class TilerManager:
 
         if self.multiProcessing > 0:
             print NUMBER_POOL_PROCESSES
-            pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES)
-            pool.map(worker, jobs)
-            pool.close()
+            pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES, init_worker)
+            # Async needed to catch keyboard interrupt
+            async = pool.map_async(worker, jobs)
+            close = True
+            try:
+                while not async.ready():
+                    time.sleep(3)
+            except KeyboardInterrupt:
+                close = False
+                pool.terminate()
+                logger.info('Keyboard interupt recieved')
+
+            if close:
+                pool.close()
+
             try:
                 pool.join()
                 pool.terminate()
