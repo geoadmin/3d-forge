@@ -198,7 +198,7 @@ class TilerManager:
             for j in self.jobs():
                 worker(j)
         tend = time.time()
-        logger.info('It took %s create %s tiles' % (str(datetime.timedelta(seconds=tend - tstart)), len(self.jobs)))
+        logger.info('It took %s create all the tiles' % str(datetime.timedelta(seconds=tend - tstart)))
 
     def stats(self):
         msg = '\n'
