@@ -75,6 +75,7 @@ class DB:
                 poolclass=NullPool
             )
         )
+        print  self.databaseConf.user, self.databaseConf.password, self.databaseConf.name
 #        self.logger.info('Database engines ready (server: %(host)s:%(port)d)' % dict(
 #            host=self.serverConf.host,
 #            port=self.serverConf.port

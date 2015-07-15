@@ -51,6 +51,13 @@ def init_worker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
+def take(X, Y, Z):
+    if X == 17101 and Y == 12444:
+        return True
+    if X == 17102 and Y == 12443:
+        return True
+    return False;
+
 def worker(job):
     global count
     session = None
@@ -68,14 +75,30 @@ def worker(job):
                     loc_models[str(i)] = model
                     break
 
+        if not take(tileXYZ[0], tileXYZ[1], tileXYZ[2]):
+            return retval
+ 
+        margin = 0.00000000001
+        bounds = (7.88818359375 - margin, 46.7138671875 - margin, 7.88818359375, 46.7138671875)
+        if tileXYZ[0] == 17101:
+            bounds = (7.88818359375, 46.7138671875, 7.88818359375 + margin, 46.7138671875 + margin)
+ 
         db = DB('database.cfg')
         session = sessionmaker()(bind=db.userEngine)
 
         model = loc_models[str(tileXYZ[2])]
         clippedGeometry = model.bboxClippedGeom(bounds)
+
+        
+
         query = session.query(clippedGeometry)
         query = query.filter(model.bboxIntersects(bounds))
+        print query
         ringsCoordinates = [list(to_shape(q[0]).exterior.coords) for q in query]
+
+        print ringsCoordinates
+        
+        return retval
 
         bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
         # Skip empty tiles for now, we should instead write an empty tile to S3
@@ -106,7 +129,7 @@ def worker(job):
             count += 1
 
             val = tilecount.value
-            if val % 10 == 0:
+            if val % 1 == 0:
                 logger.info('The last tile address written is S3 was %s.' % bucketKey)
                 logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend - t0)), val))
 
