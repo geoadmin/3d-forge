@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, and_
 from geoalchemy2.elements import WKBElement
 from shapely.geometry import box
 
@@ -36,7 +36,7 @@ class Vector(object):
         bboxGeom = shapelyBBox(bbox)
         wkbGeometry = WKBElement(buffer(bboxGeom.wkb), srid)
         geomColumn = cls.geometryColumn()
-        return func.ST_Intersects(geomColumn, wkbGeometry)
+        return and_(geomColumn.intersects(wkbGeometry), func.ST_Intersects(geomColumn, wkbGeometry))
 
 
 """
