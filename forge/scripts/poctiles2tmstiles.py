@@ -140,7 +140,7 @@ def main():
 
             bucketKey = tilestring + '.terrain'
             print 'Uploading %s to S3' % bucketKey
-            writeToS3(bucket, bucketKey, compressedFile)
+            writeToS3(bucket, bucketKey, compressedFile, 'POC Tiles copy')
 
         except Exception as e:
             print "error with " + line + " " + str(e)

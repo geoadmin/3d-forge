@@ -100,7 +100,7 @@ def worker(job):
             fileObject = terrainFormat.toStringIO()
             compressedFile = gzipFileObject(fileObject)
 
-            writeToS3(bucket, bucketKey, compressedFile)
+            writeToS3(bucket, bucketKey, compressedFile, model.__tablename__)
             tend = time.time()
             tilecount.value += 1
             count += 1
