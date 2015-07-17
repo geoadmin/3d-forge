@@ -28,16 +28,23 @@ config = ConfigParser.RawConfigParser()
 config.read('database.cfg')
 logger = getLogger(config, __name__, suffix=timestamp())
 
+def is_inside(tile, bounds):
+    if tile[0] >= bounds[0] and tile[1] >= bounds[1] and tile[2] <= bounds[2] and tile[3] >= bounds[3]:
+        return True
+    return False
 
-def grid(bounds, zoomLevels):
+def grid(bounds, zoomLevels, fullonly):
     geodetic = GlobalGeodetic(True)
 
     for tileZ in zoomLevels:
         tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], tileZ)
         tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], tileZ)
+
         for tileX in xrange(tileMinX, tileMaxX + 1):
             for tileY in xrange(tileMinY, tileMaxY + 1):
-                yield (geodetic.TileBounds(tileX, tileY, tileZ), (tileX, tileY, tileZ))
+                tilebounds = geodetic.TileBounds(tileX, tileY, tileZ)
+                if fullonly == 0 or is_inside(tilebounds, bounds):
+                    yield (tilebounds, (tileX, tileY, tileZ))
 
 # shared counter
 tilecount = multiprocessing.Value('i', 0)
@@ -139,6 +146,7 @@ class TilerManager:
         self.maxLon = float(config.get('Extent', 'maxLon'))
         self.minLat = float(config.get('Extent', 'minLat'))
         self.maxLat = float(config.get('Extent', 'maxLat'))
+        self.fullonly = int(config.get('Extent', 'fullonly'))
         self.tileMinZ = int(config.get('Zooms', 'tileMinZ'))
         self.tileMaxZ = int(config.get('Zooms', 'tileMaxZ'))
         self.multiProcessing = int(config.get('General', 'multiProcessing'))
@@ -157,11 +165,12 @@ class TilerManager:
 
     def jobs(self):
         bucket = getBucket()
-        for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), range(self.tileMinZ, self.tileMaxZ + 1)):
+        for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), range(self.tileMinZ, self.tileMaxZ + 1), self.fullonly):
             yield (self.config, self.tileMinZ, self.tileMaxZ, bounds, tileXYZ, self.t0, bucket)
 
     def create(self):
         tstart = time.time()
+        tilecount.value = 0
 
         if self.multiProcessing > 0:
             pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES, init_worker)
@@ -198,7 +207,7 @@ class TilerManager:
             for j in self.jobs():
                 worker(j)
         tend = time.time()
-        logger.info('It took %s create all the tiles' % str(datetime.timedelta(seconds=tend - tstart)))
+        logger.info('It took %s create all %s tiles' % (str(datetime.timedelta(seconds=tend - tstart)), tilecount.value))
 
     def stats(self):
         msg = '\n'
@@ -215,13 +224,21 @@ class TilerManager:
             nbObjects = self.DBSession.query(model).filter(model.bboxIntersects(bounds)).count()
             tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], zoom)
             tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], zoom)
-            xCount = tileMaxX - tileMinX
-            yCount = tileMaxY - tileMinY
-            nbTiles = xCount * yCount
+            # Fast approach, but might not be fully correct 
+            if self.fullonly == 1:
+                tileMinX += 1
+                tileMinY += 1
+                tileMaxX -= 1
+                tileMaxY -= 1
             tileBounds = geodetic.TileBounds(tileMinX, tileMinY, zoom)
+            xCount = tileMaxX - tileMinX + 1
+            yCount = tileMaxY - tileMinY + 1
+            nbTiles = xCount * yCount
             pointA = transformCoordinate('POINT(%s %s)' % (tileBounds[0], tileBounds[1]), 4326, 21781).GetPoints()[0]
             pointB = transformCoordinate('POINT(%s %s)' % (tileBounds[2], tileBounds[3]), 4326, 21781).GetPoints()[0]
             length = c2d.distance(pointA, pointB)
+            if self.fullonly == 1:
+                msg += 'WARNING: stats are approximative because fullonly is activated!\n'
             msg += 'At zoom %s:\n' % zoom
             msg += 'We expect %s tiles overall\n' % nbTiles
             msg += 'Min X is %s, Max X is %s\n' % (tileMinX, tileMaxX)
@@ -230,7 +247,8 @@ class TilerManager:
             msg += '%s rows over Y\n' % yCount
             msg += '\n'
             msg += 'A tile side is around %s meters long\n' % int(round(length))
-            msg += 'We have an average of about %s triangles per tile\n' % int(round(nbObjects / nbTiles))
+            if nbTiles > 0:
+                msg += 'We have an average of about %s triangles per tile\n' % int(round(nbObjects / nbTiles))
             msg += '\n'
 
         logger.info(msg)
