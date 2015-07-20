@@ -28,10 +28,12 @@ config = ConfigParser.RawConfigParser()
 config.read('database.cfg')
 logger = getLogger(config, __name__, suffix=timestamp())
 
+
 def is_inside(tile, bounds):
     if tile[0] >= bounds[0] and tile[1] >= bounds[1] and tile[2] <= bounds[2] and tile[3] >= bounds[3]:
         return True
     return False
+
 
 def grid(bounds, zoomLevels, fullonly):
     geodetic = GlobalGeodetic(True)
@@ -224,7 +226,7 @@ class TilerManager:
             nbObjects = self.DBSession.query(model).filter(model.bboxIntersects(bounds)).count()
             tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], zoom)
             tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], zoom)
-            # Fast approach, but might not be fully correct 
+            # Fast approach, but might not be fully correct
             if self.fullonly == 1:
                 tileMinX += 1
                 tileMinY += 1
