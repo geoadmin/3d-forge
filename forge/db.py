@@ -45,6 +45,7 @@ def populateFeatures(args):
 
         count = 1
         shp = ShpToGDALFeatures(shpFile)
+        logger.info('[%s]: Processing %s' % (pid, shpFile))
         bulk = BulkInsert(model, session, withAutoCommit=1000)
         for feature in shp.getFeatures():
             polygon = feature.GetGeometryRef()
