@@ -24,38 +24,43 @@ logger = getLogger(config, __name__, suffix='db_%s' % timestamp())
 # Create pickable object
 class PopulateFeaturesArguments:
 
-    def __init__(self, engineURL, modelIndex):
+    def __init__(self, engineURL, modelIndex, shpFile):
         self.engineURL = engineURL
         self.modelIndex = modelIndex
+        self.shpFile = shpFile
 
 
 def populateFeatures(args):
     pid = os.getpid()
-
+    session = None
     try:
         engine = sqlalchemy.create_engine(args.engineURL)
-        model = models[args.modelIndex]
-
         session = scoped_session(sessionmaker(bind=engine))
+        model = models[args.modelIndex]
+        shpFile = args.shpFile
+
+        if not os.path.exists(shpFile):
+            logger.error('[%s]: Shapefile %s does not exists' % (pid, shpFile))
+            sys.exit(1)
+
         count = 1
-        shpFiles = model.__shapefiles__
-        for shpFile in shpFiles:
-            if not os.path.exists(shpFile):
-                logger.error('[%s]: Shapefile %s does not exists' % (pid, shpFile))
-                sys.exit(1)
-            features = ShpToGDALFeatures(shpFile).__read__()
-            bulk = BulkInsert(model, session, withAutoCommit=1000)
-            for feature in features:
-                polygon = feature.GetGeometryRef()
-                bulk.add(dict(
-                    id=count,
-                    the_geom=WKTElement(polygon.ExportToWkt(), 4326)
-                ))
-                count += 1
-            bulk.commit()
-            logger.info('[%s]: Commit features for %s.' % (pid, shpFile))
+        shp = ShpToGDALFeatures(shpFile)
+        bulk = BulkInsert(model, session, withAutoCommit=1000)
+        for feature in shp.getFeatures():
+            polygon = feature.GetGeometryRef()
+            bulk.add(dict(
+                the_geom=WKTElement(polygon.ExportToWkt(), 4326)
+            ))
+            count += 1
+        bulk.commit()
+        logger.info('[%s]: Commit %s features for %s.' % (pid, count, shpFile))
     except Exception as e:
+        logger.error(e)
         raise Exception(e)
+    finally:
+        if session is not None:
+            session.close_all()
+            engine.dispose()
 
     return count
 
@@ -205,18 +210,21 @@ class DB:
 
     def populateTables(self):
         logger.info('Action: populateTables()')
+        featuresArgs = []
+        for i in range(0, len(models)):
+            model = models[i]
+            for shp in model.__shapefiles__:
+                featuresArgs.append(PopulateFeaturesArguments(
+                    self.userEngine.url,
+                    i,
+                    shp
+                ))
 
         try:
             pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
             pool.imap_unordered(
                 populateFeatures,
-                iterable=map(
-                    lambda model: PopulateFeaturesArguments(
-                        self.userEngine.url,
-                        models.index(model)
-                    ),
-                    models
-                )
+                iterable=featuresArgs
             )
         except Exception as e:
             logger.error('An error occured while populating the tables with shapefiles.')
