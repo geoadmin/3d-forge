@@ -47,7 +47,7 @@ To clone use the --recursive option to get all submodules.
 
 - sudo su postgres
 
-  * edit /etc/postgresql/9.1/main/postgresql.conf
+  * edit `/etc/postgresql/9.1/main/postgresql.conf`
 
   * uncommend `ssl=true` line
 
@@ -75,3 +75,13 @@ To clone use the --recursive option to get all submodules.
 
 - create tiles with `tmspyramid`, adapt `tms.cfg` for different tiler
   configurations
+
+- you can also deactivate stats collection by setting `track_activities` to off in `/etc/postgresql/9.1/main/postgresql.conf`
+
+## Remove logs
+
+    rm -f /var/log/tileforge/*.log
+
+    sudo su postgres
+
+    rm -r /var/log/postgresql/*

@@ -5,7 +5,7 @@ import ConfigParser
 from geoalchemy2 import Geometry
 from sqlalchemy import event
 from sqlalchemy.schema import CreateSchema
-from sqlalchemy import Column, Integer
+from sqlalchemy import Column, Sequence, Integer
 from sqlalchemy.ext.declarative import declarative_base
 from forge.models import Vector
 from forge.lib.helpers import isShapefile
@@ -21,11 +21,13 @@ WGS84Polygon = Geometry(geometry_type='POLYGON', srid=4326, dimension=3, spatial
 
 
 def modelFactory(BaseClass, tablename, shapefiles, classname):
+    sequence = Sequence('id_%s_seq' % tablename, schema=table_args['schema'])
+
     class NewClass(BaseClass, Vector):
         __tablename__ = tablename
         __table_args__ = table_args
         __shapefiles__ = shapefiles
-        id = Column(Integer(), nullable=False, primary_key=True)
+        id = Column(Integer(), sequence, nullable=False, primary_key=True)
         the_geom = Column('the_geom', WGS84Polygon)
     NewClass.__name__ = classname
     return NewClass

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import multiprocessing
 import sys
 import ConfigParser
 import sqlalchemy
@@ -11,8 +12,58 @@ from sqlalchemy.pool import NullPool
 from contextlib import contextmanager
 from forge.lib.logs import getLogger
 from forge.lib.shapefile_utils import ShpToGDALFeatures
-from forge.lib.helpers import BulkInsert
+from forge.lib.helpers import BulkInsert, timestamp
 from forge.models.tables import Base, models
+
+
+config = ConfigParser.RawConfigParser()
+config.read('database.cfg')
+logger = getLogger(config, __name__, suffix='db_%s' % timestamp())
+
+
+# Create pickable object
+class PopulateFeaturesArguments:
+
+    def __init__(self, engineURL, modelIndex, shpFile):
+        self.engineURL = engineURL
+        self.modelIndex = modelIndex
+        self.shpFile = shpFile
+
+
+def populateFeatures(args):
+    pid = os.getpid()
+    session = None
+    try:
+        engine = sqlalchemy.create_engine(args.engineURL)
+        session = scoped_session(sessionmaker(bind=engine))
+        model = models[args.modelIndex]
+        shpFile = args.shpFile
+
+        if not os.path.exists(shpFile):
+            logger.error('[%s]: Shapefile %s does not exists' % (pid, shpFile))
+            sys.exit(1)
+
+        count = 1
+        shp = ShpToGDALFeatures(shpFile)
+        logger.info('[%s]: Processing %s' % (pid, shpFile))
+        bulk = BulkInsert(model, session, withAutoCommit=1000)
+        for feature in shp.getFeatures():
+            polygon = feature.GetGeometryRef()
+            bulk.add(dict(
+                the_geom=WKTElement(polygon.ExportToWkt(), 4326)
+            ))
+            count += 1
+        bulk.commit()
+        logger.info('[%s]: Commit %s features for %s.' % (pid, count, shpFile))
+    except Exception as e:
+        logger.error(e)
+        raise Exception(e)
+    finally:
+        if session is not None:
+            session.close_all()
+            engine.dispose()
+
+    return count
 
 
 class DB:
@@ -44,8 +95,6 @@ class DB:
         self.adminConf = DB.Admin(config)
         self.databaseConf = DB.Database(config)
 
-        self.logger = getLogger(config, __name__, 'db')
-
         self.superEngine = sqlalchemy.create_engine(
             'postgresql+psycopg2://%(user)s:%(password)s@%(host)s:%(port)d/%(database)s' % dict(
                 user=self.adminConf.user,
@@ -75,10 +124,6 @@ class DB:
                 poolclass=NullPool
             )
         )
-#        self.logger.info('Database engines ready (server: %(host)s:%(port)d)' % dict(
-#            host=self.serverConf.host,
-#            port=self.serverConf.port
-#        ))
 
     @contextmanager
     def superConnection(self):
@@ -105,7 +150,7 @@ class DB:
         conn.close()
 
     def createUser(self):
-        self.logger.info('Action: createUser()')
+        logger.info('Action: createUser()')
         with self.superConnection() as conn:
             try:
                 conn.execute(
@@ -115,13 +160,13 @@ class DB:
                     )
                 )
             except ProgrammingError as e:
-                self.logger.error('Could not create user %(role)s: %(err)s' % dict(
+                logger.error('Could not create user %(role)s: %(err)s' % dict(
                     role=self.databaseConf.user,
                     err=str(e)
                 ))
 
     def createDatabase(self):
-        self.logger.info('Action: createDatabase()')
+        logger.info('Action: createDatabase()')
         with self.superConnection() as conn:
             try:
                 conn.execute(
@@ -131,7 +176,7 @@ class DB:
                     )
                 )
             except ProgrammingError as e:
-                self.logger.error('Could not create database %(name)s with owner %(role)s: %(err)s' % dict(
+                logger.error('Could not create database %(name)s with owner %(role)s: %(err)s' % dict(
                     name=self.databaseConf.name,
                     role=self.databaseConf.user,
                     err=str(e)
@@ -148,47 +193,52 @@ class DB:
                 )
                 )
             except ProgrammingError as e:
-                self.logger.error('Could not create database %(name)s with owner %(role)s: %(err)s' % dict(
+                logger.error('Could not create database %(name)s with owner %(role)s: %(err)s' % dict(
                     name=self.databaseConf.name,
                     role=self.databaseConf.user,
                     err=str(e)
                 ))
 
     def setupDatabase(self):
-        self.logger.info('Action: setupDatabase()')
+        logger.info('Action: setupDatabase()')
         try:
             Base.metadata.create_all(self.userEngine)
         except ProgrammingError as e:
-            self.logger.warning('Could not setup database on %(name)s: %(err)s' % dict(
+            logger.warning('Could not setup database on %(name)s: %(err)s' % dict(
                 name=self.databaseConf.name,
                 err=str(e)
             ))
 
     def populateTables(self):
-        self.logger.info('Action: populateTables()')
-        session = scoped_session(sessionmaker(bind=self.userEngine))
-        for model in models:
-            count = 1
-            shpFiles = model.__shapefiles__
-            for shpFile in shpFiles:
-                if not os.path.exists(shpFile):
-                    self.logger.error('Shapefile %s does not exists' % shpFile)
-                    sys.exit(1)
-                features = ShpToGDALFeatures(shpFile).__read__()
-                bulk = BulkInsert(model, session, withAutoCommit=1000)
-                for feature in features:
-                    polygon = feature.GetGeometryRef()
-                    bulk.add(dict(
-                        id=count,
-                        the_geom=WKTElement(polygon.ExportToWkt(), 4326)
-                    ))
-                    count += 1
-                bulk.commit()
-                self.logger.info('Commit features for %s.' % shpFile)
-        self.logger.info('All tables have been created.')
+        logger.info('Action: populateTables()')
+        featuresArgs = []
+        for i in range(0, len(models)):
+            model = models[i]
+            for shp in model.__shapefiles__:
+                featuresArgs.append(PopulateFeaturesArguments(
+                    self.userEngine.url,
+                    i,
+                    shp
+                ))
+
+        try:
+            pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+            pool.imap_unordered(
+                populateFeatures,
+                iterable=featuresArgs
+            )
+        except Exception as e:
+            logger.error('An error occured while populating the tables with shapefiles.')
+            logger.error(e)
+            raise Exception(e)
+        finally:
+            pool.close()
+            pool.join()
+
+        logger.info('All tables have been created.')
 
     def dropDatabase(self):
-        self.logger.info('Action: dropDatabase()')
+        logger.info('Action: dropDatabase()')
         with self.superConnection() as conn:
             try:
                 conn.execute(
@@ -197,13 +247,13 @@ class DB:
                     )
                 )
             except ProgrammingError as e:
-                self.logger.error('Could not drop database %(name)s: %(err)s' % dict(
+                logger.error('Could not drop database %(name)s: %(err)s' % dict(
                     name=self.databaseConf.name,
                     err=str(e)
                 ))
 
     def dropUser(self):
-        self.logger.info('Action: dropUser()')
+        logger.info('Action: dropUser()')
         with self.superConnection() as conn:
             try:
                 conn.execute(
@@ -212,19 +262,19 @@ class DB:
                     )
                 )
             except ProgrammingError as e:
-                self.logger.error('Could not drop user %(role)s: %(err)s' % dict(
+                logger.error('Could not drop user %(role)s: %(err)s' % dict(
                     role=self.databaseConf.user,
                     err=str(e)
                 ))
 
     def create(self):
-        self.logger.info('Action: create()')
+        logger.info('Action: create()')
         self.createUser()
         self.createDatabase()
         self.setupDatabase()
         self.populateTables()
 
     def destroy(self):
-        self.logger.info('Action: destroy()')
+        logger.info('Action: destroy()')
         self.dropDatabase()
         self.dropUser()
