@@ -6,7 +6,7 @@ import multiprocessing
 import sys
 import ConfigParser
 import sqlalchemy
-from geoalchemy2 import WKBElement
+from geoalchemy2 import WKTElement
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.pool import NullPool
@@ -50,8 +50,9 @@ def populateFeatures(args):
         bulk = BulkInsert(model, session, withAutoCommit=1000)
         for feature in shp.getFeatures():
             polygon = feature.GetGeometryRef()
+            # TODO Use WKBelement directly instead
             bulk.add(dict(
-                the_geom=WKBElement(buffer(polygon.ExportToWkb()), 4326)
+                the_geom=WKTElement(polygon.ExportToWkt(), 4326)
             ))
             count += 1
         bulk.commit()
