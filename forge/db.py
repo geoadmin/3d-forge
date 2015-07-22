@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import os
+import datetime
+import time
 import subprocess
 import multiprocessing
 import sys
 import ConfigParser
 import sqlalchemy
+import signal
 from geoalchemy2 import WKTElement
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.exc import ProgrammingError
@@ -228,6 +231,7 @@ class DB:
 
     def populateTables(self):
         logger.info('Action: populateTables()')
+        tstart = time.time()
         featuresArgs = []
         for i in range(0, len(models)):
             model = models[i]
@@ -238,21 +242,39 @@ class DB:
                     shp
                 ))
 
+        def init_worker():
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+        pool = multiprocessing.Pool(multiprocessing.cpu_count(), init_worker)
+        async = pool.map_async(populateFeatures, iterable=featuresArgs)
+        closed = False
+
         try:
-            pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-            pool.imap_unordered(
-                populateFeatures,
-                iterable=featuresArgs
-            )
+            while not async.ready():
+                time.sleep(3)
+        except KeyboardInterrupt:
+            closed = True
+            pool.terminate()
+            logger.info('Keyboard interupt recieved')
+
+        if not closed:
+            pool.close()
+
+        try:
+            pool.join()
+            pool.terminate()
         except Exception as e:
+            for i in reversed(range(len(pool._pool))):
+                p = pool._pool[i]
+                if p.exitcode is None:
+                    p.terminate()
+                del pool._pool[i]
             logger.error('An error occured while populating the tables with shapefiles.')
             logger.error(e)
             raise Exception(e)
-        finally:
-            pool.close()
-            pool.join()
 
-        logger.info('All tables have been created.')
+        tend = time.time()
+        logger.info('All tables have been created. It took %s' % str(datetime.timedelta(seconds=tend - tstart)))
 
     def dropDatabase(self):
         logger.info('Action: dropDatabase()')
