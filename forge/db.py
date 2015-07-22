@@ -288,8 +288,8 @@ class DB:
         logger.info('Action: create()')
         self.createUser()
         self.createDatabase()
-        self.setupFunctions()
         self.setupDatabase()
+        self.setupFunctions()
         self.populateTables()
 
     def destroy(self):
