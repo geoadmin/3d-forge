@@ -37,28 +37,28 @@ class TerrainTopology(object):
         self.maxHeight = float('-inf')
 
     def __str__(self):
-        str = 'Min height:'
-        str += '\n%s' % self.minHeight
-        str += '\nMax height:'
-        str += '\n%s' % self.maxHeight
-        str += '\nuVertex length:'
-        str += '\n%s' % len(self.uVertex)
-        str += '\nuVertex list:'
-        str += '\n%s' % self.uVertex
-        str += '\nvVertex length:'
-        str += '\n%s' % len(self.vVertex)
-        str += '\nuVertex list:'
-        str += '\n%s' % self.vVertex
-        str += '\nhVertex length:'
-        str += '\n%s' % len(self.hVertex)
-        str += '\nhVertex list:'
-        str += '\n%s' % self.hVertex
-        str += '\nindexData length:'
-        str += '\n%s' % len(self.indexData)
-        str += '\nindexData list:'
-        str += '\n%s' % self.indexData
-        str += '\nNumber of triangles: %s' % (len(self.indexData) / 3)
-        return str
+        msg = 'Min height:'
+        msg += '\n%s' % self.minHeight
+        msg += '\nMax height:'
+        msg += '\n%s' % self.maxHeight
+        msg += '\nuVertex length:'
+        msg += '\n%s' % len(self.uVertex)
+        msg += '\nuVertex list:'
+        msg += '\n%s' % self.uVertex
+        msg += '\nvVertex length:'
+        msg += '\n%s' % len(self.vVertex)
+        msg += '\nuVertex list:'
+        msg += '\n%s' % self.vVertex
+        msg += '\nhVertex length:'
+        msg += '\n%s' % len(self.hVertex)
+        msg += '\nhVertex list:'
+        msg += '\n%s' % self.hVertex
+        msg += '\nindexData length:'
+        msg += '\n%s' % len(self.indexData)
+        msg += '\nindexData list:'
+        msg += '\n%s' % self.indexData
+        msg += '\nNumber of triangles: %s' % (len(self.indexData) / 3)
+        return msg
 
     def fromRingsCoordinates(self):
         self.index = 0

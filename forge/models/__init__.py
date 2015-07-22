@@ -50,7 +50,7 @@ class Vector(object):
         return and_(geomColumn.intersects(wkbGeometry), func.ST_Intersects(geomColumn, wkbGeometry))
 
     """
-    Returns a slqalchemy.sql.functions.Function interesects function
+    Returns a slqalchemy.sql.functions.Function (interesects function)
     Use it as a point filter to determine if a geometry should be returned (True or False)
     :params point: A list of dim 3 representing one point [X, Y, Z]
     :params geomColumn: A sqlAlchemy Column representing a postgis geometry (Optional)
@@ -63,7 +63,7 @@ class Vector(object):
         return func.ST_Intersects(geomColumn, wkbGeometry)
 
     """
-    Returns a slqalchemy.sql.functions.Function interesects function
+    Returns a slqalchemy.sql.functions.Function
     Use it as a point filter to determine if a geometry should be returned (True or False)
     :params planGeom: A sqlAlchemy Column representing a postgis geometry (Must be a triangle)
     :params point: A list of dim 3 representing one point [X, Y, Z]
