@@ -212,20 +212,18 @@ class DB:
 
     def setupFunctions(self):
         logger.info('Action: setupFunctions()')
-        with self.superConnection() as conn:
-            os.environ['PGPASSWORD'] = self.databaseConf.password
-            command = 'psql -U %(user)s -d %(dbname)s -a -f forge/sql/_interpolate_height_on_plane.sql' % dict(
-                user=self.databaseConf.user,
-                dbname=self.databaseConf.name
-            )
-            try:
-                subprocess.call(command, shell=True)
-            except Exception as e:
-                logger.error('Could not add custom functions to the database: %(err)s' % dict(
-                    err=str(e)
-                ))
-            del os.environ['PGPASSWORD']
-
+        os.environ['PGPASSWORD'] = self.databaseConf.password
+        command = 'psql -U %(user)s -d %(dbname)s -a -f forge/sql/_interpolate_height_on_plane.sql' % dict(
+            user=self.databaseConf.user,
+            dbname=self.databaseConf.name
+        )
+        try:
+            subprocess.call(command, shell=True)
+        except Exception as e:
+            logger.error('Could not add custom functions to the database: %(err)s' % dict(
+                err=str(e)
+            ))
+        del os.environ['PGPASSWORD']
 
     def populateTables(self):
         logger.info('Action: populateTables()')
