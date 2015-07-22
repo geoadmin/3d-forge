@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import os
+import subprocess
 import multiprocessing
 import sys
 import ConfigParser
 import sqlalchemy
-from geoalchemy2 import WKTElement
+from geoalchemy2 import WKBElement
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.pool import NullPool
@@ -50,7 +51,7 @@ def populateFeatures(args):
         for feature in shp.getFeatures():
             polygon = feature.GetGeometryRef()
             bulk.add(dict(
-                the_geom=WKTElement(polygon.ExportToWkt(), 4326)
+                the_geom=WKBElement(buffer(polygon.ExportToWkb()), 4326)
             ))
             count += 1
         bulk.commit()
@@ -209,6 +210,23 @@ class DB:
                 err=str(e)
             ))
 
+    def setupFunctions(self):
+        logger.info('Action: setupFunctions()')
+        with self.superConnection() as conn:
+            os.environ['PGPASSWORD'] = self.databaseConf.password
+            command = 'psql -U %(user)s -d %(dbname)s -a -f forge/sql/_interpolate_height_on_plane.sql' % dict(
+                user=self.databaseConf.user,
+                dbname=self.databaseConf.name
+            )
+            try:
+                subprocess.call(command, shell=True)
+            except Exception as e:
+                logger.error('Could not add custom functions to the database: %(err)s' % dict(
+                    err=str(e)
+                ))
+            del os.environ['PGPASSWORD']
+
+
     def populateTables(self):
         logger.info('Action: populateTables()')
         featuresArgs = []
@@ -271,6 +289,7 @@ class DB:
         logger.info('Action: create()')
         self.createUser()
         self.createDatabase()
+        self.setupFunctions()
         self.setupDatabase()
         self.populateTables()
 
