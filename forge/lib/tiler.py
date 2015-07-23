@@ -30,7 +30,7 @@ logger = getLogger(config, __name__, suffix=timestamp())
 
 
 def is_inside(tile, bounds):
-    if tile[0] >= bounds[0] and tile[1] >= bounds[1] and tile[2] <= bounds[2] and tile[3] >= bounds[3]:
+    if tile[0] >= bounds[0] and tile[1] >= bounds[1] and tile[2] <= bounds[2] and tile[3] <= bounds[3]:
         return True
     return False
 
