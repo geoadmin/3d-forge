@@ -45,17 +45,14 @@ To clone use the --recursive option to get all submodules.
 
 - Adapt your configurations (.bashrc, .vim, .screenrc) if desired
 
+- connect to db host
+
 - sudo su postgres
 
-  * edit `/etc/postgresql/9.1/main/postgresql.conf`
-
-  * uncomment `ssl=true` line (set it to false if using localhost)
-
-  * restart postgresql with `/etc/init.d/postgresql restart`
-
-  * connect to postgress with `psql postgres`
-
-  * change passwrod to xxx with \password
+  * change password of superuser to xxx with the following sql query:
+    ```sql
+    ALTER role pgkogis WITH PASSWORD 'xxxxxx';
+    ```
 
   * exit sudo
 
