@@ -5,10 +5,10 @@ import datetime
 import ConfigParser
 import multiprocessing
 import signal
-import sys
 import os
-import traceback
+from sqlalchemy.sql import and_
 from sqlalchemy.orm import scoped_session, sessionmaker
+from geoalchemy2 import WKBElement
 from geoalchemy2.shape import to_shape
 
 from forge import DB
@@ -30,7 +30,7 @@ logger = getLogger(config, __name__, suffix=timestamp())
 
 
 def is_inside(tile, bounds):
-    if tile[0] >= bounds[0] and tile[1] >= bounds[1] and tile[2] <= bounds[2] and tile[3] >= bounds[3]:
+    if tile[0] >= bounds[0] and tile[1] >= bounds[1] and tile[2] <= bounds[2] and tile[3] <= bounds[3]:
         return True
     return False
 
@@ -68,7 +68,6 @@ def worker(job):
 
     try:
         (config, tileMinZ, tileMaxZ, bounds, tileXYZ, t0, bucket) = job
-
         # Prepare models
         loc_models = {}
         for i in range(tileMinZ, tileMaxZ + 1):
@@ -80,11 +79,43 @@ def worker(job):
         db = DB('database.cfg')
         session = sessionmaker()(bind=db.userEngine)
 
+        # Get the model according to the zoom level
         model = loc_models[str(tileXYZ[2])]
+
+        # Get the interpolated point at the 4 corners
+        # 0: (minX, minY), 1: (minX, maxY), 2: (maxX, maxY), 3: (maxX, minY)
+        p_0 = (bounds[0], bounds[1], 0)
+        p_1 = (bounds[0], bounds[3], 0)
+        p_2 = (bounds[2], bounds[3], 0)
+        p_3 = (bounds[2], bounds[1], 0)
+        pts = [p_0, p_1, p_2, p_3]
+        cornerPts = {}
+        # Get the height of the corner points as postgis cannot properly clip
+        # a polygon
+        for pt in pts:
+            query = session.query(model.id, model.interpolateHeightOnPlane(pt, model.the_geom).label('p')).filter(
+                and_(model.bboxIntersects(bounds), model.pointIntersects(pt))
+            )
+            for q in query:
+                cornerPts[q.id] = list(to_shape(WKBElement(q.p)).coords)
+
+        # Clip using the bounds
         clippedGeometry = model.bboxClippedGeom(bounds)
-        query = session.query(clippedGeometry)
-        query = query.filter(model.bboxIntersects(bounds))
-        ringsCoordinates = [list(to_shape(q[0]).exterior.coords) for q in query]
+        query = session.query(
+            model.id,
+            clippedGeometry.label('clip')
+        ).filter(model.bboxIntersects(bounds))
+
+        ringsCoordinates = []
+        for q in query:
+            coords = list(to_shape(q.clip).exterior.coords)
+            if q.id in cornerPts:
+                pt = cornerPts[q.id][0]
+                for i in range(0, len(coords)):
+                    c = coords[i]
+                    if c[0] == pt[0] and c[1] == pt[1]:
+                        coords[i] = [c[0], c[1], pt[2]]
+            ringsCoordinates.append(coords)
 
         bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
         # Skip empty tiles for now, we should instead write an empty tile to S3
@@ -124,10 +155,8 @@ def worker(job):
             logger.info('[%s] Skipping %s because no features have been found for this tile' % (pid, bucketKey))
 
     except Exception as e:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        logger.debug("*** Traceback:/n" + traceback.print_tb(exc_traceback, limit=1, file=sys.stdout))
-        logger.debug("*** Exception:/n" + traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout))
         retval = 2
+        raise Exception(e)
 
     finally:
         if session is not None:
@@ -200,14 +229,15 @@ class TilerManager:
                         p.terminate()
                     del pool._pool[i]
                 logger.error('Error while tiles: %s', e)
-                exc_type, exc_value, exc_traceback = sys.exc_info()
-                logger.debug("*** Traceback:/n" + traceback.print_tb(exc_traceback, limit=1, file=sys.stdout))
-                logger.debug("*** Exception:/n" + traceback.print_exception(exc_type, exc_value, exc_traceback, limit=2, file=sys.stdout))
                 return 1
 
         else:
             for j in self.jobs():
-                worker(j)
+                try:
+                    worker(j)
+                except Exception as e:
+                    logger.error('Error while tiles: %s', e)
+                    return 1
         tend = time.time()
         logger.info('It took %s create all %s tiles' % (str(datetime.timedelta(seconds=tend - tstart)), tilecount.value))
 

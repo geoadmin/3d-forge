@@ -107,27 +107,27 @@ class TerrainTile:
 
     def __str__(self):
 
-        str = 'Header: %s' % self.header
-        str += '\nVertexCount: %s' % len(self.u)
-        str += '\nuVertex: %s' % self.u
-        str += '\nvVertex: %s' % self.v
-        str += '\nhVertex: %s' % self.h
-        str += '\nindexDataCount: %s' % len(self.indices)
-        str += '\nindexData: %s' % self.indices
-        str += '\nwestIndicesCount: %s' % len(self.westI)
-        str += '\nwestIndices: %s' % self.westI
-        str += '\nsouthIndicesCount: %s' % len(self.southI)
-        str += '\nsouthIndices: %s' % self.southI
-        str += '\neastIndicesCount: %s' % len(self.eastI)
-        str += '\neastIndices: %s' % self.eastI
-        str += '\nnorthIndicesCount: %s' % len(self.northI)
-        str += '\nnorthIndices: %s' % self.northI
+        msg = 'Header: %s' % self.header
+        msg += '\nVertexCount: %s' % len(self.u)
+        msg += '\nuVertex: %s' % self.u
+        msg += '\nvVertex: %s' % self.v
+        msg += '\nhVertex: %s' % self.h
+        msg += '\nindexDataCount: %s' % len(self.indices)
+        msg += '\nindexData: %s' % self.indices
+        msg += '\nwestIndicesCount: %s' % len(self.westI)
+        msg += '\nwestIndices: %s' % self.westI
+        msg += '\nsouthIndicesCount: %s' % len(self.southI)
+        msg += '\nsouthIndices: %s' % self.southI
+        msg += '\neastIndicesCount: %s' % len(self.eastI)
+        msg += '\neastIndices: %s' % self.eastI
+        msg += '\nnorthIndicesCount: %s' % len(self.northI)
+        msg += '\nnorthIndices: %s' % self.northI
         # output coordinates
-        str += '\nCoordinates in EPSG %s ----------------------------\n' % self.targetEPSG
-        str += '\n%s' % self.getVerticesCoordinates(epsg=self.targetEPSG)
+        msg += '\nCoordinates in EPSG %s ----------------------------\n' % self.targetEPSG
+        msg += '\n%s' % self.getVerticesCoordinates(epsg=self.targetEPSG)
 
-        str += '\nNumber of triangles: %s' % (len(self.indices) / 3)
-        return str
+        msg += '\nNumber of triangles: %s' % (len(self.indices) / 3)
+        return msg
 
     def getVerticesCoordinates(self, epsg=4326):
         coordinates = []

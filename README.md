@@ -49,7 +49,7 @@ To clone use the --recursive option to get all submodules.
 
   * edit `/etc/postgresql/9.1/main/postgresql.conf`
 
-  * uncommend `ssl=true` line
+  * uncomment `ssl=true` line (set it to false if using localhost)
 
   * restart postgresql with `/etc/init.d/postgresql restart`
 
@@ -77,6 +77,8 @@ To clone use the --recursive option to get all submodules.
   configurations
 
 - you can also deactivate stats collection by setting `track_activities` to off in `/etc/postgresql/9.1/main/postgresql.conf`
+
+- choose the appropriate logging level for postgres client_min_messages = error and log_min_messages = error and log_min_error_statement = error
 
 ## Remove logs
 
