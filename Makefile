@@ -18,6 +18,7 @@ help:
 	@echo "- updatesubmodule    Update 3d testapp"
 	@echo "- serve              Serve examples in localhost (usage make serve PORT=9005)"
 	@echo "- createdb           Create the database"
+	@echo "- importshp"			Imports shapefiles"
 	@echo "- dropdb             Drop the database"
 	@echo "- tmspyramid         Create the TMS pyramid based on the config file tms.cfg"
 	@echo "- tmsstats           Provide statistics about the TMS pyramid"
@@ -66,6 +67,10 @@ serve:
 .PHONY: createdb
 createdb:
 	$(PYTHON_CMD) forge/scripts/db_management.py create
+
+.PHONY: importshp
+importshp:
+	$(PYTHON_CMD) forge/scripts/db_management.py importshp
 
 .PHONY: dropdb
 dropdb:
