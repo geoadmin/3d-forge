@@ -204,24 +204,6 @@ class DB:
                     err=str(e)
                 ))
 
-        with self.adminConnection() as conn:
-            pgVersion=conn.execute("Select postgis_version();").fetchone()[0]
-            if pgVersion.startswith("2."):
-                logger.info('Action: createDatabase()->legacy.sql')
-                os.environ['PGPASSWORD'] = self.adminConf.password
-                command = 'psql --quiet -h %(host)s -U %(user)s -d %(dbname)s -f forge/sql/legacy.sql' % dict(
-                host=self.serverConf.host,
-                user=self.adminConf.user,
-                dbname=self.databaseConf.name
-                )
-                try:
-                    subprocess.call(command, shell=True)
-                except Exception as e:
-                    logger.error('Could not install postgis 2.1 legacy functions to the database: %(err)s' % dict(
-                    err=str(e)
-                    ))
-                del os.environ['PGPASSWORD']
-
     def setupDatabase(self):
         logger.info('Action: setupDatabase()')
         try:
@@ -246,6 +228,24 @@ class DB:
                 err=str(e)
             ))
         del os.environ['PGPASSWORD']
+
+        with self.adminConnection() as conn:
+            pgVersion = conn.execute("Select postgis_version();").fetchone()[0]
+            if pgVersion.startswith("2."):
+                logger.info('Action: setupFunctions()->legacy.sql')
+                os.environ['PGPASSWORD'] = self.adminConf.password
+                command = 'psql --quiet -h %(host)s -U %(user)s -d %(dbname)s -f forge/sql/legacy.sql' % dict(
+                    host=self.serverConf.host,
+                    user=self.adminConf.user,
+                    dbname=self.databaseConf.name
+                )
+                try:
+                    subprocess.call(command, shell=True)
+                except Exception as e:
+                    logger.error('Could not install postgis 2.1 legacy functions to the database: %(err)s' % dict(
+                        err=str(e)
+                    ))
+                del os.environ['PGPASSWORD']
 
     def populateTables(self):
         logger.info('Action: populateTables()')
