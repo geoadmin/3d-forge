@@ -13,6 +13,7 @@ def usage():
 
         Commands:
             create:             create the database. Fails if already exist.
+            importshp:          imports shapefiles
             destroy:            destroy the database.
     '''))
 
@@ -36,6 +37,8 @@ def main():
     command = args[0]
     if command == 'create':
         db.create()
+    elif command == 'importshp':
+        db.importshp()
     elif command == 'destroy':
         db.destroy()
     else:

@@ -312,6 +312,8 @@ class DB:
         self.createDatabase()
         self.setupDatabase()
         self.setupFunctions()
+
+    def importshp(self):
         self.populateTables()
 
     def destroy(self):
