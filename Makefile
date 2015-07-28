@@ -18,7 +18,7 @@ help:
 	@echo "- updatesubmodule    Update 3d testapp"
 	@echo "- serve              Serve examples in localhost (usage make serve PORT=9005)"
 	@echo "- createdb           Create the database"
-	@echo "- importshp"			Imports shapefiles"
+	@echo "- importshp          Imports shapefiles"
 	@echo "- dropdb             Drop the database"
 	@echo "- tmspyramid         Create the TMS pyramid based on the config file tms.cfg"
 	@echo "- tmsstats           Provide statistics about the TMS pyramid"
@@ -31,7 +31,7 @@ help:
 	@echo
 
 .PHONY: all
-all: install apache/testapp.conf test lint
+all: install database.cfg apache/testapp.conf test lint
 
 .PHONY: install
 install:
@@ -41,6 +41,9 @@ install:
 
 apache/testapp.conf: apache/testapp.conf.mako
 	$(VENV)/bin/mako-render --var "user=$(USERNAME)" --var "directory=$(CURDIR)" $< > $@
+
+database.cfg: database.cfg.mako
+	$(VENV)/bin/mako-render --var "pgpass=$(PGPASS)" --var "dbtarget=$(DBTARGET)" $< > $@
 
 .PHONY: lint
 lint:

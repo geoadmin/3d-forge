@@ -4,9 +4,19 @@ Read/Write quantized-mesh tiles
 To clone use the --recursive option to get all submodules.
 `git clone --recursive https://github.com/geoadmin/3d-forge`
 
+## Set up the required variables in your .bashrc
+
+    export PGSPASS=xxx
+
+    export DBTARGET=xxx
+
 ## Getting started
 
     make all
+
+## Create the database and import the shapefiles in the DB
+
+    make createdb importshp
 
 ## Interactive programming
 

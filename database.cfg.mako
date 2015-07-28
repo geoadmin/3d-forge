@@ -1,10 +1,10 @@
 [Server]
-host: <<ip or localhost>>
+host: ${dbtarget}
 port: 5432
 
 [Admin]
 user: pgkogis
-password: <<getfromkeepass>>
+password: ${pgpass}
 
 [Database]
 name: forge
