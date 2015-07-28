@@ -147,7 +147,7 @@ def worker(job):
 
             val = tilecount.value
             if val % 10 == 0:
-                logger.info('The last tile address written is S3 was %s.' % bucketKey)
+                logger.info('The last tile address written in S3 was %s, and contained %s rings.' % (bucketKey, len(rings)))
                 logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend - t0)), val))
 
         else:
