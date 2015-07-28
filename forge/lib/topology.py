@@ -27,6 +27,7 @@ class TerrainTopology(object):
         self.uVertex = []
         self.vVertex = []
         self.hVertex = []
+        self.coordsLookup = {}
         self.indexData = []
         self.coords = []
         self.minLon = float('inf')
@@ -107,13 +108,15 @@ class TerrainTopology(object):
         ring = self._assureRingCounterClockWise(ring)
 
         for coord in ring:
-            indexData = self._findVertexIndex(coord)
+            lookupKey= ','.join([str(coord[0]), str(coord[1]), str(coord[2])])
+            indexData = self._findVertexIndex(lookupKey)
             if indexData is not None:
                 self.indexData.append(indexData)
             else:
                 self.uVertex.append(coord[0])
                 self.vVertex.append(coord[1])
                 self.hVertex.append(coord[2])
+                self.coordsLookup[lookupKey] = len(self.uVertex) - 1
 
                 if coord[0] < self.minLon:
                     self.minLon = coord[0]
@@ -132,11 +135,10 @@ class TerrainTopology(object):
                 # Keep track of coordinates for bbsphere and friends
                 self.coords.append(coord)
                 self.index += 1
+        self.coordsLookup = {}
 
-    def _findVertexIndex(self, coord):
+    def _findVertexIndex(self, lookupKey):
         # Naive approach for now
-        for i in xrange(0, len(self.uVertex)):
-            if self.uVertex[i] == coord[0] and self.vVertex[i] == coord[1] and \
-                    self.hVertex[i] == coord[2]:
-                return i
+        if lookupKey in self.coordsLookup:
+            return self.coordsLookup[lookupKey]
         return None
