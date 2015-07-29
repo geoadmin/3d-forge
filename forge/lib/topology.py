@@ -108,7 +108,7 @@ class TerrainTopology(object):
         ring = self._assureRingCounterClockWise(ring)
 
         for coord in ring:
-            lookupKey= ','.join([str(coord[0]), str(coord[1]), str(coord[2])])
+            lookupKey = ','.join([str(coord[0]), str(coord[1]), str(coord[2])])
             indexData = self._findVertexIndex(lookupKey)
             if indexData is not None:
                 self.indexData.append(indexData)
