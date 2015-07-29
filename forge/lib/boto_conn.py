@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import sys
 import time
 import logging
 from boto import connect_s3
@@ -49,6 +50,10 @@ class S3Keys:
     def delete(self):
         count = 0
         keysToDelete = []
+        print 'Are you sure you want to delete all tiles starting with %s? (y/n)' % self.prefix
+        answer = raw_input('> ')
+        if answer.lower() != 'y':
+            sys.exit(1)
         print 'Deleting keys for prefix %s...' % self.prefix
         for key in self.keysList:
             keysToDelete.append(key)
