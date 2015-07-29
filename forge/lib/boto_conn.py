@@ -41,6 +41,7 @@ class S3Keys:
 
     def __init__(self, prefix):
         self.bucket = getBucket()
+        self.counter = 0
         if prefix is not None:
             self.prefix = prefix
         else:
@@ -48,7 +49,6 @@ class S3Keys:
         self.keysList = self.bucket.list(prefix=self.prefix)
 
     def delete(self):
-        count = 0
         keysToDelete = []
         print 'Are you sure you want to delete all tiles starting with %s? (y/n)' % self.prefix
         answer = raw_input('> ')
@@ -57,15 +57,12 @@ class S3Keys:
         print 'Deleting keys for prefix %s...' % self.prefix
         for key in self.keysList:
             keysToDelete.append(key)
-            count += 1
             if len(keysToDelete) % 1000 == 0:
-                temp = self.bucket.delete_keys(keysToDelete)
-                print '%s could not be deleted.' % len(temp.errors)
-                print '%s have been deleted.' % len(temp.deleted)
+                self._deleteKeysResults(self.bucket.delete_keys(keysToDelete))
                 keysToDelete = []
         if len(keysToDelete) > 0:
-            self.bucket.delete_keys(keysToDelete)
-        print '%s keys have been deleted' % count
+            self._deleteKeysResults(self.bucket.delete_keys(keysToDelete))
+        print '%s keys have been deleted' % self.counter
 
     def listKeys(self):
         print 'Listing keys for prefix %s...' % self.prefix
@@ -82,3 +79,9 @@ class S3Keys:
         print 'Counting keys for prefix %s...' % self.prefix
         nbKeys = len(list(self.keysList))
         print '%s keys have been found for prefix %s' % (nbKeys, self.prefix)
+
+    def _deleteKeysResults(self, results):
+        nbDeleted = len(results.deleted)
+        print '%s could not be deleted.' % len(results.errors)
+        print '%s have been deleted.' % nbDeleted
+        self.counter += len(results.deleted)
