@@ -61,6 +61,16 @@ def init_worker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
+def prepareModelsPyramid(tileMinZ, tileMaxZ, config):
+    modelsPyramid = {}
+    for i in range(tileMinZ, tileMaxZ + 1):
+        for model in models:
+            if model.__tablename__ == config.get(str(i), 'tablename'):
+                modelsPyramid[str(i)] = model
+                break
+    return modelsPyramid
+
+
 def worker(job):
     global count
     session = None
@@ -70,18 +80,13 @@ def worker(job):
     try:
         (config, tileMinZ, tileMaxZ, bounds, tileXYZ, t0, bucket) = job
         # Prepare models
-        loc_models = {}
-        for i in range(tileMinZ, tileMaxZ + 1):
-            for model in models:
-                if model.__tablename__ == config.get(str(i), 'tablename'):
-                    loc_models[str(i)] = model
-                    break
+        modelsPyramid = prepareModelsPyramid(tileMinZ, tileMaxZ, config)
 
         db = DB('database.cfg')
         session = sessionmaker()(bind=db.userEngine)
 
         # Get the model according to the zoom level
-        model = loc_models[str(tileXYZ[2])]
+        model = modelsPyramid[str(tileXYZ[2])]
 
         # Get the interpolated point at the 4 corners
         # 0: (minX, minY), 1: (minX, maxY), 2: (maxX, maxY), 3: (maxX, minY)
@@ -186,14 +191,6 @@ class TilerManager:
         self.multiProcessing = int(config.get('General', 'multiProcessing'))
         self.config = config
 
-        # Prepare models
-        self.models = {}
-        for i in range(self.tileMinZ, self.tileMaxZ + 1):
-            for model in models:
-                if model.__tablename__ == config.get(str(i), 'tablename'):
-                    self.models[str(i)] = model
-                    break
-
     def __iter__(self):
         return self.jobs()
 
@@ -250,13 +247,14 @@ class TilerManager:
         geodetic = GlobalGeodetic(True)
         bounds = (self.minLon, self.minLat, self.maxLon, self.maxLat)
         zooms = range(self.tileMinZ, self.tileMaxZ + 1)
+        modelsPyramid = prepareModelsPyramid(self.tileMinZ, self.tileMaxZ, self.config)
 
         db = DB('database.cfg')
         self.DBSession = scoped_session(sessionmaker(bind=db.userEngine))
 
         for i in xrange(0, len(zooms)):
             zoom = zooms[i]
-            model = self.models[str(zoom)]
+            model = modelsPyramid[str(zoom)]
             nbObjects = self.DBSession.query(model).filter(model.bboxIntersects(bounds)).count()
             tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], zoom)
             tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], zoom)
