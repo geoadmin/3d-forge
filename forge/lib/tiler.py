@@ -209,39 +209,36 @@ class TilerManager:
             pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES, initWorker)
             # Async needed to catch keyboard interrupt
             async = pool.map_async(worker, self)
-            close = True
             try:
                 while not async.ready():
                     time.sleep(3)
             except KeyboardInterrupt:
-                close = False
+                logger.info('Keyboard interupt recieved, terminating workers...')
                 pool.terminate()
-                logger.info('Keyboard interupt recieved')
-
-            if close:
-                pool.close()
-
-            try:
                 pool.join()
-                pool.terminate()
             except Exception as e:
-                for i in reversed(range(len(pool._pool))):
-                    p = pool._pool[i]
-                    if p.exitcode is None:
-                        p.terminate()
-                    del pool._pool[i]
-                logger.error('Error while tiles: %s', e)
-                return 1
-
+                logger.error('Error while generating the tiles: %s' % e)
+                logger.error('Terminating workers...')
+                pool.terminate()
+                pool.join()
+                raise Exception(e)
+            else:
+                logger.info('All jobs have been completed.')
+                logger.info('Closing processes...')
+                pool.close()
+                pool.join()
         else:
             for j in self.jobs():
                 try:
                     worker(j)
                 except Exception as e:
-                    logger.error('Error while tiles: %s', e)
-                    return 1
+                    logger.error('An error occured while generating the tile: %s', e)
+                    raise Exception(e)
+
         tend = time.time()
-        logger.info('It took %s create all %s tiles (%s were skipped)' % (str(datetime.timedelta(seconds=tend - tstart)), tilecount.value, skipcount.value))
+        logger.info('It took %s to create %s tiles (%s were skipped)' % (
+            str(datetime.timedelta(seconds=tend - tstart)), tilecount.value, skipcount.value))
+
 
     def stats(self):
         msg = '\n'
