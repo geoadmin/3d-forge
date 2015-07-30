@@ -50,6 +50,7 @@ def grid(bounds, zoomLevels, fullonly):
 
 # shared counter
 tilecount = multiprocessing.Value('i', 0)
+skipcount = multiprocessing.Value('i', 0)
 # per process counter
 count = 0
 
@@ -151,8 +152,10 @@ def worker(job):
                 logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend - t0)), val))
 
         else:
+            skipcount.value += 1
+            val = skipcount.value
             # One should write an empyt tile
-            logger.info('[%s] Skipping %s because no features have been found for this tile' % (pid, bucketKey))
+            logger.info('[%s] Skipping %s because no features have been found for this tile (%s total skipped)' % (pid, bucketKey, val))
 
     except Exception as e:
         retval = 2
@@ -202,6 +205,7 @@ class TilerManager:
     def create(self):
         tstart = time.time()
         tilecount.value = 0
+        skipcount.value = 0
 
         if self.multiProcessing > 0:
             pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES, init_worker)
@@ -239,7 +243,7 @@ class TilerManager:
                     logger.error('Error while tiles: %s', e)
                     return 1
         tend = time.time()
-        logger.info('It took %s create all %s tiles' % (str(datetime.timedelta(seconds=tend - tstart)), tilecount.value))
+        logger.info('It took %s create all %s tiles (%s were skipped)' % (str(datetime.timedelta(seconds=tend - tstart)), tilecount.value, skipcount.value))
 
     def stats(self):
         msg = '\n'
