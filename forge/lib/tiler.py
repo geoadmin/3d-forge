@@ -57,7 +57,8 @@ count = 0
 
 # Worker processes won't recieve KeyboradInterrupts. It's parents
 # responsibility to handle those (mainly Ctlr-C)
-def init_worker():
+def initWorker():
+    logger.info('Starting process id: %s' % multiprocessing.current_process().pid)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
@@ -205,7 +206,7 @@ class TilerManager:
         skipcount.value = 0
 
         if self.multiProcessing > 0:
-            pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES, init_worker)
+            pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES, initWorker)
             # Async needed to catch keyboard interrupt
             async = pool.map_async(worker, self)
             close = True
