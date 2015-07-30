@@ -116,5 +116,14 @@ $BODY$
 
 /*
 Execute function like that:
-select * FROM bgdi_global_geodetic_recursive(st_setsrid('BOX(8.15974 46.75665,8.16465 46.75913)'::box2d::geometry, 4326),18);
+$ psql -c "select id,zoomlevel,x,y,st_astext(the_geom),label_tsm,label_google FROM bgdi_global_geodetic_recursive(st_setsrid('BOX(8.15974 46.75665,8.16465 46.75913)'::box2d::geometry, 4326),5);" -d forge
+ id | zoomlevel | x  | y  |                            st_astext                            | label_tsm | label_google
+----+-----------+----+----+-----------------------------------------------------------------+-----------+--------------
+  0 |         0 |  1 |  0 | POLYGON((0 -90,0 90,180 90,180 -90,0 -90))                      | 0/1/0     | 0/1/0
+  1 |         1 |  2 |  0 | POLYGON((0 0,0 90,90 90,90 0,0 0))                              | 1/2/0     | 1/2/1
+  2 |         2 |  4 |  0 | POLYGON((0 45,0 90,45 90,45 45,0 45))                           | 2/4/0     | 2/4/3
+  3 |         3 |  8 |  2 | POLYGON((0 45,0 67.5,22.5 67.5,22.5 45,0 45))                   | 3/8/1     | 3/8/6
+  4 |         4 | 16 |  5 | POLYGON((0 45,0 56.25,11.25 56.25,11.25 45,0 45))               | 4/16/3    | 4/16/12
+  5 |         5 | 32 | 11 | POLYGON((5.625 45,5.625 50.625,11.25 50.625,11.25 45,5.625 45)) | 5/33/7    | 5/33/24
+(6 Zeilen)
 */
