@@ -1,6 +1,7 @@
 VENV = venv
 PYTHON_CMD = $(VENV)/bin/python
 PORT ?= 9025
+PREFIX ?= 1/
 PYTHON_FILES := $(shell find forge/ -name '*.py')
 USERNAME := $(shell whoami)
 
@@ -16,10 +17,13 @@ help:
 	@echo "- all                All of the above"
 	@echo "- autolint           Auto lint code styling"
 	@echo "- updatesubmodule    Update 3d testapp"
-	@echo "- serve              Serve examples in localhost (usage make serve PORT=9005)"
+	@echo "- serve              Serve examples in localhost (usage: make serve PORT=9005)"
 	@echo "- createdb           Create the database"
 	@echo "- importshp          Imports shapefiles"
 	@echo "- dropdb             Drop the database"
+	@echo "- counttiles         Count tiles in S3 bucket using a prexfix (usage: make counttiles PREFIX=12/)"
+	@echo "- deletetiles        Delete tiles in S3 bucket using a prefix (usage: make deletetiles PREFIX=12/)"
+	@echo "- listtiles          List tiles in S3 bucket using a prefix (usage: make listtiles PREFIX=12/)"
 	@echo "- tmspyramid         Create the TMS pyramid based on the config file tms.cfg"
 	@echo "- tmsstats           Provide statistics about the TMS pyramid"
 	@echo "- clean              Clean all generated files and folders"
@@ -78,6 +82,18 @@ importshp:
 .PHONY: dropdb
 dropdb:
 	$(PYTHON_CMD) forge/scripts/db_management.py destroy
+
+.PHONY: counttiles
+counttiles:
+	$(PYTHON_CMD) forge/scripts/s3_tiles.py -p $(PREFIX) count
+
+.PHONY: deletetiles
+deletetiles:
+	$(PYTHON_CMD) forge/scripts/s3_tiles.py -p $(PREFIX) delete
+
+.PHONY: listtiles
+listtiles:
+	$(PYTHON_CMD) forge/scripts/s3_tiles.py -p $(PREFIX) list
 
 .PHONY: tmspyramid
 tmspyramid:
