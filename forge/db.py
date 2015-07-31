@@ -227,6 +227,28 @@ class DB:
             logger.error('Could not add custom functions to the database: %(err)s' % dict(
                 err=str(e)
             ))
+
+        command = 'psql -U %(user)s -d %(dbname)s -a -f forge/sql/meta.sql' % dict(
+            user=self.databaseConf.user,
+            dbname=self.databaseConf.name
+        )
+        try:
+            subprocess.call(command, shell=True)
+        except Exception as e:
+            logger.error('Could not add custom functions to the database: %(err)s' % dict(
+                err=str(e)
+            ))
+
+        command = 'psql -U %(user)s -d %(dbname)s -a -f forge/sql/visualize_tms_grid.sql' % dict(
+            user=self.databaseConf.user,
+            dbname=self.databaseConf.name
+        )
+        try:
+            subprocess.call(command, shell=True)
+        except Exception as e:
+            logger.error('Could not add custom functions to the database: %(err)s' % dict(
+                err=str(e)
+            ))
         del os.environ['PGPASSWORD']
 
         with self.adminConnection() as conn:
