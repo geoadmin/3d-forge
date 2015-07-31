@@ -260,39 +260,32 @@ class DB:
                     shp
                 ))
 
-        def init_worker():
+        def initWorker():
             signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-        pool = multiprocessing.Pool(multiprocessing.cpu_count(), init_worker)
+        pool = multiprocessing.Pool(multiprocessing.cpu_count(), initWorker)
         async = pool.map_async(populateFeatures, iterable=featuresArgs)
-        closed = False
 
         try:
             while not async.ready():
                 time.sleep(3)
         except KeyboardInterrupt:
-            closed = True
+            logger.info('Keyboard interupt recieved, terminating workers...')
             pool.terminate()
-            logger.info('Keyboard interupt recieved')
-
-        if not closed:
-            pool.close()
-
-        try:
             pool.join()
-            pool.terminate()
         except Exception as e:
-            for i in reversed(range(len(pool._pool))):
-                p = pool._pool[i]
-                if p.exitcode is None:
-                    p.terminate()
-                del pool._pool[i]
-            logger.error('An error occured while populating the tables with shapefiles.')
-            logger.error(e)
+            logger.error('An error occured while populating the tables with shapefiles: %s' % e)
+            logger.error('Terminating workers...')
+            pool.terminate()
+            pool.join()
             raise Exception(e)
-
-        tend = time.time()
-        logger.info('All tables have been created. It took %s' % str(datetime.timedelta(seconds=tend - tstart)))
+        else:
+            logger.info('All jobs have been completed.')
+            logger.info('Closing processes...')
+            pool.close()
+            pool.join()
+            tend = time.time()
+            logger.info('All tables have been created. It took %s' % str(datetime.timedelta(seconds=tend - tstart)))
 
     def dropDatabase(self):
         logger.info('Action: dropDatabase()')

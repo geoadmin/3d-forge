@@ -24,9 +24,9 @@ from forge.lib.logs import getLogger
 
 NUMBER_POOL_PROCESSES = multiprocessing.cpu_count()
 # Init logging
-config = ConfigParser.RawConfigParser()
-config.read('database.cfg')
-logger = getLogger(config, __name__, suffix=timestamp())
+dbConfig = ConfigParser.RawConfigParser()
+dbConfig.read('database.cfg')
+logger = getLogger(dbConfig, __name__, suffix=timestamp())
 
 
 def is_inside(tile, bounds):
@@ -54,34 +54,39 @@ skipcount = multiprocessing.Value('i', 0)
 # per process counter
 count = 0
 
-
 # Worker processes won't recieve KeyboradInterrupts. It's parents
 # responsibility to handle those (mainly Ctlr-C)
-def init_worker():
+
+
+def initWorker():
+    logger.info('Starting process id: %s' % multiprocessing.current_process().pid)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
+def prepareModelsPyramid(tileMinZ, tileMaxZ, tmsConfig):
+    modelsPyramid = {}
+    for i in range(tileMinZ, tileMaxZ + 1):
+        for model in models:
+            if model.__tablename__ == tmsConfig.get(str(i), 'tablename'):
+                modelsPyramid[str(i)] = model
+                break
+    return modelsPyramid
 
 
 def worker(job):
     global count
     session = None
     pid = os.getpid()
-    retval = 0
 
     try:
-        (config, tileMinZ, tileMaxZ, bounds, tileXYZ, t0, bucket) = job
+        (tmsConfig, tileMinZ, tileMaxZ, bounds, tileXYZ, t0, bucket) = job
         # Prepare models
-        loc_models = {}
-        for i in range(tileMinZ, tileMaxZ + 1):
-            for model in models:
-                if model.__tablename__ == config.get(str(i), 'tablename'):
-                    loc_models[str(i)] = model
-                    break
-
+        modelsPyramid = prepareModelsPyramid(tileMinZ, tileMaxZ, tmsConfig)
         db = DB('database.cfg')
         session = sessionmaker()(bind=db.userEngine)
 
         # Get the model according to the zoom level
-        model = loc_models[str(tileXYZ[2])]
+        model = modelsPyramid[str(tileXYZ[2])]
 
         # Get the interpolated point at the 4 corners
         # 0: (minX, minY), 1: (minX, maxY), 2: (maxX, maxY), 3: (maxX, minY)
@@ -91,6 +96,7 @@ def worker(job):
         p_3 = (bounds[2], bounds[1], 0)
         pts = [p_0, p_1, p_2, p_3]
         cornerPts = {}
+
         # Get the height of the corner points as postgis cannot properly clip
         # a polygon
         for pt in pts:
@@ -99,7 +105,6 @@ def worker(job):
             )
             for q in query:
                 cornerPts[q.id] = list(to_shape(WKBElement(q.p)).coords)
-
         # Clip using the bounds
         clippedGeometry = model.bboxClippedGeom(bounds)
         query = session.query(
@@ -127,9 +132,7 @@ def worker(job):
                 msg = '[%s] --------- ERROR ------- occured while collapsing non triangular shapes\n'
                 msg += '%s' % (pid, e)
                 logger.error(msg)
-                session.close_all()
-                db.userEngine.dispose()
-                retval = 1
+                raise Exception(e)
 
             # Prepare terrain tile
             terrainTopo = TerrainTopology(ringsCoordinates=rings)
@@ -140,12 +143,10 @@ def worker(job):
             # Bytes manipulation and compression
             fileObject = terrainFormat.toStringIO()
             compressedFile = gzipFileObject(fileObject)
-
             writeToS3(bucket, bucketKey, compressedFile, model.__tablename__)
             tend = time.time()
             tilecount.value += 1
             count += 1
-
             val = tilecount.value
             if val % 10 == 0:
                 logger.info('The last tile address written in S3 was %s, and contained %s rings.' % (bucketKey, len(rings)))
@@ -155,113 +156,112 @@ def worker(job):
             skipcount.value += 1
             val = skipcount.value
             # One should write an empyt tile
-            logger.info('[%s] Skipping %s because no features have been found for this tile (%s total skipped)' % (pid, bucketKey, val))
+            logger.info('[%s] Skipping %s because no features found for this tile (%s total skipped)' % (pid, bucketKey, val))
 
     except Exception as e:
-        retval = 2
         raise Exception(e)
-
     finally:
         if session is not None:
             session.close_all()
             db.userEngine.dispose()
 
-    return retval
+    return 0
+
+
+class Jobs:
+
+    def __init__(self, tmsConfig, t0):
+        self.t0 = t0
+
+        self.minLon = float(tmsConfig.get('Extent', 'minLon'))
+        self.maxLon = float(tmsConfig.get('Extent', 'maxLon'))
+        self.minLat = float(tmsConfig.get('Extent', 'minLat'))
+        self.maxLat = float(tmsConfig.get('Extent', 'maxLat'))
+        self.fullonly = int(tmsConfig.get('Extent', 'fullonly'))
+
+        self.tileMinZ = int(tmsConfig.get('Zooms', 'tileMinZ'))
+        self.tileMaxZ = int(tmsConfig.get('Zooms', 'tileMaxZ'))
+
+        self.tmsConfig = tmsConfig
+
+    def __iter__(self):
+        bucket = getBucket()
+        zRange = range(self.tileMinZ, self.tileMaxZ + 1)
+        for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), zRange, self.fullonly):
+            yield (self.tmsConfig, self.tileMinZ, self.tileMaxZ, bounds, tileXYZ, self.t0, bucket)
 
 
 class TilerManager:
 
     def __init__(self, configFile):
-        self.t0 = time.time()
-        config = ConfigParser.RawConfigParser()
-        config.read(configFile)
-
-        self.minLon = float(config.get('Extent', 'minLon'))
-        self.maxLon = float(config.get('Extent', 'maxLon'))
-        self.minLat = float(config.get('Extent', 'minLat'))
-        self.maxLat = float(config.get('Extent', 'maxLat'))
-        self.fullonly = int(config.get('Extent', 'fullonly'))
-        self.tileMinZ = int(config.get('Zooms', 'tileMinZ'))
-        self.tileMaxZ = int(config.get('Zooms', 'tileMaxZ'))
-        self.multiProcessing = int(config.get('General', 'multiProcessing'))
-        self.config = config
-
-        # Prepare models
-        self.models = {}
-        for i in range(self.tileMinZ, self.tileMaxZ + 1):
-            for model in models:
-                if model.__tablename__ == config.get(str(i), 'tablename'):
-                    self.models[str(i)] = model
-                    break
-
-    def __iter__(self):
-        return self.jobs()
-
-    def jobs(self):
-        bucket = getBucket()
-        for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), range(self.tileMinZ, self.tileMaxZ + 1), self.fullonly):
-            yield (self.config, self.tileMinZ, self.tileMaxZ, bounds, tileXYZ, self.t0, bucket)
+        tmsConfig = ConfigParser.RawConfigParser()
+        tmsConfig.read(configFile)
+        self.multiProcessing = int(tmsConfig.get('General', 'multiProcessing'))
+        self.tmsConfig = tmsConfig
 
     def create(self):
-        tstart = time.time()
+        self.t0 = time.time()
+
         tilecount.value = 0
         skipcount.value = 0
 
+        jobs = Jobs(self.tmsConfig, self.t0)
+
         if self.multiProcessing > 0:
-            pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES, init_worker)
+            pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES, initWorker)
             # Async needed to catch keyboard interrupt
-            async = pool.map_async(worker, self)
-            close = True
+            async = pool.map_async(worker, jobs)
             try:
                 while not async.ready():
                     time.sleep(3)
             except KeyboardInterrupt:
-                close = False
+                logger.info('Keyboard interupt recieved, terminating workers...')
                 pool.terminate()
-                logger.info('Keyboard interupt recieved')
-
-            if close:
-                pool.close()
-
-            try:
                 pool.join()
-                pool.terminate()
             except Exception as e:
-                for i in reversed(range(len(pool._pool))):
-                    p = pool._pool[i]
-                    if p.exitcode is None:
-                        p.terminate()
-                    del pool._pool[i]
-                logger.error('Error while tiles: %s', e)
-                return 1
-
+                logger.error('Error while generating the tiles: %s' % e)
+                logger.error('Terminating workers...')
+                pool.terminate()
+                pool.join()
+                raise Exception(e)
+            else:
+                logger.info('All jobs have been completed.')
+                logger.info('Closing processes...')
+                pool.close()
+                pool.join()
         else:
-            for j in self.jobs():
+            for j in jobs:
                 try:
                     worker(j)
                 except Exception as e:
-                    logger.error('Error while tiles: %s', e)
-                    return 1
+                    logger.error('An error occured while generating the tile: %s', e)
+                    raise Exception(e)
+
         tend = time.time()
-        logger.info('It took %s create all %s tiles (%s were skipped)' % (str(datetime.timedelta(seconds=tend - tstart)), tilecount.value, skipcount.value))
+        logger.info('It took %s to create %s tiles (%s were skipped)' % (
+            str(datetime.timedelta(seconds=tend - self.t0)), tilecount.value, skipcount.value))
 
     def stats(self):
+        self.t0 = time.time()
+
         msg = '\n'
+        jobs = Jobs(self.tmsConfig, self.t0)
         geodetic = GlobalGeodetic(True)
-        bounds = (self.minLon, self.minLat, self.maxLon, self.maxLat)
-        zooms = range(self.tileMinZ, self.tileMaxZ + 1)
+        bounds = (jobs.minLon, jobs.minLat, jobs.maxLon, jobs.maxLat)
+        zooms = range(jobs.tileMinZ, jobs.tileMaxZ + 1)
+        modelsPyramid = prepareModelsPyramid(jobs.tileMinZ, jobs.tileMaxZ, jobs.tmsConfig)
 
         db = DB('database.cfg')
         self.DBSession = scoped_session(sessionmaker(bind=db.userEngine))
 
         for i in xrange(0, len(zooms)):
             zoom = zooms[i]
-            model = self.models[str(zoom)]
+            model = modelsPyramid[str(zoom)]
             nbObjects = self.DBSession.query(model).filter(model.bboxIntersects(bounds)).count()
             tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], zoom)
             tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], zoom)
             # Fast approach, but might not be fully correct
-            if self.fullonly == 1:
+            if jobs.fullonly == 1:
                 tileMinX += 1
                 tileMinY += 1
                 tileMaxX -= 1
@@ -273,7 +273,7 @@ class TilerManager:
             pointA = transformCoordinate('POINT(%s %s)' % (tileBounds[0], tileBounds[1]), 4326, 21781).GetPoints()[0]
             pointB = transformCoordinate('POINT(%s %s)' % (tileBounds[2], tileBounds[3]), 4326, 21781).GetPoints()[0]
             length = c2d.distance(pointA, pointB)
-            if self.fullonly == 1:
+            if jobs.fullonly == 1:
                 msg += 'WARNING: stats are approximative because fullonly is activated!\n'
             msg += 'At zoom %s:\n' % zoom
             msg += 'We expect %s tiles overall\n' % nbTiles
