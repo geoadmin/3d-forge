@@ -148,15 +148,17 @@ def worker(job):
             tilecount.value += 1
             count += 1
             val = tilecount.value
+            total = val + skipcount.value
             if val % 10 == 0:
                 logger.info('The last tile address written in S3 was %s, and contained %s rings.' % (bucketKey, len(rings)))
-                logger.info('[%s] It took %s to create %s tiles on S3.' % (pid, str(datetime.timedelta(seconds=tend - t0)), val))
+                logger.info('[%s] It took %s to create %s tiles on S3. (total processed: %s)' % (pid, str(datetime.timedelta(seconds=tend - t0)), val, total))
 
         else:
             skipcount.value += 1
             val = skipcount.value
+            total = val + tilecount.value
             # One should write an empyt tile
-            logger.info('[%s] Skipping %s because no features found for this tile (%s total skipped)' % (pid, bucketKey, val))
+            logger.info('[%s] Skipping %s because no features found for this tile (%s skipped from %s total)' % (pid, bucketKey, val, total))
 
     except Exception as e:
         raise Exception(e)
@@ -191,12 +193,32 @@ class Jobs:
             yield (self.tmsConfig, self.tileMinZ, self.tileMaxZ, bounds, tileXYZ, self.t0, bucket)
 
 
+class Chunks:
+
+    def __init__(self, jobs):
+        self.itr = iter(jobs)
+
+    def nextX(self, N):
+        res = []
+        count = 0
+        try:
+            while count < N:
+                n = self.itr.next()
+                res.append(n)
+                count += 1
+        except StopIteration:
+            logger.info('last chunks reached')
+            pass
+        return res
+
+
 class TilerManager:
 
     def __init__(self, configFile):
         tmsConfig = ConfigParser.RawConfigParser()
         tmsConfig.read(configFile)
         self.multiProcessing = int(tmsConfig.get('General', 'multiProcessing'))
+        self.chunks = int(tmsConfig.get('General', 'chunks'))
         self.tmsConfig = tmsConfig
 
     def create(self):
@@ -209,22 +231,31 @@ class TilerManager:
 
         if self.multiProcessing > 0:
             pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES, initWorker)
-            # Async needed to catch keyboard interrupt
-            async = pool.map_async(worker, jobs)
-            try:
-                while not async.ready():
-                    time.sleep(3)
-            except KeyboardInterrupt:
-                logger.info('Keyboard interupt recieved, terminating workers...')
-                pool.terminate()
-                pool.join()
-            except Exception as e:
-                logger.error('Error while generating the tiles: %s' % e)
-                logger.error('Terminating workers...')
-                pool.terminate()
-                pool.join()
-                raise Exception(e)
-            else:
+
+            chunker = Chunks(jobs)
+
+            chunks = chunker.nextX(self.chunks)
+            bail = False
+            while len(chunks) > 0 and not bail:
+                logger.info('Processing %s jobs...' % str(len(chunks)))
+                async = pool.map_async(worker, chunks, 1)
+                try:
+                    while not async.ready():
+                        time.sleep(3)
+                except KeyboardInterrupt:
+                    logger.info('Keyboard interupt recieved, terminating workers...')
+                    pool.terminate()
+                    pool.join()
+                    bail = True
+                except Exception as e:
+                    logger.error('Error while generating the tiles: %s' % e)
+                    logger.error('Terminating workers...')
+                    pool.terminate()
+                    pool.join()
+                    raise Exception(e)
+                logger.info('Getting next jobs')
+                chunks = chunker.nextX(self.chunks)
+            if not bail:
                 logger.info('All jobs have been completed.')
                 logger.info('Closing processes...')
                 pool.close()
