@@ -216,58 +216,46 @@ class DB:
 
     def setupFunctions(self):
         logger.info('Action: setupFunctions()')
+
         os.environ['PGPASSWORD'] = self.databaseConf.password
-        command = 'psql -U %(user)s -d %(dbname)s -a -f forge/sql/_interpolate_height_on_plane.sql' % dict(
-            user=self.databaseConf.user,
-            dbname=self.databaseConf.name
-        )
-        try:
-            subprocess.call(command, shell=True)
-        except Exception as e:
-            logger.error('Could not add custom functions to the database: %(err)s' % dict(
-                err=str(e)
-            ))
+        baseDir = 'forge/sql/'
 
-        command = 'psql -U %(user)s -d %(dbname)s -a -f forge/sql/meta.sql' % dict(
-            user=self.databaseConf.user,
-            dbname=self.databaseConf.name
-        )
-        try:
-            subprocess.call(command, shell=True)
-        except Exception as e:
-            logger.error('Could not add custom functions to the database: %(err)s' % dict(
-                err=str(e)
-            ))
-
-        command = 'psql -U %(user)s -d %(dbname)s -a -f forge/sql/visualize_tms_grid.sql' % dict(
-            user=self.databaseConf.user,
-            dbname=self.databaseConf.name
-        )
-        try:
-            subprocess.call(command, shell=True)
-        except Exception as e:
-            logger.error('Could not add custom functions to the database: %(err)s' % dict(
-                err=str(e)
-            ))
-        del os.environ['PGPASSWORD']
-
-        with self.adminConnection() as conn:
-            pgVersion = conn.execute("Select postgis_version();").fetchone()[0]
-            if pgVersion.startswith("2."):
-                logger.info('Action: setupFunctions()->legacy.sql')
-                os.environ['PGPASSWORD'] = self.adminConf.password
-                command = 'psql --quiet -h %(host)s -U %(user)s -d %(dbname)s -f forge/sql/legacy.sql' % dict(
-                    host=self.serverConf.host,
-                    user=self.adminConf.user,
-                    dbname=self.databaseConf.name
+        for fileName in os.listdir('forge/sql/'):
+            if fileName != 'legacy.sql':
+                command = 'psql -U %(user)s -d %(dbname)s -a -f %(baseDir)s%(fileName)s' % dict(
+                    user=self.databaseConf.user,
+                    dbname=self.databaseConf.name,
+                    baseDir=baseDir,
+                    fileName=fileName
                 )
                 try:
                     subprocess.call(command, shell=True)
                 except Exception as e:
-                    logger.error('Could not install postgis 2.1 legacy functions to the database: %(err)s' % dict(
+                    logger.error('Could not add custom functions %s to the database: %(err)s' % dict(
+                        fileName=fileName,
                         err=str(e)
                     ))
-                del os.environ['PGPASSWORD']
+            else:
+                with self.adminConnection() as conn:
+                    pgVersion = conn.execute("Select postgis_version();").fetchone()[0]
+                    if pgVersion.startswith("2."):
+                        logger.info('Action: setupFunctions()->legacy.sql')
+                        os.environ['PGPASSWORD'] = self.adminConf.password
+                        command = 'psql --quiet -h %(host)s -U %(user)s -d %(dbname)s -f %(baseDir)s%(fileName)s' % dict(
+                            host=self.serverConf.host,
+                            user=self.adminConf.user,
+                            dbname=self.databaseConf.name,
+                            baseDir=baseDir,
+                            fileName=fileName
+                        )
+                        try:
+                            subprocess.call(command, shell=True)
+                        except Exception as e:
+                            logger.error('Could not install postgis 2.1 legacy functions to the database: %(err)s' % dict(
+                                err=str(e)
+                            ))
+
+        del os.environ['PGPASSWORD']
 
     def populateTables(self):
         logger.info('Action: populateTables()')
