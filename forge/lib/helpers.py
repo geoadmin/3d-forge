@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from osgeo import osr, ogr
+import os
 import gzip
 import sys
 import time
@@ -72,6 +73,17 @@ def error(msg, exitCode=1, usage=None):
     if usage is not None:
         usage()
     sys.exit(exitCode)
+
+
+def cleanup(filePath, extensions=['.shp', '.shx', '.prj', '.dbf']):
+    if os.path.isfile(filePath):
+        dirName = os.path.dirname(filePath)
+        baseName = os.path.basename(filePath).split('.')[0]
+        for ext in extensions:
+            try:
+                os.remove('%s/%s%s' % (dirName, baseName, ext))
+            except OSError as e:
+                raise OSError(e)
 
 
 class Bulk:
