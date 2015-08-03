@@ -36,11 +36,13 @@ def modelFactory(BaseClass, tablename, shapefiles, classname):
 def createModels(configFile):
     config = ConfigParser.RawConfigParser()
     config.read(configFile)
-    shapefilesBaseDir = config.get('Data', 'shapefiles').split(',')
+    baseDir = config.get('Data', 'baseDir')
+    shpsBaseDir = config.get('Data', 'shapefiles').split(',')
     tablenames = config.get('Data', 'tablenames').split(',')
     modelnames = config.get('Data', 'modelnames').split(',')
-    for i in range(0, len(shapefilesBaseDir)):
-        shapefiles = [shapefilesBaseDir[i] + f for f in os.listdir(shapefilesBaseDir[i]) if isShapefile(f)]
+    for i in range(0, len(shpsBaseDir)):
+        shpBaseDir = '%s%s' % (baseDir, shpsBaseDir[i])
+        shapefiles = ['%s%s' % (shpBaseDir, f) for f in os.listdir(shpBaseDir) if isShapefile(f)]
         models.append(modelFactory(
             Base, tablenames[i], shapefiles, modelnames[i]
         ))
