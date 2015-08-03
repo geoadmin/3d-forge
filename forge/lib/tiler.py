@@ -90,21 +90,29 @@ def worker(job):
 
         # Get the interpolated point at the 4 corners
         # 0: (minX, minY), 1: (minX, maxY), 2: (maxX, maxY), 3: (maxX, minY)
-        p_0 = (bounds[0], bounds[1], 0)
-        p_1 = (bounds[0], bounds[3], 0)
-        p_2 = (bounds[2], bounds[3], 0)
-        p_3 = (bounds[2], bounds[1], 0)
-        pts = [p_0, p_1, p_2, p_3]
-        cornerPts = {}
+        pts = [
+          (bounds[0], bounds[1], 0),
+          (bounds[0], bounds[3], 0),
+          (bounds[2], bounds[3], 0),
+          (bounds[2], bounds[1], 0)
+        ]
+        def toSubQuery(x):
+            return session.query(model.id, model.interpolateHeightOnPlane(pts[x])).filter(
+                model.pointIntersects(pts[x])).subquery('p%s' %x)
+        subqueries = [toSubQuery(i) for i in range(0, len(pts))]
 
         # Get the height of the corner points as postgis cannot properly clip
         # a polygon
-        for pt in pts:
-            query = session.query(model.id, model.interpolateHeightOnPlane(pt, model.the_geom).label('p')).filter(
-                and_(model.bboxIntersects(bounds), model.pointIntersects(pt))
-            )
-            for q in query:
-                cornerPts[q.id] = list(to_shape(WKBElement(q.p)).coords)
+        cornerPts = {}
+        step = 2
+        j = step
+        query = session.query(*subqueries)
+        for q in query:
+            for i in range(0, len(q), step):
+                sub = q[i:j]
+                j += step
+                cornerPts[sub[0]] = list(to_shape(WKBElement(sub[1])).coords)
+
         # Clip using the bounds
         clippedGeometry = model.bboxClippedGeom(bounds)
         query = session.query(
@@ -161,6 +169,7 @@ def worker(job):
             logger.info('[%s] Skipping %s because no features found for this tile (%s skipped from %s total)' % (pid, bucketKey, val, total))
 
     except Exception as e:
+        logger.error(e)
         raise Exception(e)
     finally:
         if session is not None:
