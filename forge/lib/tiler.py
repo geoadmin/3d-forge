@@ -14,13 +14,14 @@ from geoalchemy2.shape import to_shape
 from forge import DB
 import forge.lib.cartesian2d as c2d
 from forge.models.terrain import TerrainTile
-from forge.models.tables import models
+from forge.models.tables import modelsPyramid
 from forge.lib.boto_conn import getBucket, writeToS3
 from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate, createBBox
 from forge.lib.topology import TerrainTopology
 from forge.lib.global_geodetic import GlobalGeodetic
 from forge.lib.collapse_geom import processRingCoordinates
 from forge.lib.logs import getLogger
+
 
 NUMBER_POOL_PROCESSES = multiprocessing.cpu_count()
 # Init logging
@@ -63,16 +64,6 @@ def initWorker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
-def prepareModelsPyramid(tileMinZ, tileMaxZ, tmsConfig):
-    modelsPyramid = {}
-    for i in range(tileMinZ, tileMaxZ + 1):
-        for model in models:
-            if model.__tablename__ == tmsConfig.get(str(i), 'tablename'):
-                modelsPyramid[str(i)] = model
-                break
-    return modelsPyramid
-
-
 def worker(job):
     global count
     session = None
@@ -81,24 +72,24 @@ def worker(job):
     try:
         (tmsConfig, tileMinZ, tileMaxZ, bounds, tileXYZ, t0, bucket) = job
         # Prepare models
-        modelsPyramid = prepareModelsPyramid(tileMinZ, tileMaxZ, tmsConfig)
         db = DB('database.cfg')
         session = sessionmaker()(bind=db.userEngine)
 
         # Get the model according to the zoom level
-        model = modelsPyramid[str(tileXYZ[2])]
+        model = modelsPyramid.getModelByZoom(tileXYZ[2])
 
         # Get the interpolated point at the 4 corners
         # 0: (minX, minY), 1: (minX, maxY), 2: (maxX, maxY), 3: (maxX, minY)
         pts = [
-          (bounds[0], bounds[1], 0),
-          (bounds[0], bounds[3], 0),
-          (bounds[2], bounds[3], 0),
-          (bounds[2], bounds[1], 0)
+            (bounds[0], bounds[1], 0),
+            (bounds[0], bounds[3], 0),
+            (bounds[2], bounds[3], 0),
+            (bounds[2], bounds[1], 0)
         ]
+
         def toSubQuery(x):
             return session.query(model.id, model.interpolateHeightOnPlane(pts[x])).filter(
-                and_(model.bboxIntersects(createBBox(pts[x], 0.01)), model.pointIntersects(pts[x]))).subquery('p%s' %x)
+                and_(model.bboxIntersects(createBBox(pts[x], 0.01)), model.pointIntersects(pts[x]))).subquery('p%s' % x)
         subqueries = [toSubQuery(i) for i in range(0, len(pts))]
 
         # Get the height of the corner points as postgis cannot properly clip
@@ -273,7 +264,7 @@ class TilerManager:
                 try:
                     worker(j)
                 except Exception as e:
-                    logger.error('An error occured while generating the tile: %s' %e)
+                    logger.error('An error occured while generating the tile: %s' % e)
                     raise Exception(e)
 
         tend = time.time()
@@ -288,14 +279,13 @@ class TilerManager:
         geodetic = GlobalGeodetic(True)
         bounds = (jobs.minLon, jobs.minLat, jobs.maxLon, jobs.maxLat)
         zooms = range(jobs.tileMinZ, jobs.tileMaxZ + 1)
-        modelsPyramid = prepareModelsPyramid(jobs.tileMinZ, jobs.tileMaxZ, jobs.tmsConfig)
 
         db = DB('database.cfg')
         self.DBSession = scoped_session(sessionmaker(bind=db.userEngine))
 
         for i in xrange(0, len(zooms)):
             zoom = zooms[i]
-            model = modelsPyramid[str(zoom)]
+            model = modelsPyramid.getModelByZoom(zoom)
             nbObjects = self.DBSession.query(model).filter(model.bboxIntersects(bounds)).count()
             tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], zoom)
             tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], zoom)

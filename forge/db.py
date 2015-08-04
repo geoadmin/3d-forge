@@ -17,7 +17,7 @@ from contextlib import contextmanager
 from forge.lib.logs import getLogger
 from forge.lib.shapefile_utils import ShpToGDALFeatures
 from forge.lib.helpers import BulkInsert, timestamp, cleanup
-from forge.models.tables import Base, models
+from forge.models.tables import Base, modelsPyramid
 
 
 config = ConfigParser.RawConfigParser()
@@ -93,6 +93,7 @@ def populateFeatures(args):
             raise Exception(e)
 
     try:
+        models = modelsPyramid.models
         engine = sqlalchemy.create_engine(args.engineURL)
         session = scoped_session(sessionmaker(bind=engine))
         model = models[args.modelIndex]
@@ -319,6 +320,7 @@ class DB:
 
         reproject = config.get('Reprojection', 'reproject')
         tstart = time.time()
+        models = modelsPyramid.models
         featuresArgs = []
         for i in range(0, len(models)):
             model = models[i]

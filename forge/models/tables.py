@@ -7,6 +7,7 @@ from sqlalchemy import event
 from sqlalchemy.schema import CreateSchema
 from sqlalchemy import Column, Sequence, Integer
 from sqlalchemy.ext.declarative import declarative_base
+
 from forge.models import Vector
 from forge.lib.helpers import isShapefile
 
@@ -14,7 +15,6 @@ from forge.lib.helpers import isShapefile
 Base = declarative_base()
 event.listen(Base.metadata, 'before_create', CreateSchema('data'))
 
-models = []
 table_args = {'schema': 'data'}
 # management to true only for postgis 1.5
 WGS84Polygon = Geometry(geometry_type='POLYGON', srid=4326, dimension=3, spatial_index=True, management=True)
@@ -33,18 +33,52 @@ def modelFactory(BaseClass, tablename, shapefiles, classname):
     return NewClass
 
 
-def createModels(configFile):
-    config = ConfigParser.RawConfigParser()
-    config.read(configFile)
-    baseDir = config.get('Data', 'baseDir')
-    shpsBaseDir = config.get('Data', 'shapefiles').split(',')
-    tablenames = config.get('Data', 'tablenames').split(',')
-    modelnames = config.get('Data', 'modelnames').split(',')
-    for i in range(0, len(shpsBaseDir)):
-        shpBaseDir = '%s%s' % (baseDir, shpsBaseDir[i])
-        shapefiles = ['%s%s' % (shpBaseDir, f) for f in os.listdir(shpBaseDir) if isShapefile(f)]
-        models.append(modelFactory(
-            Base, tablenames[i], shapefiles, modelnames[i]
-        ))
+class ModelsPyramid:
 
-createModels('database.cfg')
+    def __init__(self, dbConfigFile, tmsConfigFile):
+        dbConfig = ConfigParser.RawConfigParser()
+        dbConfig.read(dbConfigFile)
+        self.baseDir = dbConfig.get('Data', 'baseDir')
+        self.shpsBaseDir = dbConfig.get('Data', 'shapefiles').split(',')
+        self.tablenames = dbConfig.get('Data', 'tablenames').split(',')
+        self.modelnames = dbConfig.get('Data', 'modelnames').split(',')
+        self.tmsConfigFile = tmsConfigFile
+
+        self.models = []
+        self._createModels()
+
+    def _createModels(self):
+        for i in range(0, len(self.shpsBaseDir)):
+            shpBaseDir = '%s%s' % (self.baseDir, self.shpsBaseDir[i])
+            shapefiles = ['%s%s' % (shpBaseDir, f) for f in os.listdir(shpBaseDir) if isShapefile(f)]
+            self.models.append(modelFactory(
+                Base, self.tablenames[i], shapefiles, self.modelnames[i]
+            ))
+
+        self._buildModelsPyramid()
+
+    def _buildModelsPyramid(self):
+        tmsConfig = ConfigParser.RawConfigParser()
+        tmsConfig.read(self.tmsConfigFile)
+        self.tileMinZ = int(tmsConfig.get('Zooms', 'tileMinZ'))
+        self.tileMaxZ = int(tmsConfig.get('Zooms', 'tileMaxZ'))
+
+        self.modelsPyramid = {}
+        for i in range(self.tileMinZ, self.tileMaxZ + 1):
+            for j in range(0, len(self.models)):
+                model = self.models[j]
+                tableName = tmsConfig.get(str(i), 'tablename')
+                if model.__tablename__ == tableName:
+                    self.modelsPyramid[str(i)] = j
+                    break
+
+    def getModelByZoom(self, zoom):
+        zoom = str(zoom)
+        if zoom in self.modelsPyramid:
+            return self.models[
+                self.modelsPyramid[zoom]
+            ]
+        return None
+
+
+modelsPyramid = ModelsPyramid('database.cfg', 'tms.cfg')
