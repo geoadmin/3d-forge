@@ -16,10 +16,10 @@ import forge.lib.cartesian2d as c2d
 from forge.models.terrain import TerrainTile
 from forge.models.tables import models
 from forge.lib.boto_conn import getBucket, writeToS3
-from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate
+from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate, createBBox
 from forge.lib.topology import TerrainTopology
 from forge.lib.global_geodetic import GlobalGeodetic
-from forge.lib.collapse_geom import processRingsCoordinates
+from forge.lib.collapse_geom import processRingCoordinates
 from forge.lib.logs import getLogger
 
 NUMBER_POOL_PROCESSES = multiprocessing.cpu_count()
@@ -98,7 +98,7 @@ def worker(job):
         ]
         def toSubQuery(x):
             return session.query(model.id, model.interpolateHeightOnPlane(pts[x])).filter(
-                model.pointIntersects(pts[x])).subquery('p%s' %x)
+                and_(model.bboxIntersects(createBBox(pts[x], 0.01)), model.pointIntersects(pts[x]))).subquery('p%s' %x)
         subqueries = [toSubQuery(i) for i in range(0, len(pts))]
 
         # Get the height of the corner points as postgis cannot properly clip
@@ -120,7 +120,7 @@ def worker(job):
             clippedGeometry.label('clip')
         ).filter(model.bboxIntersects(bounds))
 
-        ringsCoordinates = []
+        rings = []
         for q in query:
             coords = list(to_shape(q.clip).exterior.coords)
             if q.id in cornerPts:
@@ -129,19 +129,18 @@ def worker(job):
                     c = coords[i]
                     if c[0] == pt[0] and c[1] == pt[1]:
                         coords[i] = [c[0], c[1], pt[2]]
-            ringsCoordinates.append(coords)
 
-        bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
-        # Skip empty tiles for now, we should instead write an empty tile to S3
-        if len(ringsCoordinates) > 0:
             try:
-                rings = processRingsCoordinates(ringsCoordinates)
+                rings += processRingCoordinates(coords)
             except Exception as e:
-                msg = '[%s] --------- ERROR ------- occured while collapsing non triangular shapes\n'
-                msg += '%s' % (pid, e)
+                msg = '[%s] --------- ERROR ------- occured while collapsing non triangular shapes\n' % pid
+                msg += '[%s]: %s' % (pid, e)
                 logger.error(msg)
                 raise Exception(e)
 
+        bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
+        # Skip empty tiles for now, we should instead write an empty tile to S3
+        if len(rings) > 0:
             # Prepare terrain tile
             terrainTopo = TerrainTopology(ringsCoordinates=rings)
             terrainTopo.fromRingsCoordinates()
@@ -274,7 +273,7 @@ class TilerManager:
                 try:
                     worker(j)
                 except Exception as e:
-                    logger.error('An error occured while generating the tile: %s', e)
+                    logger.error('An error occured while generating the tile: %s' %e)
                     raise Exception(e)
 
         tend = time.time()

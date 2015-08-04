@@ -26,19 +26,22 @@ def squaredDistances(coordsPairs):
     return sDistances
 
 
+def processRingCoordinates(ringCoordinates):
+    nbPoints = len(ringCoordinates) - 1
+    if nbPoints >= 4:
+        # If this condition is not respected it means that we clipped
+        # geometries that were not triangles
+        if nbPoints not in (4, 5, 6, 7):
+            raise Exception('Error while processing the clipped geometries: %s coords have been found' % nbPoints)
+        return collapseIntoTriangles(ringCoordinates)
+    else:
+        return [ringCoordinates[0: len(ringCoordinates) - 1]]
+
+
 def processRingsCoordinates(ringsCoordinates):
     rings = []
     for ring in ringsCoordinates:
-        nbPoints = len(ring) - 1
-        if nbPoints >= 4:
-            # If this condition is not respected it means that we clipped
-            # geometries that were not triangles
-            if nbPoints not in (4, 5, 6, 7):
-                raise Exception('Error while processing the clipped geometries: %s coords have been found' % nbPoints)
-            triangles = collapseIntoTriangles(ring)
-            rings += triangles
-        else:
-            rings += [ring[0: len(ring) - 1]]
+        rings += processRingCoordinates(ring)
     return rings
 
 
