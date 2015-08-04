@@ -12,7 +12,7 @@ directory = '.tmp'
 extension = '.terrain'
 
 curDir = os.getcwd()
-filePathSource = '%s/forge/data/shapfile-features/%s.shp' % (curDir, basename)
+filePathSource = '%s/forge/data/shapefile-features/%s.shp' % (curDir, basename)
 filePathTarget = '%s/%s%s' % (directory, basename, extension)
 
 shapefile = ShpToGDALFeatures(shpFilePath=filePathSource)

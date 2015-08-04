@@ -16,7 +16,7 @@ from sqlalchemy.pool import NullPool
 from contextlib import contextmanager
 from forge.lib.logs import getLogger
 from forge.lib.shapefile_utils import ShpToGDALFeatures
-from forge.lib.helpers import BulkInsert, timestamp
+from forge.lib.helpers import BulkInsert, timestamp, cleanup
 from forge.models.tables import Base, models
 
 
@@ -28,20 +28,74 @@ logger = getLogger(config, __name__, suffix='db_%s' % timestamp())
 # Create pickable object
 class PopulateFeaturesArguments:
 
-    def __init__(self, engineURL, modelIndex, shpFile):
+    def __init__(self, engineURL, modelIndex, shpFile, reproject):
         self.engineURL = engineURL
         self.modelIndex = modelIndex
         self.shpFile = shpFile
+        self.reproject = reproject
+
+
+def reprojectShp(shpFilePath):
+    logger.info('Action reprojectShapefile(%s)' % shpFilePath)
+    outDirectory = config.get('Reprojection', 'outDirectory')
+    outFile = '%s%s' % (outDirectory, os.path.basename(shpFilePath))
+
+    # If out file already exists clean it up first
+    cleanup(outFile)
+
+    command = '%(geosuiteCmd)s -calc reframe -in %(inFile)s -out %(outFile)s -pframes %(fromPFrames)s,%(toPFrames)s ' \
+        '-aframes %(fromAFrames)s,%(toAFrames)s -log %(logfile)s -err %(errorfile)s' % dict(
+            geosuiteCmd=config.get('Reprojection', 'geosuiteCmd'),
+            inFile=shpFilePath,
+            outFile=outFile,
+            fromPFrames=config.get('Reprojection', 'fromPFrames'),
+            toPFrames=config.get('Reprojection', 'toPFrames'),
+            fromAFrames=config.get('Reprojection', 'fromAFrames'),
+            toAFrames=config.get('Reprojection', 'toAFrames'),
+            logfile=config.get('Reprojection', 'logfile'),
+            errorfile=config.get('Reprojection', 'errorfile')
+        )
+    try:
+        logger.info('Command: %s' % command)
+        subprocess.call(command, shell=True)
+    except Exception as e:
+        logger.error('Could not reproject %(inFile)s into %(outFile)s: %(err)s' % dict(
+            inFile=shpFilePath,
+            outFile=outFile,
+            err=e
+        ))
+        raise Exception(e)
+
+    # As we can't detect a success from an error with the current implementation
+    # We determine if the output file exists and exit if not
+    if not os.path.isfile(outFile):
+        logger.error('File could not be reprojected')
+        logger.error('Have a look at %(logfile)s or %(errorfile)s for more information.' % dict(
+            logfile=config.get('Reprojection', 'logfile'),
+            errorfile=config.get('Reprojection', 'errorfile')
+        ))
+        raise Exception('File could not be reprojected!!')
+
+    return outFile
 
 
 def populateFeatures(args):
     pid = os.getpid()
     session = None
+    shpFile = args.shpFile
+    reproject = args.reproject
+    keepfiles = True if config.get('Reprojection', 'keepfiles') == '1' else False
+
+    if reproject:
+        try:
+            shpFile = reprojectShp(shpFile)
+        except Exception as e:
+            raise Exception(e)
+
     try:
         engine = sqlalchemy.create_engine(args.engineURL)
         session = scoped_session(sessionmaker(bind=engine))
         model = models[args.modelIndex]
-        shpFile = args.shpFile
 
         if not os.path.exists(shpFile):
             logger.error('[%s]: Shapefile %s does not exists' % (pid, shpFile))
@@ -53,7 +107,6 @@ def populateFeatures(args):
         bulk = BulkInsert(model, session, withAutoCommit=1000)
         for feature in shp.getFeatures():
             polygon = feature.GetGeometryRef()
-            # TODO Use WKBelement directly instead
             bulk.add(dict(
                 the_geom=WKTElement(polygon.ExportToWkt(), 4326)
             ))
@@ -67,6 +120,12 @@ def populateFeatures(args):
         if session is not None:
             session.close_all()
             engine.dispose()
+
+    if reproject:
+        # Discard file after reprojection if specified in config
+        if not keepfiles:
+            logger.info('[%s] Removing %s...' % (pid, shpFile))
+            cleanup(shpFile)
 
     return count
 
@@ -93,8 +152,6 @@ class DB:
             self.password = config.get('Database', 'password')
 
     def __init__(self, configFile):
-        config = ConfigParser.RawConfigParser()
-        config.read(configFile)
 
         self.serverConf = DB.Server(config)
         self.adminConf = DB.Admin(config)
@@ -216,61 +273,51 @@ class DB:
 
     def setupFunctions(self):
         logger.info('Action: setupFunctions()')
+
         os.environ['PGPASSWORD'] = self.databaseConf.password
-        command = 'psql -U %(user)s -d %(dbname)s -a -f forge/sql/_interpolate_height_on_plane.sql' % dict(
-            user=self.databaseConf.user,
-            dbname=self.databaseConf.name
-        )
-        try:
-            subprocess.call(command, shell=True)
-        except Exception as e:
-            logger.error('Could not add custom functions to the database: %(err)s' % dict(
-                err=str(e)
-            ))
+        baseDir = 'forge/sql/'
 
-        command = 'psql -U %(user)s -d %(dbname)s -a -f forge/sql/meta.sql' % dict(
-            user=self.databaseConf.user,
-            dbname=self.databaseConf.name
-        )
-        try:
-            subprocess.call(command, shell=True)
-        except Exception as e:
-            logger.error('Could not add custom functions to the database: %(err)s' % dict(
-                err=str(e)
-            ))
-
-        command = 'psql -U %(user)s -d %(dbname)s -a -f forge/sql/visualize_tms_grid.sql' % dict(
-            user=self.databaseConf.user,
-            dbname=self.databaseConf.name
-        )
-        try:
-            subprocess.call(command, shell=True)
-        except Exception as e:
-            logger.error('Could not add custom functions to the database: %(err)s' % dict(
-                err=str(e)
-            ))
-        del os.environ['PGPASSWORD']
-
-        with self.adminConnection() as conn:
-            pgVersion = conn.execute("Select postgis_version();").fetchone()[0]
-            if pgVersion.startswith("2."):
-                logger.info('Action: setupFunctions()->legacy.sql')
-                os.environ['PGPASSWORD'] = self.adminConf.password
-                command = 'psql --quiet -h %(host)s -U %(user)s -d %(dbname)s -f forge/sql/legacy.sql' % dict(
-                    host=self.serverConf.host,
-                    user=self.adminConf.user,
-                    dbname=self.databaseConf.name
+        for fileName in os.listdir('forge/sql/'):
+            if fileName != 'legacy.sql':
+                command = 'psql -U %(user)s -d %(dbname)s -a -f %(baseDir)s%(fileName)s' % dict(
+                    user=self.databaseConf.user,
+                    dbname=self.databaseConf.name,
+                    baseDir=baseDir,
+                    fileName=fileName
                 )
                 try:
                     subprocess.call(command, shell=True)
                 except Exception as e:
-                    logger.error('Could not install postgis 2.1 legacy functions to the database: %(err)s' % dict(
+                    logger.error('Could not add custom functions %s to the database: %(err)s' % dict(
+                        fileName=fileName,
                         err=str(e)
                     ))
-                del os.environ['PGPASSWORD']
+            else:
+                with self.adminConnection() as conn:
+                    pgVersion = conn.execute("Select postgis_version();").fetchone()[0]
+                    if pgVersion.startswith("2."):
+                        logger.info('Action: setupFunctions()->legacy.sql')
+                        os.environ['PGPASSWORD'] = self.adminConf.password
+                        command = 'psql --quiet -h %(host)s -U %(user)s -d %(dbname)s -f %(baseDir)s%(fileName)s' % dict(
+                            host=self.serverConf.host,
+                            user=self.adminConf.user,
+                            dbname=self.databaseConf.name,
+                            baseDir=baseDir,
+                            fileName=fileName
+                        )
+                        try:
+                            subprocess.call(command, shell=True)
+                        except Exception as e:
+                            logger.error('Could not install postgis 2.1 legacy functions to the database: %(err)s' % dict(
+                                err=str(e)
+                            ))
+
+        del os.environ['PGPASSWORD']
 
     def populateTables(self):
         logger.info('Action: populateTables()')
+
+        reproject = config.get('Reprojection', 'reproject')
         tstart = time.time()
         featuresArgs = []
         for i in range(0, len(models)):
@@ -279,7 +326,8 @@ class DB:
                 featuresArgs.append(PopulateFeaturesArguments(
                     self.userEngine.url,
                     i,
-                    shp
+                    shp,
+                    True if reproject == '1' else False
                 ))
 
         def initWorker():
