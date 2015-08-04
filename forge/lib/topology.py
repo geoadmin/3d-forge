@@ -67,6 +67,7 @@ class TerrainTopology(object):
         # coordinates as an input
         for ring in self.ringsCoordinates:
             self._buildTopologyFromRing(ring)
+        self.coordsLookup = {}
         del self.ringsCoordinates
 
     def fromFeatures(self):
@@ -81,6 +82,7 @@ class TerrainTopology(object):
 
             ring = self._ringFromGDALGeometry(geometry)
             self._buildTopologyFromRing(ring)
+        self.coordsLookup = {}
         del self.features
 
     def _ringFromGDALGeometry(self, geometry):
@@ -135,7 +137,6 @@ class TerrainTopology(object):
                 # Keep track of coordinates for bbsphere and friends
                 self.coords.append(coord)
                 self.index += 1
-        self.coordsLookup = {}
 
     def _findVertexIndex(self, lookupKey):
         # Naive approach for now
