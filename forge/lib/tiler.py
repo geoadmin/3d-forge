@@ -70,7 +70,7 @@ def worker(job):
     pid = os.getpid()
 
     try:
-        (tmsConfig, tileMinZ, tileMaxZ, bounds, tileXYZ, t0, bucket) = job
+        (bounds, tileXYZ, t0, bucket) = job
         # Prepare models
         db = DB('database.cfg')
         session = sessionmaker()(bind=db.userEngine)
@@ -189,7 +189,7 @@ class Jobs:
         bucket = getBucket()
         zRange = range(self.tileMinZ, self.tileMaxZ + 1)
         for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), zRange, self.fullonly):
-            yield (self.tmsConfig, self.tileMinZ, self.tileMaxZ, bounds, tileXYZ, self.t0, bucket)
+            yield (bounds, tileXYZ, self.t0, bucket)
 
 
 class Chunks:
