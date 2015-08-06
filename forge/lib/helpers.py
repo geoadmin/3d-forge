@@ -27,6 +27,15 @@ def zigZagDecode(z):
     # return (z >> 1) if not z & 1 else -(z+1 >> 1)
 
 
+def createBBox(center, length):
+    offset = length / 2
+    xmin = center[0] - offset
+    ymin = center[1] - offset
+    xmax = center[0] + offset
+    ymax = center[1] + offset
+    return [xmin, ymin, xmax, ymax]
+
+
 def transformCoordinate(wkt, srid_from, srid_to):
     srid_in = osr.SpatialReference()
     srid_in.ImportFromEPSG(srid_from)

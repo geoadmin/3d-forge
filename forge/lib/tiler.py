@@ -14,13 +14,14 @@ from geoalchemy2.shape import to_shape
 from forge import DB
 import forge.lib.cartesian2d as c2d
 from forge.models.terrain import TerrainTile
-from forge.models.tables import models
+from forge.models.tables import modelsPyramid
 from forge.lib.boto_conn import getBucket, writeToS3
-from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate
+from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate, createBBox
 from forge.lib.topology import TerrainTopology
 from forge.lib.global_geodetic import GlobalGeodetic
-from forge.lib.collapse_geom import processRingsCoordinates
+from forge.lib.collapse_geom import processRingCoordinates
 from forge.lib.logs import getLogger
+
 
 NUMBER_POOL_PROCESSES = multiprocessing.cpu_count()
 # Init logging
@@ -63,48 +64,46 @@ def initWorker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
-def prepareModelsPyramid(tileMinZ, tileMaxZ, tmsConfig):
-    modelsPyramid = {}
-    for i in range(tileMinZ, tileMaxZ + 1):
-        for model in models:
-            if model.__tablename__ == tmsConfig.get(str(i), 'tablename'):
-                modelsPyramid[str(i)] = model
-                break
-    return modelsPyramid
-
-
 def worker(job):
     global count
     session = None
     pid = os.getpid()
 
     try:
-        (tmsConfig, tileMinZ, tileMaxZ, bounds, tileXYZ, t0, bucket) = job
+        (bounds, tileXYZ, t0, bucket) = job
         # Prepare models
-        modelsPyramid = prepareModelsPyramid(tileMinZ, tileMaxZ, tmsConfig)
         db = DB('database.cfg')
         session = sessionmaker()(bind=db.userEngine)
 
         # Get the model according to the zoom level
-        model = modelsPyramid[str(tileXYZ[2])]
+        model = modelsPyramid.getModelByZoom(tileXYZ[2])
 
         # Get the interpolated point at the 4 corners
         # 0: (minX, minY), 1: (minX, maxY), 2: (maxX, maxY), 3: (maxX, minY)
-        p_0 = (bounds[0], bounds[1], 0)
-        p_1 = (bounds[0], bounds[3], 0)
-        p_2 = (bounds[2], bounds[3], 0)
-        p_3 = (bounds[2], bounds[1], 0)
-        pts = [p_0, p_1, p_2, p_3]
-        cornerPts = {}
+        pts = [
+            (bounds[0], bounds[1], 0),
+            (bounds[0], bounds[3], 0),
+            (bounds[2], bounds[3], 0),
+            (bounds[2], bounds[1], 0)
+        ]
+
+        def toSubQuery(x):
+            return session.query(model.id, model.interpolateHeightOnPlane(pts[x])).filter(
+                and_(model.bboxIntersects(createBBox(pts[x], 0.01)), model.pointIntersects(pts[x]))).subquery('p%s' % x)
+        subqueries = [toSubQuery(i) for i in range(0, len(pts))]
 
         # Get the height of the corner points as postgis cannot properly clip
         # a polygon
-        for pt in pts:
-            query = session.query(model.id, model.interpolateHeightOnPlane(pt, model.the_geom).label('p')).filter(
-                and_(model.bboxIntersects(bounds), model.pointIntersects(pt))
-            )
-            for q in query:
-                cornerPts[q.id] = list(to_shape(WKBElement(q.p)).coords)
+        cornerPts = {}
+        step = 2
+        j = step
+        query = session.query(*subqueries)
+        for q in query:
+            for i in range(0, len(q), step):
+                sub = q[i:j]
+                j += step
+                cornerPts[sub[0]] = list(to_shape(WKBElement(sub[1])).coords)
+
         # Clip using the bounds
         clippedGeometry = model.bboxClippedGeom(bounds)
         query = session.query(
@@ -112,7 +111,7 @@ def worker(job):
             clippedGeometry.label('clip')
         ).filter(model.bboxIntersects(bounds))
 
-        ringsCoordinates = []
+        rings = []
         for q in query:
             coords = list(to_shape(q.clip).exterior.coords)
             if q.id in cornerPts:
@@ -121,19 +120,18 @@ def worker(job):
                     c = coords[i]
                     if c[0] == pt[0] and c[1] == pt[1]:
                         coords[i] = [c[0], c[1], pt[2]]
-            ringsCoordinates.append(coords)
 
-        bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
-        # Skip empty tiles for now, we should instead write an empty tile to S3
-        if len(ringsCoordinates) > 0:
             try:
-                rings = processRingsCoordinates(ringsCoordinates)
+                rings += processRingCoordinates(coords)
             except Exception as e:
-                msg = '[%s] --------- ERROR ------- occured while collapsing non triangular shapes\n'
-                msg += '%s' % (pid, e)
+                msg = '[%s] --------- ERROR ------- occured while collapsing non triangular shapes\n' % pid
+                msg += '[%s]: %s' % (pid, e)
                 logger.error(msg)
                 raise Exception(e)
 
+        bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
+        # Skip empty tiles for now, we should instead write an empty tile to S3
+        if len(rings) > 0:
             # Prepare terrain tile
             terrainTopo = TerrainTopology(ringsCoordinates=rings)
             terrainTopo.fromRingsCoordinates()
@@ -161,6 +159,7 @@ def worker(job):
             logger.info('[%s] Skipping %s because no features found for this tile (%s skipped from %s total)' % (pid, bucketKey, val, total))
 
     except Exception as e:
+        logger.error(e)
         raise Exception(e)
     finally:
         if session is not None:
@@ -190,7 +189,7 @@ class Jobs:
         bucket = getBucket()
         zRange = range(self.tileMinZ, self.tileMaxZ + 1)
         for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), zRange, self.fullonly):
-            yield (self.tmsConfig, self.tileMinZ, self.tileMaxZ, bounds, tileXYZ, self.t0, bucket)
+            yield (bounds, tileXYZ, self.t0, bucket)
 
 
 class Chunks:
@@ -265,7 +264,7 @@ class TilerManager:
                 try:
                     worker(j)
                 except Exception as e:
-                    logger.error('An error occured while generating the tile: %s', e)
+                    logger.error('An error occured while generating the tile: %s' % e)
                     raise Exception(e)
 
         tend = time.time()
@@ -280,14 +279,13 @@ class TilerManager:
         geodetic = GlobalGeodetic(True)
         bounds = (jobs.minLon, jobs.minLat, jobs.maxLon, jobs.maxLat)
         zooms = range(jobs.tileMinZ, jobs.tileMaxZ + 1)
-        modelsPyramid = prepareModelsPyramid(jobs.tileMinZ, jobs.tileMaxZ, jobs.tmsConfig)
 
         db = DB('database.cfg')
         self.DBSession = scoped_session(sessionmaker(bind=db.userEngine))
 
         for i in xrange(0, len(zooms)):
             zoom = zooms[i]
-            model = modelsPyramid[str(zoom)]
+            model = modelsPyramid.getModelByZoom(zoom)
             nbObjects = self.DBSession.query(model).filter(model.bboxIntersects(bounds)).count()
             tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], zoom)
             tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], zoom)
