@@ -3,10 +3,15 @@
 import sys
 import time
 import logging
+import ConfigParser
 from boto import connect_s3
 from boto.s3.key import Key
 
 logging.getLogger('boto').setLevel(logging.CRITICAL)
+
+tmsConfig = ConfigParser.RawConfigParser()
+tmsConfig.read('tms.cfg')
+basePath = tmsConfig.get('General', 'bucketpath')
 
 
 def _getS3Conn(profileName='tms3d_filestorage'):
@@ -31,7 +36,7 @@ def getBucket(bucketName='tms3d.geo.admin.ch'):
 def writeToS3(b, path, content, origin, contentType='application/octet-stream'):
     headers = {'Content-Type': contentType}
     k = Key(b)
-    k.key = path
+    k.key = basePath + path
     k.set_metadata('IWI_Origin', origin)
     headers['Content-Encoding'] = 'gzip'
     k.set_contents_from_file(content, headers=headers)
@@ -43,7 +48,7 @@ class S3Keys:
         self.bucket = getBucket()
         self.counter = 0
         if prefix is not None:
-            self.prefix = prefix
+            self.prefix = basePath + prefix
         else:
             raise Exception('One must define a prefix')
         self.keysList = self.bucket.list(prefix=self.prefix)
