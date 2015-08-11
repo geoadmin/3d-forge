@@ -8,8 +8,6 @@ import ConfigParser
 from forge.lib.logs import getLogger
 from forge.lib.helpers import timestamp
 
-NUMBER_POOL_PROCESSES = multiprocessing.cpu_count()
-
 dbConfig = ConfigParser.RawConfigParser()
 dbConfig.read('database.cfg')
 logger = getLogger(dbConfig, __name__, suffix=timestamp())
@@ -23,15 +21,16 @@ def initProcess():
 
 class PoolManager:
 
-    def __init__(self):
-        self._pool = multiprocessing.Pool(NUMBER_POOL_PROCESSES, initProcess)
+    def __init__(self, numProcs=multiprocessing.cpu_count()):
+        self._numProcs = numProcs
+        self._pool = multiprocessing.Pool(self._numProcs, initProcess)
 
     def _abort(self):
         self._pool.terminate()
         self._pool.join()
 
     def numOfProcesses(self):
-        return NUMBER_POOL_PROCESSES
+        return self._numProcs
 
     # Blocking call
     def process(self, iterable, func, chunks):

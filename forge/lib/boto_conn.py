@@ -24,8 +24,6 @@ dbConfig = ConfigParser.RawConfigParser()
 dbConfig.read('database.cfg')
 log = getLogger(dbConfig, __name__, suffix=timestamp())
 
-bucketName = 'tms3d.geo.admin.ch'
-
 
 def _getS3Conn(profileName='tms3d_filestorage'):
     try:
@@ -38,7 +36,7 @@ def _getS3Conn(profileName='tms3d_filestorage'):
 connS3 = _getS3Conn()
 
 
-def getBucket(bucketName=bucketName):
+def getBucket(bucketName='tms3d.geo.admin.ch'):
     try:
         bucket = connS3.get_bucket(bucketName)
     except Exception as e:
@@ -62,7 +60,7 @@ def copyKey(args):
     try:
         bucket = getBucket()
         key = bucket.lookup(keyname)
-        key.copy(bucketName, toPrefix + keyname)
+        key.copy(bucket.name, toPrefix + keyname)
         copycount.value += 1
         val = copycount.value
         if val % 100 == 0:
@@ -102,14 +100,12 @@ def copyKeys(fromPrefix, toPrefix, zooms):
 
 class S3Keys:
 
-    def __init__(self, prefix, applyBasePath=True):
+    def __init__(self, prefix):
         self.bucket = getBucket()
         self.counter = 0
+        self.prefix = basePath
         if prefix is not None:
-            if applyBasePath:
-                self.prefix = basePath + prefix
-            else:
-                self.prefix = prefix
+            self.prefix += prefix
         else:
             raise Exception('One must define a prefix')
         self.keysList = self.bucket.list(prefix=self.prefix)

@@ -183,7 +183,6 @@ class TilerManager:
     def __init__(self, configFile):
         tmsConfig = ConfigParser.RawConfigParser()
         tmsConfig.read(configFile)
-        self.chunks = int(tmsConfig.get('General', 'chunks'))
         self.tmsConfig = tmsConfig
 
     def create(self):
@@ -196,16 +195,17 @@ class TilerManager:
 
         pm = PoolManager()
 
-        useChunks = self.chunks
+        maxChunks = int(self.tmsConfig.get('General', 'maxChunks'))
+
         nbTiles = self.numOfTiles()
         tilesPerProc = int(nbTiles / pm.numOfProcesses())
-        if tilesPerProc < useChunks:
-            useChunks = tilesPerProc
-        if useChunks < 1:
-            useChunks = 1
+        if tilesPerProc < maxChunks:
+            maxChunks = tilesPerProc
+        if maxChunks < 1:
+            maxChunks = 1
 
-        logger.info('Starting creation of %s tiles (%s per chunk)' % (nbTiles, useChunks))
-        pm.process(tiles, createTile, useChunks)
+        logger.info('Starting creation of %s tiles (%s per chunk)' % (nbTiles, maxChunks))
+        pm.process(tiles, createTile, maxChunks)
 
         tend = time.time()
         logger.info('It took %s to create %s tiles (%s were skipped)' % (
