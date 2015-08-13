@@ -246,14 +246,22 @@ class TilerManager:
         tiles = Tiles(self.tmsConfig, t0)
         tMeta = TerrainMetadata(minzoom=tiles.tileMinZ, maxzoom=tiles.tileMaxZ, useGlobalTiles=True)
 
-        tilecount = 1
-        for tile in tiles:
-            tMeta = scanTerrain(tMeta, tile, session, tilecount)
-            tilecount += 1
+        try:
+            tilecount = 1
+            for tile in tiles:
+                tMeta = scanTerrain(tMeta, tile, session, tilecount)
+                tilecount += 1
 
-        tend = time.time()
-        logger.info('It took %s to scan %s tiles' % (
-            str(datetime.timedelta(seconds=tend - t0)), tilecount))
+            tend = time.time()
+            logger.info('It took %s to scan %s tiles' % (
+                str(datetime.timedelta(seconds=tend - t0)), tilecount))
+        except Exception as e:
+            logger.error('An error occured during layer.json creation')
+            logger.error('%s' % e)
+            raise Exception(e)
+        finally:
+            session.close_all()
+            db.userEngine.dispose()
 
         with open('.tmp/layer.json', 'w') as f:
             f.write(tMeta.toJSON())
