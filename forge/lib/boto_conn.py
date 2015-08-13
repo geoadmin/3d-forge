@@ -22,9 +22,9 @@ profileName = tmsConfig.get('General', 'profileName')
 basePath = tmsConfig.get('General', 'bucketpath')
 
 # Init logging
-dbConfig = ConfigParser.RawConfigParser()
-dbConfig.read('database.cfg')
-log = getLogger(dbConfig, __name__, suffix=timestamp())
+loggingConfig = ConfigParser.RawConfigParser()
+loggingConfig.read('logging.cfg')
+log = getLogger(loggingConfig, __name__, suffix=timestamp())
 
 
 def _getS3Conn():
@@ -96,8 +96,20 @@ def copyKeys(fromPrefix, toPrefix, zooms):
 
         pm.process(keys, copyKey, 50)
 
-        log.info('It took %s to copy this zoomlevel (total %s)' % (str(datetime.timedelta(seconds=time.time() - t0zoom)), copycount.value))
-    log.info('It took %s to copy for all zoomlevels (total %s)' % (str(datetime.timedelta(seconds=time.time() - t0)), copycount.value))
+        log.info(
+            'It took %s to copy this zoomlevel (total %s)' %
+            (str(
+                datetime.timedelta(
+                    seconds=time.time() -
+                    t0zoom)),
+                copycount.value))
+    log.info(
+        'It took %s to copy for all zoomlevels (total %s)' %
+        (str(
+            datetime.timedelta(
+                seconds=time.time() -
+                t0)),
+     copycount.value))
 
 
 class S3Keys:

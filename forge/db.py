@@ -19,24 +19,21 @@ from forge.models.tables import Base, modelsPyramid
 from forge.lib.poolmanager import PoolManager
 
 
-config = ConfigParser.RawConfigParser()
-config.read('database.cfg')
-logger = getLogger(config, __name__, suffix='db_%s' % timestamp())
+loggingConfig = ConfigParser.RawConfigParser()
+loggingConfig.read('logging.cfg')
+logger = getLogger(loggingConfig, __name__, suffix='db_%s' % timestamp())
 
 
 # Create pickable object
-class PopulateFeaturesArguments:
+class PopulateFeaturesArguments(object):
 
-    def __init__(self, engineURL, modelIndex, shpFile, reproject):
-        self.engineURL = engineURL
-        self.modelIndex = modelIndex
-        self.shpFile = shpFile
-        self.reproject = reproject
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
 
 
-def reprojectShp(shpFilePath):
+def reprojectShp(shpFilePath, args):
     logger.info('Action reprojectShapefile(%s)' % shpFilePath)
-    outDirectory = config.get('Reprojection', 'outDirectory')
+    outDirectory = args.outDirectory
     outFile = '%s%s' % (outDirectory, os.path.basename(shpFilePath))
 
     # If out file already exists clean it up first
@@ -44,24 +41,24 @@ def reprojectShp(shpFilePath):
 
     command = '%(geosuiteCmd)s -calc reframe -in %(inFile)s -out %(outFile)s -pframes %(fromPFrames)s,%(toPFrames)s ' \
         '-aframes %(fromAFrames)s,%(toAFrames)s -log %(logfile)s -err %(errorfile)s' % dict(
-            geosuiteCmd=config.get('Reprojection', 'geosuiteCmd'),
-            inFile=shpFilePath,
-            outFile=outFile,
-            fromPFrames=config.get('Reprojection', 'fromPFrames'),
-            toPFrames=config.get('Reprojection', 'toPFrames'),
-            fromAFrames=config.get('Reprojection', 'fromAFrames'),
-            toAFrames=config.get('Reprojection', 'toAFrames'),
-            logfile=config.get('Reprojection', 'logfile'),
-            errorfile=config.get('Reprojection', 'errorfile')
+            geosuiteCmd = args.geosuiteCmd,
+            inFile      = args.shpFilePath,
+            outFile     = args.outFile,
+            fromPFrames = args.fromPFrames,
+            toPFrames   = args.toPFrames,
+            fromAFrames = args.fromAFrames,
+            toAFrames   = args.toAFrames,
+            logfile     = args.logfile,
+            errorfile   = args.errorfile
         )
     try:
         logger.info('Command: %s' % command)
         subprocess.call(command, shell=True)
     except Exception as e:
         logger.error('Could not reproject %(inFile)s into %(outFile)s: %(err)s' % dict(
-            inFile=shpFilePath,
-            outFile=outFile,
-            err=e
+            inFile  = shpFilePath,
+            outFile = outFile,
+            err     = e
         ))
         raise Exception(e)
 
@@ -70,8 +67,8 @@ def reprojectShp(shpFilePath):
     if not os.path.isfile(outFile):
         logger.error('File could not be reprojected')
         logger.error('Have a look at %(logfile)s or %(errorfile)s for more information.' % dict(
-            logfile=config.get('Reprojection', 'logfile'),
-            errorfile=config.get('Reprojection', 'errorfile')
+            logfile   = args.logfile,
+            errorfile = args.errorfile
         ))
         raise Exception('File could not be reprojected!!')
 
@@ -83,11 +80,11 @@ def populateFeatures(args):
     session = None
     shpFile = args.shpFile
     reproject = args.reproject
-    keepfiles = True if config.get('Reprojection', 'keepfiles') == '1' else False
+    keepfiles = args.keepfiles
 
     if reproject:
         try:
-            shpFile = reprojectShp(shpFile)
+            shpFile = reprojectShp(shpFile, args)
         except Exception as e:
             raise Exception(e)
 
@@ -152,6 +149,13 @@ class DB:
             self.password = config.get('Database', 'password')
 
     def __init__(self, configFile):
+
+        if isinstance(configFile, str):
+            config = ConfigParser.RawConfigParser()
+            config.read(configFile)
+            self.config = config
+        else:
+            config = configFile
 
         self.serverConf = DB.Server(config)
         self.adminConf = DB.Admin(config)
@@ -317,21 +321,39 @@ class DB:
     def populateTables(self):
         logger.info('Action: populateTables()')
 
-        reproject = config.get('Reprojection', 'reproject')
+        reproject    = self.config.get('Reprojection', 'reproject')
+        keepfiles    = self.config.get('Reprojection', 'keepfiles')
+        outDirectory = self.config.get('Reprojection', 'outDirectory')
+        geosuiteCmd  = self.config.get('Reprojection', 'geosuiteCmd')
+        fromPFrames  = self.config.get('Reprojection', 'fromPFrames')
+        toPFrames    = self.config.get('Reprojection', 'toPFrames')
+        fromAFrames  = self.config.get('Reprojection', 'fromAFrames')
+        logfile      = self.config.get('Reprojection', 'logfile')
+        errorfile    = self.config.get('Reprojection', 'errorfile')
+
         tstart = time.time()
         models = modelsPyramid.models
         featuresArgs = []
         for i in range(0, len(models)):
             model = models[i]
             for shp in model.__shapefiles__:
+
                 featuresArgs.append(PopulateFeaturesArguments(
-                    self.userEngine.url,
-                    i,
-                    shp,
-                    True if reproject == '1' else False
+                    engineURL    = self.userEngine.url,
+                    modelIndex   = i,
+                    shpFile      = shp,
+                    reproject    = True if reproject == '1' else False,
+                    keepfiles    = True if keepfiles == '1' else False,
+                    outDirectory = outDirectory,
+                    geosuiteCmd  = geosuiteCmd,
+                    fromPFrames  = fromPFrames,
+                    toPFrames    = toPFrames,
+                    fromAFrames  = fromAFrames,
+                    logfile      = logfile,
+                    errorfile    = errorfile
                 ))
 
-        pm = PoolManager()
+        pm = PoolManager(logger=logger)
 
         pm.process(featuresArgs, populateFeatures, 1)
 

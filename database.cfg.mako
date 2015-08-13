@@ -32,8 +32,3 @@ fromAFrames: ln02
 toAFrames: ellipsoid
 logfile: /var/log/tileforge/reprojections.log
 errorfile: /var/log/tileforge/reprojections_errors.log
-
-[Logging]
-config: logging.cfg
-logfile: /var/log/tileforge/forge_%(timestamp)s.log
-sqlLogfile: /var/log/tileforge/sql_%(timestamp)s.log
