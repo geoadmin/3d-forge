@@ -64,8 +64,8 @@ class GlobalGeodetic(object):
     def PixelsToTile(self, px, py):
         "Returns coordinates of the tile covering region in pixel coordinates"
 
-        tx = int(math.ceil(px / float(self.tileSize)) - 1)
-        ty = int(math.ceil(py / float(self.tileSize)) - 1)
+        tx = int(math.ceil(px / float(self.tileSize)) - 1) if px > 0 else 0
+        ty = int(math.ceil(py / float(self.tileSize)) - 1) if py > 0 else 0
         return tx, ty
 
     def LonLatToTile(self, lon, lat, zoom):
