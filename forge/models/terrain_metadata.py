@@ -4,6 +4,35 @@ import json
 from forge.lib.global_geodetic import GlobalGeodetic
 
 
+# Zoom 0 to 8
+globalTilesConfig = [
+    [
+        {"startX": 0, "startY": 0, "endX": 1, "endY": 0}
+    ],
+    [
+        {"startX": 0, "startY": 0, "endX": 3, "endY": 1}
+    ],
+    [
+        {"startX": 0, "startY": 0, "endX": 7, "endY": 3}
+    ],
+    [
+        {"startX": 0, "startY": 0, "endX": 15, "endY": 7}
+    ],
+    [
+        {"startX": 0, "startY": 0, "endX": 31, "endY": 15}
+    ],
+    [
+        {"startX": 25, "startY": 20, "endX": 39, "endY": 29}
+    ],
+    [
+        {"startX": 51, "startY": 40, "endX": 79, "endY": 58}
+    ],
+    [
+        {"startX": 103, "startY": 81, "endX": 159, "endY": 117}
+    ]
+]
+
+
 class TerrainMetadata:
 
     def __init__(self, *args, **kwargs):
@@ -11,6 +40,7 @@ class TerrainMetadata:
         self.bounds = kwargs.get('bounds')
         self.tileMinZoom = kwargs.get('minzoom')
         self.tileMaxZoom = kwargs.get('maxzoom')
+        self.useGlobalTiles = kwargs.get('useGlobalTiles', False)
 
         self.available = [[] for i in range(self.tileMinZoom, self.tileMaxZoom + 1)]
         self.meta = dict(
@@ -65,8 +95,7 @@ class TerrainMetadata:
 
                     newRow = [[tileMinX, tileMaxX]]
                     # Current row over x is equal to previous row -> increase rectangle size over y
-                    if previousRow[0][0] == newRow[0][0] and \
-                            previousRow[0][1] == newRow[0][1]:
+                    if previousRow[0][0] == newRow[0][0] and previousRow[0][1] == newRow[0][1]:
                         previousRec[0]['endY'] = y
                     # Move temp rectangle in the final list, create new temp rec
                     else:
@@ -98,19 +127,19 @@ class TerrainMetadata:
                         for i in range(0, len(previousRec)):
                             previousRec[i]['endY'] = y
                     else:
-                        if y == tileMinY:
-                            previousRec = []
-                            for r in newRow:
-                                previousRec.append(self._createRectangle(r[0], r[1], y, y))
-                        else:
+                        if y != tileMinY:
                             self.available[z - self.tileMinZoom] += previousRec
-                            previousRec = []
-                            for r in newRow:
-                                previousRec.append(self._createRectangle(r[0], r[1], y, y))
+                        previousRec = []
+                        for r in newRow:
+                            previousRec.append(self._createRectangle(r[0], r[1], y, y))
                 previousRow = newRow
 
             # Finally push the last rec
             self.meta['available'][z - self.tileMinZoom] += previousRec
+
+        # Add global tiles config to the metadata
+        if self.useGlobalTiles:
+            self.meta['available'] = globalTilesConfig + self.meta['available']
 
         return json.dumps(self.meta)
 
