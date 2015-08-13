@@ -17,7 +17,6 @@ help:
 	@echo "- all                All of the above"
 	@echo "- autolint           Auto lint code styling"
 	@echo "- updatesubmodule    Update 3d testapp"
-	@echo "- serve              Serve examples in localhost (usage: make serve PORT=9005)"
 	@echo "- createdb           Create the database"
 	@echo "- importshp          Imports shapefiles"
 	@echo "- dropdb             Drop the database"
@@ -71,10 +70,6 @@ autolint:
 updatesubmodule:
 	git submodule update
 	git submodule foreach git pull origin master
-
-.PHONY: serve
-serve:
-	$(PYTHON_CMD) forge/scripts/http_server.py $(PORT)
 
 .PHONY: createdb
 createdb:
