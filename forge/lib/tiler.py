@@ -255,7 +255,7 @@ class TilerManager:
         logger.info('It took %s to scan %s tiles' % (
             str(datetime.timedelta(seconds=tend - t0)), tilecount))
 
-        with open('.tmp/layers.json', 'w') as f:
+        with open('.tmp/layer.json', 'w') as f:
             f.write(tMeta.toJSON())
 
     def _stats(self, withDb=True):
