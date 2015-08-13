@@ -1,9 +1,20 @@
 VENV = venv
 PYTHON_CMD = $(VENV)/bin/python
-PORT ?= 9025
+FLAKE8_CMD = $(VENV)/bin/flake8
+AUTOPEP8_CMD = $(VENV)/bin/autopep8
 PREFIX ?= 1/
 PYTHON_FILES := $(shell find forge/ -name '*.py')
 USERNAME := $(shell whoami)
+
+MAX_LINE_LENGTH=130
+PEP8_IGNORE="E128,E221,E241,E251,E272,E711"
+
+# E128: continuation line under-indented for visual indent
+# E221: multiple spaces before operator
+# E241: multiple spaces after ':'
+# E251: multiple spaces around keyword/parameter equals
+# E272: multiple spaces before keyword
+# E711: comparison to None should be 'if cond is None:' (SQLAlchemy's filter syntax requires this ignore!)
 
 .PHONY: help
 help:
@@ -32,8 +43,10 @@ help:
 	@echo "Variables:"
 	@echo
 	@echo "- PYTHON_CMD (current value: $(PYTHON_CMD))"
-
+	@echo "- FLAKE8_CMD (current value: $(FLAKE8_CMD))"
+	@echo "- AUTOPEP8_CMD (current value: $(AUTOPEP8_CMD))"
 	@echo
+
 
 .PHONY: all
 all: install apache/testapp.conf database.cfg tms.cfg test lint
@@ -53,18 +66,18 @@ database.cfg: database.cfg.mako
 tms.cfg: tms.cfg.mako
 	$(VENV)/bin/mako-render --var "bucketname=$(BUCKETNAME)" --var "profilename=$(PROFILENAME)" $< > $@
 
-.PHONY: lint
-lint:
-	venv/bin/flake8 --ignore=E501 forge/
-
 .PHONY: test
 test:
 	$(VENV)/bin/nosetests forge/tests/
 
+.PHONY: lint
+lint:
+	$(FLAKE8_CMD) --max-line-length=${MAX_LINE_LENGTH} --ignore=${PEP8_IGNORE} forge/
+
 .PHONY: autolint
 autolint:
 	@echo $(PYTHON_FILES)
-	$(VENV)/bin/autopep8 -v -i -a --ignore=E501 $(PYTHON_FILES)
+	$(AUTOPEP8_CMD) -v -i -a --max-line-length=${MAX_LINE_LENGTH} --ignore=${PEP8_IGNORE} $(PYTHON_FILES)
 
 .PHONY: updatesubmodule
 updatesubmodule:
