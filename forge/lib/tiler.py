@@ -166,7 +166,7 @@ def scanTerrain(tMeta, tile, session, tilecount):
 
         # Get the model according to the zoom level
         model = modelsPyramid.getModelByZoom(tileXYZ[2])
-        query = session.query(model).filter(model.bboxIntersects(bounds)).limit(1)
+        query = session.query(model.id).filter(model.bboxIntersects(bounds)).limit(1)
         try:
             query.one()
         except NoResultFound as e:
@@ -193,6 +193,7 @@ class Tiles:
         self.minLat = float(tmsConfig.get('Extent', 'minLat'))
         self.maxLat = float(tmsConfig.get('Extent', 'maxLat'))
         self.fullonly = int(tmsConfig.get('Extent', 'fullonly'))
+        self.bounds = (self.minLon, self.minLat, self.maxLon, self.maxLat)
 
         self.tileMinZ = int(tmsConfig.get('Zooms', 'tileMinZ'))
         self.tileMaxZ = int(tmsConfig.get('Zooms', 'tileMaxZ'))
@@ -202,7 +203,7 @@ class Tiles:
     def __iter__(self):
         zRange = range(self.tileMinZ, self.tileMaxZ + 1)
 
-        for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), zRange, self.fullonly):
+        for bounds, tileXYZ in grid(self.bounds, zRange, self.fullonly):
             yield (bounds, tileXYZ, self.t0, self.dbConfigFile)
 
 
@@ -247,7 +248,8 @@ class TilerManager:
         db = DB('database.cfg')
         session = sessionmaker()(bind=db.userEngine)
         tiles = Tiles(self.dbConfigFile, self.tmsConfig, t0)
-        tMeta = TerrainMetadata(minzoom=tiles.tileMinZ, maxzoom=tiles.tileMaxZ, useGlobalTiles=True)
+        tMeta = TerrainMetadata(
+            bounds=tiles.bounds, minzoom=tiles.tileMinZ, maxzoom=tiles.tileMaxZ, useGlobalTiles=True)
 
         try:
             tilecount = 1

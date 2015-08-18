@@ -18,8 +18,8 @@ maxLat: 47.119
 fullonly: 0
 
 [Zooms]
-tileMinZ: 11
-tileMaxZ: 11
+tileMinZ: 9
+tileMaxZ: 17
 
 [9]
 tablename: mnt25_simplified_100m
