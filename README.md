@@ -163,3 +163,34 @@ $ psql -c "select st_astext(bgdi_lonlat2tile(8.159259,46.758162,17));" -d forge
  POINT Z (137013 99584 31487)
 (1 Zeile)
 ```
+
+### watermask.sql
+This script is installing the following sql functions to the database:
+* bgdi_watermask_rasterize(geometry, integer, integer, regclass, text)
+
+**bgdi_watermask_rasterize(geometry, integer, integer, regclass, text)** can be used to create the watermask for a given tile geometry. All the lake intersections within this tile will be rasterized, the raster dimension (pixel width and height) and the lake geometry table has to be set within the function call.
+
+The input parameters of the function are:
+```sql
+bgdi_watermask_rasterize(
+bbox geometry                 -- geometry object with the tile geometry
+, width integer               -- tile width in pixels
+, height integer              -- tile height in pixels
+, watermask_table regclass    -- schema.table containing lake geometry
+, watermask_geom_column text  -- geometry column
+)
+```
+The returned raster is of type ``'1BB' 1-bit boolean`` [1]:
+```
+1 -> water
+0 -> land
+```
+Example Query:
+```SQL
+SELECT bgdi_watermask_rasterize(st_setsrid('POLYGON((6.865 46.379, 6.865 46.383 , 6.869 46.383 , 6.869 46.379, 6.865 46.379 ))'::geometry,4326), 256,256,'v25_pri25_a_seeflaechen'::regclass,'the_geom'::text)as geom;
+```
+
+The current implementation is rasterizing the vector features with the GDAL ALL_TOUCHED=TRUE option.
+![image](https://cloud.githubusercontent.com/assets/5286659/9340301/36695576-45ef-11e5-91a1-881c6819a03e.png)
+
+[1] http://postgis.net/docs/RT_ST_BandPixelType.html
