@@ -29,6 +29,9 @@ globalTilesConfig = [
     ],
     [
         {"startX": 103, "startY": 81, "endX": 159, "endY": 117}
+    ],
+    [
+        {"startX": 206, "startY": 163, "endX": 319, "endY": 234}
     ]
 ]
 
@@ -44,18 +47,18 @@ class TerrainMetadata:
 
         self.available = [[] for i in range(self.tileMinZoom, self.tileMaxZoom + 1)]
         self.meta = dict(
-            tilejson=kwargs.get('tilejson', '2.1.0'),
-            name=kwargs.get('name', None),
-            description=kwargs.get('version', '2.0.0'),
-            format=kwargs.get('format', 'quantized-mesh-1.0'),
-            attribution=kwargs.get('attribution', None),
-            scheme=kwargs.get('scheme', 'tms'),
-            tiles=[kwargs.get('tiles', '{z}/{x}/{y}.terrain?v={version}')],
-            minzoom=self.tileMinZoom,
-            maxzoom=self.tileMaxZoom,
-            bounds=kwargs.get('bounds', [-180, -90, 180, 90]),
-            projection=kwargs.get('projection', 'EPSG:4326'),
-            available=kwargs.get('available', self.available)
+            tilejson     = kwargs.get('tilejson', '2.1.0'),
+            name         = kwargs.get('name', None),
+            description  = kwargs.get('version', '2.0.0'),
+            format       = kwargs.get('format', 'quantized-mesh-1.0'),
+            attribution  = kwargs.get('attribution', None),
+            scheme       = kwargs.get('scheme', 'tms'),
+            tiles        = [kwargs.get('tiles', '{z}/{x}/{y}.terrain?v={version}')],
+            minzoom      = self.tileMinZoom,
+            maxzoom      = self.tileMaxZoom,
+            bounds       = kwargs.get('bounds', [-180, -90, 180, 90]),
+            projection   = kwargs.get('projection', 'EPSG:4326'),
+            available    = kwargs.get('available', self.available)
         )
 
         self._initPyramidMetadata()
@@ -140,6 +143,7 @@ class TerrainMetadata:
         # Add global tiles config to the metadata
         if self.useGlobalTiles:
             self.meta['available'] = globalTilesConfig + self.meta['available']
+            self.meta['minzoom'] = 0
 
         return json.dumps(self.meta)
 

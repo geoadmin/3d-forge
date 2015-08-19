@@ -26,9 +26,9 @@ from forge.lib.poolmanager import PoolManager
 
 
 # Init logging
-dbConfig = ConfigParser.RawConfigParser()
-dbConfig.read('database.cfg')
-logger = getLogger(dbConfig, __name__, suffix=timestamp())
+loggingConfig = ConfigParser.RawConfigParser()
+loggingConfig.read('logging.cfg')
+logger = getLogger(loggingConfig, __name__, suffix=timestamp())
 
 
 def isInside(tile, bounds):
@@ -60,13 +60,11 @@ def createTile(tile):
     pid = os.getpid()
 
     try:
-        (bounds, tileXYZ, t0) = tile
+        (bounds, tileXYZ, t0, dbConfigFile) = tile
 
-        bucket = getBucket()
-
-        # Prepare models
-        db = DB('database.cfg')
+        db = DB(dbConfigFile)
         session = sessionmaker()(bind=db.userEngine)
+        bucket = getBucket()
 
         # Get the model according to the zoom level
         model = modelsPyramid.getModelByZoom(tileXYZ[2])
@@ -140,7 +138,7 @@ def createTile(tile):
             val = tilecount.value
             total = val + skipcount.value
             if val % 10 == 0:
-                logger.info('[%s ]Last tile %s (%s rings). %s to write %s tiles. (total processed: %s)' % (
+                logger.info('[%s] Last tile %s (%s rings). %s to write %s tiles. (total processed: %s)' % (
                     pid, bucketKey, len(rings), str(datetime.timedelta(seconds=tend - t0)), val, total))
 
         else:
@@ -164,11 +162,11 @@ def createTile(tile):
 
 def scanTerrain(tMeta, tile, session, tilecount):
     try:
-        (bounds, tileXYZ, t0) = tile
+        (bounds, tileXYZ, t0, dbConfigFile) = tile
 
         # Get the model according to the zoom level
         model = modelsPyramid.getModelByZoom(tileXYZ[2])
-        query = session.query(model).filter(model.bboxIntersects(bounds)).limit(1)
+        query = session.query(model.id).filter(model.bboxIntersects(bounds)).limit(1)
         try:
             query.one()
         except NoResultFound as e:
@@ -187,7 +185,7 @@ def scanTerrain(tMeta, tile, session, tilecount):
 
 class Tiles:
 
-    def __init__(self, tmsConfig, t0):
+    def __init__(self, dbConfigFile, tmsConfig, t0):
         self.t0 = t0
 
         self.minLon = float(tmsConfig.get('Extent', 'minLon'))
@@ -195,21 +193,27 @@ class Tiles:
         self.minLat = float(tmsConfig.get('Extent', 'minLat'))
         self.maxLat = float(tmsConfig.get('Extent', 'maxLat'))
         self.fullonly = int(tmsConfig.get('Extent', 'fullonly'))
+        self.bounds = (self.minLon, self.minLat, self.maxLon, self.maxLat)
 
         self.tileMinZ = int(tmsConfig.get('Zooms', 'tileMinZ'))
         self.tileMaxZ = int(tmsConfig.get('Zooms', 'tileMaxZ'))
 
+        self.dbConfigFile = dbConfigFile
+
     def __iter__(self):
         zRange = range(self.tileMinZ, self.tileMaxZ + 1)
-        for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), zRange, self.fullonly):
-            yield (bounds, tileXYZ, self.t0)
+
+        for bounds, tileXYZ in grid(self.bounds, zRange, self.fullonly):
+            yield (bounds, tileXYZ, self.t0, self.dbConfigFile)
 
 
 class TilerManager:
 
-    def __init__(self, configFile):
+    def __init__(self, dbConfigFile, tmsConfigFile):
+        self.dbConfigFile = dbConfigFile
+
         tmsConfig = ConfigParser.RawConfigParser()
-        tmsConfig.read(configFile)
+        tmsConfig.read(tmsConfigFile)
         self.tmsConfig = tmsConfig
 
     def create(self):
@@ -218,9 +222,9 @@ class TilerManager:
         tilecount.value = 0
         skipcount.value = 0
 
-        tiles = Tiles(self.tmsConfig, self.t0)
+        tiles = Tiles(self.dbConfigFile, self.tmsConfig, self.t0)
 
-        pm = PoolManager()
+        pm = PoolManager(logger=logger)
 
         maxChunks = int(self.tmsConfig.get('General', 'maxChunks'))
 
@@ -243,8 +247,9 @@ class TilerManager:
 
         db = DB('database.cfg')
         session = sessionmaker()(bind=db.userEngine)
-        tiles = Tiles(self.tmsConfig, t0)
-        tMeta = TerrainMetadata(minzoom=tiles.tileMinZ, maxzoom=tiles.tileMaxZ, useGlobalTiles=True)
+        tiles = Tiles(self.dbConfigFile, self.tmsConfig, t0)
+        tMeta = TerrainMetadata(
+            bounds=tiles.bounds, minzoom=tiles.tileMinZ, maxzoom=tiles.tileMaxZ, useGlobalTiles=True)
 
         try:
             tilecount = 1
@@ -271,7 +276,7 @@ class TilerManager:
         total = 0
 
         msg = '\n'
-        tiles = Tiles(self.tmsConfig, self.t0)
+        tiles = Tiles(self.dbConfigFile, self.tmsConfig, self.t0)
         geodetic = GlobalGeodetic(True)
         bounds = (tiles.minLon, tiles.minLat, tiles.maxLon, tiles.maxLat)
         zooms = range(tiles.tileMinZ, tiles.tileMaxZ + 1)
