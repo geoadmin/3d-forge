@@ -10,6 +10,10 @@ To clone use the --recursive option to get all submodules.
 
     export DBTARGET=xxx
 
+    export BUCKETNAME=xxx
+
+    export PROFILENAME=xxx
+
 ## Getting started
 
     make all

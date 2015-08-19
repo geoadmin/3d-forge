@@ -17,6 +17,8 @@ logging.getLogger('boto').setLevel(logging.CRITICAL)
 
 tmsConfig = ConfigParser.RawConfigParser()
 tmsConfig.read('tms.cfg')
+bucketName = tmsConfig.get('General', 'bucketName')
+profileName = tmsConfig.get('General', 'profileName')
 basePath = tmsConfig.get('General', 'bucketpath')
 
 # Init logging
@@ -25,7 +27,7 @@ dbConfig.read('database.cfg')
 log = getLogger(dbConfig, __name__, suffix=timestamp())
 
 
-def _getS3Conn(profileName='tms3d_filestorage'):
+def _getS3Conn():
     try:
         conn = connect_s3(profile_name=profileName)
     except Exception as e:
@@ -36,7 +38,7 @@ def _getS3Conn(profileName='tms3d_filestorage'):
 connS3 = _getS3Conn()
 
 
-def getBucket(bucketName='tms3d.geo.admin.ch'):
+def getBucket():
     try:
         bucket = connS3.get_bucket(bucketName)
     except Exception as e:

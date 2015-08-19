@@ -1,5 +1,6 @@
 venv
 database.cfg
+tms.cfg
 3d_forge.egg-info
 *.pyc
 *.swp
