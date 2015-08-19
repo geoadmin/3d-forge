@@ -39,6 +39,8 @@ def main():
     command = args[0]
     if command == 'create':
         tiler.create()
+    elif command == 'metadata':
+        tiler.metadata()
     elif command == 'stats':
         tiler.stats()
     elif command == 'statsnodb':

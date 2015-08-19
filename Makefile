@@ -17,7 +17,6 @@ help:
 	@echo "- all                All of the above"
 	@echo "- autolint           Auto lint code styling"
 	@echo "- updatesubmodule    Update 3d testapp"
-	@echo "- serve              Serve examples in localhost (usage: make serve PORT=9005)"
 	@echo "- createdb           Create the database"
 	@echo "- importshp          Imports shapefiles"
 	@echo "- dropdb             Drop the database"
@@ -25,6 +24,7 @@ help:
 	@echo "- deletetiles        Delete tiles in S3 bucket using a prefix (usage: make deletetiles PREFIX=12/)"
 	@echo "- listtiles          List tiles in S3 bucket using a prefix (usage: make listtiles PREFIX=12/)"
 	@echo "- tmspyramid         Create the TMS pyramid based on the config file tms.cfg"
+	@echo "- tmsmetadata        Create the layers.json file"
 	@echo "- tmsstats           Provide statistics about the TMS pyramid"
 	@echo "- tmsstatsnodb       Provide statistics about the TMS pyramid, without db stats"
 	@echo "- clean              Clean all generated files and folders"
@@ -71,10 +71,6 @@ updatesubmodule:
 	git submodule update
 	git submodule foreach git pull origin master
 
-.PHONY: serve
-serve:
-	$(PYTHON_CMD) forge/scripts/http_server.py $(PORT)
-
 .PHONY: createdb
 createdb:
 	$(PYTHON_CMD) forge/scripts/db_management.py create
@@ -102,6 +98,10 @@ listtiles:
 .PHONY: tmspyramid
 tmspyramid:
 	$(PYTHON_CMD) forge/scripts/tms_writer.py create
+
+.PHONY: tmsmetadata
+tmsmetadata:
+	$(PYTHON_CMD) forge/scripts/tms_writer.py metadata
 
 .PHONY: tmsstats
 tmsstats:

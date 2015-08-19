@@ -7,12 +7,14 @@ import multiprocessing
 import os
 from sqlalchemy.sql import and_
 from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm.exc import NoResultFound
 from geoalchemy2 import WKBElement
 from geoalchemy2.shape import to_shape
 
 from forge import DB
 import forge.lib.cartesian2d as c2d
 from forge.models.terrain import TerrainTile
+from forge.models.terrain_metadata import TerrainMetadata
 from forge.models.tables import modelsPyramid
 from forge.lib.boto_conn import getBucket, writeToS3
 from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate, createBBox
@@ -58,7 +60,10 @@ def createTile(tile):
     pid = os.getpid()
 
     try:
-        (bounds, tileXYZ, t0, bucket) = tile
+        (bounds, tileXYZ, t0) = tile
+
+        bucket = getBucket()
+
         # Prepare models
         db = DB('database.cfg')
         session = sessionmaker()(bind=db.userEngine)
@@ -135,14 +140,16 @@ def createTile(tile):
             val = tilecount.value
             total = val + skipcount.value
             if val % 10 == 0:
-                logger.info('[%s ]Last tile %s (%s rings). %s to write %s tiles. (total processed: %s)' % (pid, bucketKey, len(rings), str(datetime.timedelta(seconds=tend - t0)), val, total))
+                logger.info('[%s ]Last tile %s (%s rings). %s to write %s tiles. (total processed: %s)' % (
+                    pid, bucketKey, len(rings), str(datetime.timedelta(seconds=tend - t0)), val, total))
 
         else:
             skipcount.value += 1
             val = skipcount.value
             total = val + tilecount.value
             # One should write an empyt tile
-            logger.info('[%s] Skipping %s (%s) because no features found for this tile (%s skipped from %s total)' % (pid, bucketKey, bounds, val, total))
+            logger.info('[%s] Skipping %s (%s) because no features found for this tile (%s skipped from %s total)' % (
+                pid, bucketKey, bounds, val, total))
 
     except Exception as e:
         logger.error(e)
@@ -153,6 +160,29 @@ def createTile(tile):
             db.userEngine.dispose()
 
     return 0
+
+
+def scanTerrain(tMeta, tile, session, tilecount):
+    try:
+        (bounds, tileXYZ, t0) = tile
+
+        # Get the model according to the zoom level
+        model = modelsPyramid.getModelByZoom(tileXYZ[2])
+        query = session.query(model).filter(model.bboxIntersects(bounds)).limit(1)
+        try:
+            query.one()
+        except NoResultFound as e:
+            tMeta.removeTile(tileXYZ[0], tileXYZ[1], tileXYZ[2])
+    except Exception as e:
+        logger.error(e)
+        raise Exception(e)
+
+    tend = time.time()
+    if tilecount % 1000 == 0:
+        logger.info('It took %s to scan %s tiles' % (
+            str(datetime.timedelta(seconds=tend - t0)), tilecount))
+
+    return tMeta
 
 
 class Tiles:
@@ -169,13 +199,10 @@ class Tiles:
         self.tileMinZ = int(tmsConfig.get('Zooms', 'tileMinZ'))
         self.tileMaxZ = int(tmsConfig.get('Zooms', 'tileMaxZ'))
 
-        self.tmsConfig = tmsConfig
-
     def __iter__(self):
-        bucket = getBucket()
         zRange = range(self.tileMinZ, self.tileMaxZ + 1)
         for bounds, tileXYZ in grid((self.minLon, self.minLat, self.maxLon, self.maxLat), zRange, self.fullonly):
-            yield (bounds, tileXYZ, self.t0, bucket)
+            yield (bounds, tileXYZ, self.t0)
 
 
 class TilerManager:
@@ -210,6 +237,34 @@ class TilerManager:
         tend = time.time()
         logger.info('It took %s to create %s tiles (%s were skipped)' % (
             str(datetime.timedelta(seconds=tend - self.t0)), tilecount.value, skipcount.value))
+
+    def metadata(self):
+        t0 = time.time()
+
+        db = DB('database.cfg')
+        session = sessionmaker()(bind=db.userEngine)
+        tiles = Tiles(self.tmsConfig, t0)
+        tMeta = TerrainMetadata(minzoom=tiles.tileMinZ, maxzoom=tiles.tileMaxZ, useGlobalTiles=True)
+
+        try:
+            tilecount = 1
+            for tile in tiles:
+                tMeta = scanTerrain(tMeta, tile, session, tilecount)
+                tilecount += 1
+
+            tend = time.time()
+            logger.info('It took %s to scan %s tiles' % (
+                str(datetime.timedelta(seconds=tend - t0)), tilecount))
+        except Exception as e:
+            logger.error('An error occured during layer.json creation')
+            logger.error('%s' % e)
+            raise Exception(e)
+        finally:
+            session.close_all()
+            db.userEngine.dispose()
+
+        with open('.tmp/layer.json', 'w') as f:
+            f.write(tMeta.toJSON())
 
     def _stats(self, withDb=True):
         self.t0 = time.time()
