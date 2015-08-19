@@ -102,7 +102,7 @@ def createTile(tile):
             clippedGeometry.label('clip')
         ).filter(model.bboxIntersects(bounds))
 
-        rings = []
+        terrainTopo = TerrainTopology()
         for q in query:
             coords = list(to_shape(q.clip).exterior.coords)
             if q.id in cornerPts:
@@ -113,19 +113,22 @@ def createTile(tile):
                         coords[i] = [c[0], c[1], pt[2]]
 
             try:
-                rings += processRingCoordinates(coords)
+                rings = processRingCoordinates(coords)
             except Exception as e:
                 msg = '[%s] --------- ERROR ------- occured while collapsing non triangular shapes\n' % pid
                 msg += '[%s]: %s' % (pid, e)
                 logger.error(msg)
                 raise Exception(e)
+            # Redundant coord has been remove already
+            for vertices in rings:
+                terrainTopo.addVertices(vertices)
 
         bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
+        verticesLength = len(terrainTopo.vertices)
         # Skip empty tiles for now, we should instead write an empty tile to S3
-        if len(rings) > 0:
+        if verticesLength > 0:
+            terrainTopo.create()
             # Prepare terrain tile
-            terrainTopo = TerrainTopology(ringsCoordinates=rings)
-            terrainTopo.fromRingsCoordinates()
             terrainFormat = TerrainTile()
             terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
 
@@ -139,14 +142,14 @@ def createTile(tile):
             total = val + skipcount.value
             if val % 10 == 0:
                 logger.info('[%s] Last tile %s (%s rings). %s to write %s tiles. (total processed: %s)' % (
-                    pid, bucketKey, len(rings), str(datetime.timedelta(seconds=tend - t0)), val, total))
+                    pid, bucketKey, verticesLength, str(datetime.timedelta(seconds=tend - t0)), val, total))
 
         else:
             skipcount.value += 1
             val = skipcount.value
             total = val + tilecount.value
             # One should write an empyt tile
-            logger.info('[%s] Skipping %s (%s) because no features found for this tile (%s skipped from %s total)' % (
+            logger.info('[%s] Skipping %s %s because no features found for this tile (%s skipped from %s total)' % (
                 pid, bucketKey, bounds, val, total))
 
     except Exception as e:

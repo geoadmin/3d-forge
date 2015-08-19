@@ -351,7 +351,7 @@ class TerrainTile:
             self._north = topology.maxLat
 
         llh2ecef = lambda x: LLH2ECEF(x[0], x[1], x[2])
-        ecefCoords = map(llh2ecef, topology.coords)
+        ecefCoords = map(llh2ecef, topology.vertices)
         bSphere = BoundingSphere()
         bSphere.fromPoints(ecefCoords)
 
