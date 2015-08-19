@@ -29,6 +29,9 @@ globalTilesConfig = [
     ],
     [
         {"startX": 103, "startY": 81, "endX": 159, "endY": 117}
+    ],
+    [
+        {"startX": 206, "startY": 163, "endX": 319, "endY": 234}
     ]
 ]
 
@@ -140,6 +143,7 @@ class TerrainMetadata:
         # Add global tiles config to the metadata
         if self.useGlobalTiles:
             self.meta['available'] = globalTilesConfig + self.meta['available']
+            self.meta['minzoom'] = 0
 
         return json.dumps(self.meta)
 
