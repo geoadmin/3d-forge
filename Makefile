@@ -36,7 +36,7 @@ help:
 	@echo
 
 .PHONY: all
-all: install database.cfg apache/testapp.conf test lint
+all: install apache/testapp.conf database.cfg tms.cfg test lint
 
 .PHONY: install
 install:
@@ -49,6 +49,9 @@ apache/testapp.conf: apache/testapp.conf.mako
 
 database.cfg: database.cfg.mako
 	$(VENV)/bin/mako-render --var "pgpass=$(PGPASS)" --var "dbtarget=$(DBTARGET)" $< > $@
+
+tms.cfg: tms.cfg.mako
+	$(VENV)/bin/mako-render --var "bucketname=$(BUCKETNAME)" --var "profilename=$(PROFILENAME)" $< > $@
 
 .PHONY: lint
 lint:
@@ -115,4 +118,5 @@ clean:
 	rm -rf 3d-testapp
 	rm -f apache/testapp.conf
 	rm -f database.cfg
+	rm -f tms.cfg
 	rm -f .tmp/*.*

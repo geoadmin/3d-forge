@@ -1,4 +1,8 @@
 [General]
+# 3d bucket
+bucketName: ${bucketname}
+# user specific
+profileName: ${profilename}
 # terrain files base path
 bucketpath: 1.0.0/ch.swisstopo.terrain.3d/default/20151231/4326/
 # chunks per process (that's a maximum)
