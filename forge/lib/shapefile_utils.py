@@ -17,7 +17,7 @@ class ShpToGDALFeatures(object):
 
     # Returns a list of GDAL Features
     def __read__(self):
-        dataSource = self.getDatasource()
+        dataSource = self._getDatasource()
         # 0 refers to read-only
         layer = dataSource.GetLayer()
         features = [feature for feature in layer]
