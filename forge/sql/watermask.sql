@@ -8,8 +8,10 @@ DECLARE
     ymin    float default ymin(bbox);
     xmax    float default xmax(bbox);
     ymax    float default ymax(bbox);
-    scalex  float default (xmax-xmin)/width;
-    scaley  float default -((ymax-ymin)/height);
+    scalex  float default (xmax-xmin)::float/width::float;
+    scaley  float default -((ymax-ymin)::float/height::float);
+    inside  integer;
+    outside integer;
 BEGIN
     IF EXISTS ( 
         select * from information_schema.columns
@@ -30,6 +32,24 @@ BEGIN
     -- raster type is 1BB
     -- pixel value 0: land 
     -- pixel value 1: lake
+    -- if the tile geometry lies completely inside a lake a raster with one pixel with value 1 will be returned
+    -- if the tile geometry lies completely outside the lakes a raster with one pixel with value 0 will be returned
+    EXECUTE format('SELECT count(1) FROM %I where ST_ContainsProperly(%I,%L)',watermask_table,watermask_geom_column,bbox) INTO inside;
+    EXECUTE format('SELECT count(1) FROM %I where st_intersects(%L,%I)',watermask_table,bbox,watermask_geom_column) INTO outside;
+    IF outside = 0 THEN
+        --RAISE NOTICE 'tile lies completely outside lakes';
+        sql := 'SELECT st_addband(ST_MakeEmptyRaster(1,1,0,0,1,1 , 0, 0, 4326),''1BB''::text,0,0)';
+        RETURN QUERY EXECUTE sql;
+        RETURN;
+    END IF;
+    
+    IF inside > 0 THEN
+        --RAISE NOTICE 'tile lies completely inside a lake';
+        sql := 'SELECT st_addband(ST_MakeEmptyRaster(1,1,0,0,1,1 , 0, 0, 4326),''1BB''::text,1,0)';
+        RETURN QUERY EXECUTE sql;
+        RETURN;
+    END IF;
+
     sql := '
     WITH input as (
         SELECT st_addband(ST_MakeEmptyRaster('|| width ||', '|| height ||', '|| xmin ||', '|| ymax ||', '|| scalex ||', '|| scaley ||', 0, 0, 4326),''1BB''::text,1,0) raster 
@@ -67,4 +87,3 @@ END
 $BODY$
 LANGUAGE plpgsql STABLE
 COST 100;
-
