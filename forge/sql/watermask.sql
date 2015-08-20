@@ -8,8 +8,8 @@ DECLARE
     ymin    float default ymin(bbox);
     xmax    float default xmax(bbox);
     ymax    float default ymax(bbox);
-    scalex  float default (xmax-xmin)::float/width::float;
-    scaley  float default -((ymax-ymin)::float/height::float);
+    scalex  float default (xmax-xmin)/width;
+    scaley  float default -((ymax-ymin)/height);
     inside  integer;
     outside integer;
 BEGIN
@@ -42,21 +42,23 @@ BEGIN
     END IF;
     sql := '
     with  empty_raster as (SELECT ST_MakeEmptyRaster('|| width ||', '|| height ||', '|| xmin ||', '|| ymax ||', '|| scalex ||', '|| scaley ||', 0, 0, 4326) as empty) 
-    SELECT st_union(raster)
+    SELECT st_clip(raster,st_envelope(empty_raster.empty)) 
     FROM (
-    select 
-        st_asraster(
+        SELECT st_union(raster) as raster
+        FROM (
+            select 
+                st_asraster(
                 st_intersection('|| watermask_geom_column ||',st_envelope(empty_raster.empty))
                 ,empty_raster.empty
                 ,''1BB''
                 ,1
                 ,0
-                ,true
+                , true
                 ) as raster 
-    FROM '|| watermask_table ||' vector,empty_raster WHERE st_intersects(vector.'|| watermask_geom_column ||',st_envelope(empty_raster.empty))
-    UNION SELECT  
-    empty as raster from empty_raster )  sub;';
-
+            FROM '|| watermask_table ||' vector,empty_raster WHERE st_intersects(vector.'|| watermask_geom_column ||',st_envelope(empty_raster.empty))
+            UNION SELECT  empty as raster from empty_raster 
+        )  sub
+    )sub2,empty_raster;';
 
     --RAISE NOTICE 'function parameters: xmin: % ymin: % xmax: % ymax: % scalex: % scaley: % watermask_table: % watermask_column % ', xmin,ymin,xmax,ymax,scalex,scaley,watermask_table,watermask_geom_column;
     --RAISE NOTICE 'sql: %',sql;
@@ -69,3 +71,4 @@ END
 $BODY$
 LANGUAGE plpgsql STABLE
 COST 100;
+
