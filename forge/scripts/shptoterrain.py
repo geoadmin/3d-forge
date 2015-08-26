@@ -19,7 +19,7 @@ shapefile = ShpToGDALFeatures(shpFilePath=filePathSource)
 features = shapefile.__read__()
 
 terrainTopo = TerrainTopology(features=features)
-terrainTopo.fromFeatures()
+terrainTopo.fromGDALFeatures()
 terrainFormat = TerrainTile()
 
 geodetic = GlobalGeodetic(True)

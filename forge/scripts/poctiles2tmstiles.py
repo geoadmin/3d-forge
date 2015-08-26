@@ -121,7 +121,7 @@ def main():
             shapefile = ShpToGDALFeatures(shpFilePath=shape_file_name)
             features = shapefile.__read__()
             topology = TerrainTopology(features=features)
-            topology.fromFeatures()
+            topology.fromGDALFeatures()
 
             terFromPoc = TerrainTile()
             terFromPoc.fromFile(tms_file_name, tilebounds[0], tilebounds[2], tilebounds[1], tilebounds[3])

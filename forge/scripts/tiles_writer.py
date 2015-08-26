@@ -25,7 +25,7 @@ for f in shapefilesNames:
     features = shapefile.__read__()
 
     terrainTopo = TerrainTopology(features=features)
-    terrainTopo.fromFeatures()
+    terrainTopo.fromGDALFeatures()
     terrainFormat = TerrainTile()
     terrainFormat.fromTerrainTopology(terrainTopo)
 
