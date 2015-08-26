@@ -146,7 +146,7 @@ def createTile(tile):
             clippedGeometry.label('clip')
         ).filter(model.bboxIntersects(bounds))
 
-        terrainTopo = TerrainTopology()
+        terrainTopo = TerrainTopology(lightning=True)
         for q in query:
             coords = list(to_shape(q.clip).exterior.coords)
             if q.id in cornerPts:
