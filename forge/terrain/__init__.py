@@ -308,7 +308,7 @@ class TerrainTile:
             f.write(packEntry(meta['northIndices'], ni))
 
         # Extension header for light
-        if len(self.vLight > 0):
+        if len(self.vLight) > 0:
             meta = TerrainTile.ExtensionHeader
             # Extension header ID is 1 for lightening
             f.write(packEntry(meta['extensionId'], 1))
