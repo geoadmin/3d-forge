@@ -93,7 +93,7 @@ def copyKeys(fromPrefix, toPrefix, zooms):
         t0zoom = time.time()
         keys = KeyIterator(fromPrefix + str(zoom) + '/', toPrefix, t0)
 
-        pm = PoolManager()
+        pm = PoolManager(log)
 
         pm.process(keys, copyKey, 50)
 
