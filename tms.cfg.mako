@@ -22,31 +22,31 @@ tileMinZ: 9
 tileMaxZ: 17
 
 [9]
-tablename: mnt25_simplified_100m
+tablename: bl_128m
 
 [10]
-tablename: mnt25_simplified_100m
+tablename: bl_64m
 
 [11]
-tablename: break_lines_64m
+tablename: bl_64m
 
 [12]
-tablename: break_lines_32m
+tablename: bl_32m
 
 [13]
-tablename: break_lines_16m
+tablename: bl_16m
 
 [14]
-tablename: break_lines_4m
+tablename: bl_8m
 
 [15]
-tablename: break_lines_2m
+tablename: bl_8m
 
 [16]
-tablename: break_lines_1m
+tablename: bl_8m
 
 [17]
-tablename: break_lines_0_5m
+tablename: bl_8m
 
 [18]
-tablename: break_lines_0_25m
+tablename: bl_8m
