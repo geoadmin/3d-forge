@@ -89,14 +89,14 @@ def createTileFromQueue(tq):
                     tilebounds = geodetic.TileBounds(tileXYZ[0], tileXYZ[1], tileXYZ[2])
                     createTile((tilebounds, tileXYZ, t0, dbConfigFile, hasWatermask))
                 except Exception as e:
-                    logger.error('[%s] Error while processing specific tile %s' % (pid, str(e)))
+                    logger.error('[%s] Error while processing specific tile %s' % (pid, str(e)), exc_info=True)
 
             # when successfull, we delete the message from the queue
             logger.info('[%s] Successfully treated an SQS message: %s' % (pid, body))
             q.delete_message(m)
 
     except Exception as e:
-        logger.error('[%s] Error occured during processing. Halting process ' + str(e))
+        logger.error('[%s] Error occured during processing. Halting process ' + str(e), exc_info=True)
 
 
 def createTile(tile):
@@ -171,7 +171,7 @@ def createTile(tile):
             except Exception as e:
                 msg = '[%s] --------- ERROR ------- occured while collapsing non triangular shapes\n' % pid
                 msg += '[%s]: %s' % (pid, e)
-                logger.error(msg)
+                logger.error(msg, exc_info=True)
                 raise Exception(e)
             # Redundant coord has been remove already
             for vertices in rings:
@@ -207,7 +207,7 @@ def createTile(tile):
                 pid, bucketKey, bounds, val, total))
 
     except Exception as e:
-        logger.error(e)
+        logger.error(e, exc_info=True)
         raise Exception(e)
     finally:
         if session is not None:
@@ -229,7 +229,7 @@ def scanTerrain(tMeta, tile, session, tilecount):
         except NoResultFound as e:
             tMeta.removeTile(tileXYZ[0], tileXYZ[1], tileXYZ[2])
     except Exception as e:
-        logger.error(e)
+        logger.error(e, exc_info=True)
         raise Exception(e)
 
     tend = time.time()
@@ -340,7 +340,7 @@ class TilerManager:
             # Assure queue is kept for maximum of 14 weeks (aws limit). default would be 4 days.
             sqs.set_queue_attribute(q, 'MessageRetentionPeriod', 1209600)
         except Exception as e:
-            logger.error('Error during creation of queue:\n' + str(e))
+            logger.error('Error during creation of queue:\n' + str(e), exc_info=True)
             return
 
         if q.count() > 0:
@@ -372,7 +372,7 @@ class TilerManager:
                 messagecount += 1
                 writeSQSMessage(q, msg)
         except Exception as e:
-            logger.error('Error during writing of sqs message:\n' + str(e))
+            logger.error('Error during writing of sqs message:\n' + str(e), exc_info=True)
 
         tend = time.time()
         logger.info('It took %s to create %s message in SQS gueue representing %s tiles' % (
@@ -390,7 +390,7 @@ class TilerManager:
             q = sqs.get_queue(queueName)
             sqs.delete_queue(q)
         except Exception as e:
-            logger.error('Error during deletion of queue:\n' + str(e))
+            logger.error('Error during deletion of queue:\n' + str(e), exc_info=True)
             return
 
     # Create tiles based on given Queue
@@ -423,7 +423,7 @@ class TilerManager:
             q = sqs.get_queue(queueName)
             attrs = sqs.get_queue_attributes(q)
         except Exception as e:
-            logger.error('Error during statistics collection:\n' + str(e))
+            logger.error('Error during statistics collection:\n' + str(e), exc_info=True)
             return
         logger.info(attrs)
 
@@ -456,7 +456,7 @@ class TilerManager:
                 str(datetime.timedelta(seconds=tend - t0)), tilecount))
         except Exception as e:
             logger.error('An error occured during layer.json creation')
-            logger.error('%s' % e)
+            logger.error('%s' % e, exc_info=True)
             raise Exception(e)
         finally:
             session.close_all()
