@@ -56,6 +56,10 @@ class TerrainTopology(object):
             lookupKey = ','.join([str(vertex[0]), str(vertex[1]), str(vertex[2])])
             faceIndex = self._lookupVertexIndex(lookupKey)
             if faceIndex is not None:
+                # Sometimes we can have triangles with zero area (due to unfortunate clipping)
+                # In that case skip them
+                if faceIndex in face:
+                    break
                 face.append(faceIndex)
             else:
                 self.vertices.append(vertex)
@@ -64,7 +68,8 @@ class TerrainTopology(object):
                 faceIndex = len(self.vertices) - 1
                 self.verticesLookup[lookupKey] = faceIndex
                 face.append(faceIndex)
-        self.faces.append(face)
+        if len(face) == 3:
+            self.faces.append(face)
 
     """
     Builds a terrain topology from a list of GDAL features.
