@@ -12,9 +12,13 @@ def usage():
         Usage: venv/bin/python forge/script/db_management.py [-c database.cfg|--config=database.cfg] <command>')
 
         Commands:
-            create:             create the database. Fails if already exist.
-            importshp:          imports shapefiles
-            destroy:            destroy the database.
+            setupdb:            create the DB and users
+            createuser:         create the user only
+            createdb:           create the DB only
+            populate:           imports shapefiles
+            dropuser:           drop the user only
+            dropdb:             drop the db only
+            destroy:            destroy the database and users
     '''))
 
 
@@ -37,8 +41,16 @@ def main():
     command = args[0]
     if command == 'create':
         db.create()
-    elif command == 'importshp':
-        db.importshp()
+    elif command == 'createuser':
+        db.createUser()
+    elif command == 'createdb':
+        db.createDB()
+    elif command == 'populate':
+        db.populate()
+    elif command == 'dropuser':
+        db.dropUser()
+    elif command == 'dropdb':
+        db.dropDatabase()
     elif command == 'destroy':
         db.destroy()
     else:

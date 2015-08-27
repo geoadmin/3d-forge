@@ -91,6 +91,8 @@ To clone use the --recursive option to get all submodules.
 
 - choose the appropriate logging level for postgres client_min_messages = error and log_min_messages = error and log_min_error_statement = error
 
+- if you don't have tileforge user make sure you're using md5 mode in pg_hba.conf (local  all  all  md5)
+
 ## Remove logs
 
     rm -f /var/log/tileforge/*.log

@@ -36,22 +36,22 @@ def reprojectShp(shpFilePath, args):
     outDirectory = args.outDirectory
     outFile = '%s%s' % (outDirectory, os.path.basename(shpFilePath))
 
-    # If out file already exists clean it up first
-    cleanup(outFile)
-
-    command = '%(geosuiteCmd)s -calc reframe -in %(inFile)s -out %(outFile)s -pframes %(fromPFrames)s,%(toPFrames)s ' \
-        '-aframes %(fromAFrames)s,%(toAFrames)s -log %(logfile)s -err %(errorfile)s' % dict(
-            geosuiteCmd = args.geosuiteCmd,
-            inFile      = args.shpFilePath,
-            outFile     = args.outFile,
-            fromPFrames = args.fromPFrames,
-            toPFrames   = args.toPFrames,
-            fromAFrames = args.fromAFrames,
-            toAFrames   = args.toAFrames,
-            logfile     = args.logfile,
-            errorfile   = args.errorfile
-        )
     try:
+        # If out file already exists clean it up first
+        cleanup(outFile)
+
+        command = 'mono %(geosuiteCmd)s -calc reframe -in %(inFile)s -out %(outFile)s -pframes %(fromPFrames)s,%(toPFrames)s ' \
+            '-aframes %(fromAFrames)s,%(toAFrames)s -log %(logfile)s -err %(errorfile)s' % dict(
+                geosuiteCmd = args.geosuiteCmd,
+                inFile      = args.shpFile,
+                outFile     = outFile,
+                fromPFrames = args.fromPFrames,
+                toPFrames   = args.toPFrames,
+                fromAFrames = args.fromAFrames,
+                toAFrames   = args.toAFrames,
+                logfile     = args.logfile,
+                errorfile   = args.errorfile
+            )
         logger.info('Command: %s' % command)
         subprocess.call(command, shell=True)
     except Exception as e:
@@ -297,11 +297,11 @@ class DB:
                         err=str(e)
                     ))
             else:
-                with self.adminConnection() as conn:
+                with self.userConnection() as conn:
                     pgVersion = conn.execute("Select postgis_version();").fetchone()[0]
                     if pgVersion.startswith("2."):
                         logger.info('Action: setupFunctions()->legacy.sql')
-                        os.environ['PGPASSWORD'] = self.adminConf.password
+                        os.environ['PGPASSWORD'] = self.databaseConf.password
                         command = 'psql --quiet -h %(host)s -U %(user)s -d %(dbname)s -f %(baseDir)s%(fileName)s' % dict(
                             host=self.serverConf.host,
                             user=self.adminConf.user,
@@ -328,8 +328,14 @@ class DB:
         fromPFrames  = self.config.get('Reprojection', 'fromPFrames')
         toPFrames    = self.config.get('Reprojection', 'toPFrames')
         fromAFrames  = self.config.get('Reprojection', 'fromAFrames')
+        toAFrames    = self.config.get('Reprojection', 'toAFrames')
         logfile      = self.config.get('Reprojection', 'logfile')
         errorfile    = self.config.get('Reprojection', 'errorfile')
+
+        if not os.path.exists(outDirectory):
+            raise OSError('%s does not exist' % outDirectory)
+        if not os.path.exists(geosuiteCmd):
+            raise OSError('%s does not exist' % geosuiteCmd)
 
         tstart = time.time()
         models = modelsPyramid.models
@@ -349,6 +355,7 @@ class DB:
                     fromPFrames  = fromPFrames,
                     toPFrames    = toPFrames,
                     fromAFrames  = fromAFrames,
+                    toAFrames    = toAFrames,
                     logfile      = logfile,
                     errorfile    = errorfile
                 ))
@@ -393,11 +400,16 @@ class DB:
     def create(self):
         logger.info('Action: create()')
         self.createUser()
+        self.createDB()
+
+    def createDB(self):
+        logger.info('Action: createDB()')
         self.createDatabase()
         self.setupDatabase()
         self.setupFunctions()
 
-    def importshp(self):
+    def populate(self):
+        logger.info('Action: populate()')
         self.populateTables()
 
     def destroy(self):
