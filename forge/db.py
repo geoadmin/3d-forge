@@ -12,10 +12,11 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.pool import NullPool
 from contextlib import contextmanager
+
+from forge.models.tables import Base, modelsPyramid
 from forge.lib.logs import getLogger
 from forge.lib.shapefile_utils import ShpToGDALFeatures
 from forge.lib.helpers import BulkInsert, timestamp, cleanup
-from forge.models.tables import Base, modelsPyramid
 from forge.lib.poolmanager import PoolManager
 
 
@@ -268,7 +269,8 @@ class DB:
     def setupDatabase(self):
         logger.info('Action: setupDatabase()')
         try:
-            Base.metadata.create_all(self.userEngine)
+            for model in modelsPyramid.models:
+                model.__table__.create(self.userEngine, checkfirst=True)
         except ProgrammingError as e:
             logger.warning('Could not setup database on %(name)s: %(err)s' % dict(
                 name=self.databaseConf.name,
@@ -410,6 +412,8 @@ class DB:
 
     def populate(self):
         logger.info('Action: populate()')
+        # Create missing tables in case new ones were added
+        self.setupDatabase()
         self.populateTables()
 
     def destroy(self):
