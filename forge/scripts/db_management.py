@@ -3,7 +3,7 @@
 import sys
 import getopt
 from textwrap import dedent
-from forge import DB
+from forge.db import DB
 from forge.lib.helpers import error
 
 
