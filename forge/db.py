@@ -187,8 +187,7 @@ class DB:
                 password=self.databaseConf.password,
                 host=self.serverConf.host,
                 port=self.serverConf.port,
-                database=self.databaseConf.name,
-                poolclass=NullPool
+                database=self.databaseConf.name
             )
         )
 
@@ -257,8 +256,7 @@ class DB:
                     ALTER TABLE public.geometry_columns OWNER TO %(role)s
                 """ % dict(
                     role=self.databaseConf.user
-                )
-                )
+                ))
             except ProgrammingError as e:
                 logger.error('Could not create database %(name)s with owner %(role)s: %(err)s' % dict(
                     name=self.databaseConf.name,
@@ -298,15 +296,15 @@ class DB:
                         fileName=fileName,
                         err=str(e)
                     ))
+                    logger.error(command)
             else:
-                with self.userConnection() as conn:
+                with self.adminConnection() as conn:
                     pgVersion = conn.execute("Select postgis_version();").fetchone()[0]
                     if pgVersion.startswith("2."):
-                        logger.info('Action: setupFunctions()->legacy.sql')
-                        os.environ['PGPASSWORD'] = self.databaseConf.password
+                        logger.info('Action: setupFunctions() -> legacy.sql')
                         command = 'psql --quiet -h %(host)s -U %(user)s -d %(dbname)s -f %(baseDir)s%(fileName)s' % dict(
                             host=self.serverConf.host,
-                            user=self.adminConf.user,
+                            user=self.databaseConf.user,
                             dbname=self.databaseConf.name,
                             baseDir=baseDir,
                             fileName=fileName
@@ -317,6 +315,7 @@ class DB:
                             logger.error('Could not install postgis 2.1 legacy functions to the database: %(err)s' % dict(
                                 err=str(e)
                             ))
+                            logger.error(command)
 
         del os.environ['PGPASSWORD']
 

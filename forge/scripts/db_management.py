@@ -12,9 +12,10 @@ def usage():
         Usage: venv/bin/python forge/script/db_management.py [-c database.cfg|--config=database.cfg] <command>')
 
         Commands:
-            setupdb:            create the DB and users
+            create:             create the DB and users
             createuser:         create the user only
             createdb:           create the DB only
+            setupfunctions:     setup custom sql functions
             populate:           imports shapefiles
             dropuser:           drop the user only
             dropdb:             drop the db only
@@ -45,6 +46,8 @@ def main():
         db.createUser()
     elif command == 'createdb':
         db.createDB()
+    elif command == 'setupfunctions':
+        db.setupFunctions()
     elif command == 'populate':
         db.populate()
     elif command == 'dropuser':

@@ -104,7 +104,3 @@ END;
 $BODY$
   LANGUAGE plpgsql VOLATILE
  COST 100;
-ALTER FUNCTION _interpolate_height_on_plane(polygon geometry, point geometry)
-  OWNER TO tileforge;
-GRANT EXECUTE ON FUNCTION _interpolate_height_on_plane(polygon geometry, point geometry) TO postgres;
-GRANT EXECUTE ON FUNCTION _interpolate_height_on_plane(polygon geometry, point geometry) TO tileforge;

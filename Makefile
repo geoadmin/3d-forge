@@ -31,6 +31,7 @@ help:
 	@echo "- create             Create the database and user"
 	@echo "- createuser         Create the user only"
 	@echo "- createdb           Create the database only"
+	@echo "- setupfunctions     Adds custom sql functions to the database"
 	@echo "- populate           Populate the database (shapefiles)"
 	@echo "- dropdb             Drop the database only"
 	@echo "- dropuser           Drop the user only"
@@ -100,6 +101,10 @@ createuser:
 .PHONY: createdb
 createdb:
 	$(PYTHON_CMD) forge/scripts/db_management.py createdb
+
+.PHONY: setupfunctions
+setupfunctions:
+	$(PYTHON_CMD) forge/scripts/db_management.py setupfunctions
 
 .PHONY: populate
 populate:
