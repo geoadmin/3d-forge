@@ -50,7 +50,10 @@ class ModelsPyramid:
     def _createModels(self):
         for i in range(0, len(self.shpsBaseDir)):
             shpBaseDir = '%s%s' % (self.baseDir, self.shpsBaseDir[i])
-            shapefiles = ['%s%s' % (shpBaseDir, f) for f in os.listdir(shpBaseDir) if isShapefile(f)]
+            if os.path.exists(shpBaseDir):
+                shapefiles = ['%s%s' % (shpBaseDir, f) for f in os.listdir(shpBaseDir) if isShapefile(f)]
+            else:
+                shapefiles = []
             self.models.append(modelFactory(
                 Base, self.tablenames[i], shapefiles, self.modelnames[i]
             ))
