@@ -13,9 +13,9 @@ password: tileforge
 
 [Data]
 baseDir: /geodata/WGS84/
-shapefiles: 128/,64/,32/,16/,8/
-tablenames: bl_128m,bl_64m,bl_32m,bl_16m,bl_8m
-modelnames: bl_128m,bl_64m,bl_32m,bl_16m,bl_8m
+shapefiles: 128/,64/,32/,16/,8/,4/
+tablenames: bl_128m,bl_64m,bl_32m,bl_16m,bl_8m,bl_4m
+modelnames: bl_128m,bl_64m,bl_32m,bl_16m,bl_8m,bl_4m
 
 # Paths must be absolute!
 [Reprojection]

@@ -187,7 +187,8 @@ class DB:
                 password=self.databaseConf.password,
                 host=self.serverConf.host,
                 port=self.serverConf.port,
-                database=self.databaseConf.name
+                database=self.databaseConf.name,
+                poolclass=NullPool
             )
         )
 
