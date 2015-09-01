@@ -53,6 +53,7 @@ def writeToS3(b, path, content, origin, contentType='application/octet-stream', 
     k.key = basePath + path
     k.set_metadata('IWI_Origin', origin)
     headers['Content-Encoding'] = contentEnc
+    headers['Access-Control-Allow-Origin'] = '*'
     k.set_contents_from_file(content, headers=headers)
 
 copycount = multiprocessing.Value('i', 0)
@@ -73,7 +74,7 @@ def copyKey(args):
         log.info('Caught an exception when copying %s exception: %s' % (keyname, str(e)))
 
 
-class KeyIterator:
+class S3KeyIterator:
 
     def __init__(self, prefix, toPrefix, t0):
         self.bucketlist = getBucket().list(prefix=prefix)
@@ -93,7 +94,7 @@ def copyKeys(fromPrefix, toPrefix, zooms):
     for zoom in zooms:
         log.info('doing zoom ' + str(zoom))
         t0zoom = time.time()
-        keys = KeyIterator(fromPrefix + str(zoom) + '/', toPrefix + str(zoom) + '/', t0)
+        keys = S3KeyIterator(fromPrefix + str(zoom) + '/', toPrefix + str(zoom) + '/', t0)
 
         pm = PoolManager(log)
 
