@@ -14,7 +14,7 @@ def tilePathTemplate(x, y, z):
 
 def loadTileContent(baseURL, key):
     url = '%s%s' % (baseURL, key)
-    r = requests.get(url)
+    r = requests.get(url, headers={'Accept': 'application/vnd.quantized-mesh;extensions=octvertexnormals'})
     if r.status_code != requests.codes.ok:
         raise Exception('Failed to request %s, status code: %s' % (url, r.status_code))
     return r.content
