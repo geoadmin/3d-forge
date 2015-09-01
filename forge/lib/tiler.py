@@ -11,7 +11,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from geoalchemy2 import WKBElement
 from geoalchemy2.shape import to_shape
 
-from forge import DB
+from forge.db import DB
 import forge.lib.cartesian2d as c2d
 from forge.models.terrain import TerrainTile
 from forge.models.terrain_metadata import TerrainMetadata

@@ -12,10 +12,11 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.pool import NullPool
 from contextlib import contextmanager
+
+from forge.models.tables import modelsPyramid
 from forge.lib.logs import getLogger
 from forge.lib.shapefile_utils import ShpToGDALFeatures
 from forge.lib.helpers import BulkInsert, timestamp, cleanup
-from forge.models.tables import Base, modelsPyramid
 from forge.lib.poolmanager import PoolManager
 
 
@@ -36,22 +37,22 @@ def reprojectShp(shpFilePath, args):
     outDirectory = args.outDirectory
     outFile = '%s%s' % (outDirectory, os.path.basename(shpFilePath))
 
-    # If out file already exists clean it up first
-    cleanup(outFile)
-
-    command = '%(geosuiteCmd)s -calc reframe -in %(inFile)s -out %(outFile)s -pframes %(fromPFrames)s,%(toPFrames)s ' \
-        '-aframes %(fromAFrames)s,%(toAFrames)s -log %(logfile)s -err %(errorfile)s' % dict(
-            geosuiteCmd = args.geosuiteCmd,
-            inFile      = args.shpFilePath,
-            outFile     = args.outFile,
-            fromPFrames = args.fromPFrames,
-            toPFrames   = args.toPFrames,
-            fromAFrames = args.fromAFrames,
-            toAFrames   = args.toAFrames,
-            logfile     = args.logfile,
-            errorfile   = args.errorfile
-        )
     try:
+        # If out file already exists clean it up first
+        cleanup(outFile)
+
+        command = 'mono %(geosuiteCmd)s -calc reframe -in %(inFile)s -out %(outFile)s -pframes %(fromPFrames)s,%(toPFrames)s ' \
+            '-aframes %(fromAFrames)s,%(toAFrames)s -log %(logfile)s -err %(errorfile)s' % dict(
+                geosuiteCmd = args.geosuiteCmd,
+                inFile      = args.shpFile,
+                outFile     = outFile,
+                fromPFrames = args.fromPFrames,
+                toPFrames   = args.toPFrames,
+                fromAFrames = args.fromAFrames,
+                toAFrames   = args.toAFrames,
+                logfile     = args.logfile,
+                errorfile   = args.errorfile
+            )
         logger.info('Command: %s' % command)
         subprocess.call(command, shell=True)
     except Exception as e:
@@ -256,8 +257,7 @@ class DB:
                     ALTER TABLE public.geometry_columns OWNER TO %(role)s
                 """ % dict(
                     role=self.databaseConf.user
-                )
-                )
+                ))
             except ProgrammingError as e:
                 logger.error('Could not create database %(name)s with owner %(role)s: %(err)s' % dict(
                     name=self.databaseConf.name,
@@ -268,7 +268,8 @@ class DB:
     def setupDatabase(self):
         logger.info('Action: setupDatabase()')
         try:
-            Base.metadata.create_all(self.userEngine)
+            for model in modelsPyramid.models:
+                model.__table__.create(self.userEngine, checkfirst=True)
         except ProgrammingError as e:
             logger.warning('Could not setup database on %(name)s: %(err)s' % dict(
                 name=self.databaseConf.name,
@@ -296,15 +297,15 @@ class DB:
                         fileName=fileName,
                         err=str(e)
                     ))
+                    logger.error(command)
             else:
                 with self.adminConnection() as conn:
                     pgVersion = conn.execute("Select postgis_version();").fetchone()[0]
                     if pgVersion.startswith("2."):
-                        logger.info('Action: setupFunctions()->legacy.sql')
-                        os.environ['PGPASSWORD'] = self.adminConf.password
+                        logger.info('Action: setupFunctions() -> legacy.sql')
                         command = 'psql --quiet -h %(host)s -U %(user)s -d %(dbname)s -f %(baseDir)s%(fileName)s' % dict(
                             host=self.serverConf.host,
-                            user=self.adminConf.user,
+                            user=self.databaseConf.user,
                             dbname=self.databaseConf.name,
                             baseDir=baseDir,
                             fileName=fileName
@@ -315,6 +316,7 @@ class DB:
                             logger.error('Could not install postgis 2.1 legacy functions to the database: %(err)s' % dict(
                                 err=str(e)
                             ))
+                            logger.error(command)
 
         del os.environ['PGPASSWORD']
 
@@ -328,8 +330,14 @@ class DB:
         fromPFrames  = self.config.get('Reprojection', 'fromPFrames')
         toPFrames    = self.config.get('Reprojection', 'toPFrames')
         fromAFrames  = self.config.get('Reprojection', 'fromAFrames')
+        toAFrames    = self.config.get('Reprojection', 'toAFrames')
         logfile      = self.config.get('Reprojection', 'logfile')
         errorfile    = self.config.get('Reprojection', 'errorfile')
+
+        if not os.path.exists(outDirectory):
+            raise OSError('%s does not exist' % outDirectory)
+        if not os.path.exists(geosuiteCmd):
+            raise OSError('%s does not exist' % geosuiteCmd)
 
         tstart = time.time()
         models = modelsPyramid.models
@@ -349,6 +357,7 @@ class DB:
                     fromPFrames  = fromPFrames,
                     toPFrames    = toPFrames,
                     fromAFrames  = fromAFrames,
+                    toAFrames    = toAFrames,
                     logfile      = logfile,
                     errorfile    = errorfile
                 ))
@@ -393,11 +402,18 @@ class DB:
     def create(self):
         logger.info('Action: create()')
         self.createUser()
+        self.createDB()
+
+    def createDB(self):
+        logger.info('Action: createDB()')
         self.createDatabase()
         self.setupDatabase()
         self.setupFunctions()
 
-    def importshp(self):
+    def populate(self):
+        logger.info('Action: populate()')
+        # Create missing tables in case new ones were added
+        self.setupDatabase()
         self.populateTables()
 
     def destroy(self):

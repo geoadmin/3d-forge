@@ -28,9 +28,14 @@ help:
 	@echo "- all                All of the above"
 	@echo "- autolint           Auto lint code styling"
 	@echo "- updatesubmodule    Update 3d testapp"
-	@echo "- createdb           Create the database"
-	@echo "- importshp          Imports shapefiles"
-	@echo "- dropdb             Drop the database"
+	@echo "- create             Create the database and user"
+	@echo "- createuser         Create the user only"
+	@echo "- createdb           Create the database only"
+	@echo "- setupfunctions     Adds custom sql functions to the database"
+	@echo "- populate           Populate the database (shapefiles)"
+	@echo "- dropdb             Drop the database only"
+	@echo "- dropuser           Drop the user only"
+	@echo "- destroy            Drop the databasen and user"
 	@echo "- counttiles         Count tiles in S3 bucket using a prexfix (usage: make counttiles PREFIX=12/)"
 	@echo "- deletetiles        Delete tiles in S3 bucket using a prefix (usage: make deletetiles PREFIX=12/)"
 	@echo "- listtiles          List tiles in S3 bucket using a prefix (usage: make listtiles PREFIX=12/)"
@@ -42,6 +47,7 @@ help:
 	@echo
 	@echo "Variables:"
 	@echo
+	@echo "- USERNAME (current value: $(USERNAME))"
 	@echo "- PYTHON_CMD (current value: $(PYTHON_CMD))"
 	@echo "- FLAKE8_CMD (current value: $(FLAKE8_CMD))"
 	@echo "- AUTOPEP8_CMD (current value: $(AUTOPEP8_CMD))"
@@ -49,7 +55,7 @@ help:
 
 
 .PHONY: all
-all: install apache/testapp.conf database.cfg tms.cfg test lint
+all: install apache/testapp.conf database.cfg tms.cfg logging.cfg test lint
 
 .PHONY: install
 install:
@@ -61,10 +67,13 @@ apache/testapp.conf: apache/testapp.conf.mako
 	$(VENV)/bin/mako-render --var "user=$(USERNAME)" --var "directory=$(CURDIR)" $< > $@
 
 database.cfg: database.cfg.mako
-	$(VENV)/bin/mako-render --var "pgpass=$(PGPASS)" --var "dbtarget=$(DBTARGET)" $< > $@
+	$(VENV)/bin/mako-render --var "pgpass=$(PGPASS)" --var "dbtarget=$(DBTARGET)" --var "username=$(USERNAME)" $< > $@
 
 tms.cfg: tms.cfg.mako
 	$(VENV)/bin/mako-render --var "bucketname=$(BUCKETNAME)" --var "profilename=$(PROFILENAME)" $< > $@
+
+logging.cfg: logging.cfg.mako
+	$(VENV)/bin/mako-render --var "logfilefolder=$(LOGFILEFOLDER)" $< > $@
 
 .PHONY: test
 test:
@@ -84,16 +93,36 @@ updatesubmodule:
 	git submodule update
 	git submodule foreach git pull origin master
 
-.PHONY: createdb
-createdb:
+.PHONY: create
+create:
 	$(PYTHON_CMD) forge/scripts/db_management.py create
 
-.PHONY: importshp
-importshp:
-	$(PYTHON_CMD) forge/scripts/db_management.py importshp
+.PHONY: createuser
+createuser:
+	$(PYTHON_CMD) forge/scripts/db_management.py createuser
 
-.PHONY: dropdb
+.PHONY: createdb
+createdb:
+	$(PYTHON_CMD) forge/scripts/db_management.py createdb
+
+.PHONY: setupfunctions
+setupfunctions:
+	$(PYTHON_CMD) forge/scripts/db_management.py setupfunctions
+
+.PHONY: populate
+populate:
+	$(PYTHON_CMD) forge/scripts/db_management.py populate
+
+.PHONY: dropuser
+dropuser:
+	$(PYTHON_CMD) forge/scripts/db_management.py dropuser
+
+.PHONY: dropuser
 dropdb:
+	$(PYTHON_CMD) forge/scripts/db_management.py dropdb
+
+.PHONY: destroy
+destroy:
 	$(PYTHON_CMD) forge/scripts/db_management.py destroy
 
 .PHONY: counttiles

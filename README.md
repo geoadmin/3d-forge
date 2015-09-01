@@ -14,6 +14,8 @@ To clone use the --recursive option to get all submodules.
 
     export PROFILENAME=xxx
 
+    export LOGFILEFOLDER=xxx
+
 ## Getting started
 
     make all
@@ -90,6 +92,8 @@ To clone use the --recursive option to get all submodules.
 - you can also deactivate stats collection by setting `track_activities` to off in `/etc/postgresql/9.1/main/postgresql.conf`
 
 - choose the appropriate logging level for postgres client_min_messages = error and log_min_messages = error and log_min_error_statement = error
+
+- if you don't have tileforge user make sure you're using md5 mode in pg_hba.conf (local  all  all  md5)
 
 ## Remove logs
 
