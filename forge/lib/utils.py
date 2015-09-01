@@ -2,6 +2,7 @@
 
 import requests
 import cStringIO
+import shutil
 
 from forge.lib.tiler import grid
 from forge.lib.helpers import gzipFileObject
@@ -14,10 +15,10 @@ def tilePathTemplate(x, y, z):
 
 def loadTileContent(baseURL, key):
     url = '%s%s' % (baseURL, key)
-    r = requests.get(url, headers={'Accept': 'application/vnd.quantized-mesh;extensions=octvertexnormals'})
+    r = requests.get(url, headers={'Accept': 'application/vnd.quantized-mesh;extensions=octvertexnormals'}, stream=True)
     if r.status_code != requests.codes.ok:
         raise Exception('Failed to request %s, status code: %s' % (url, r.status_code))
-    return r.content
+    return r.raw
 
 
 def copyAGITiles(zooms, bounds):
@@ -29,10 +30,9 @@ def copyAGITiles(zooms, bounds):
         f = cStringIO.StringIO()
         tilebounds, [x, y, z] = bxyz
         bucketKey = tilePathTemplate(x, y, z)
-        f.write(loadTileContent(baseURL, bucketKey))
+        shutil.copyfileobj(loadTileContent(baseURL, bucketKey), f)
         f.seek(0)
-        compressedFile = gzipFileObject(f)
-        writeToS3(bucket, bucketKey, compressedFile, 'poc_light')
+        writeToS3(bucket, bucketKey, f, 'poc_light')
         count += 1
         if count % 20 == 0:
             print 'Copying %s...' % bucketKey
