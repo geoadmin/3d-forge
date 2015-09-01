@@ -46,6 +46,5 @@ format=%(asctime)s | %(name)-32s | %(levelname)-8s | %(message)s
 datefmt=
 
 [Logging]
-logfile: /geodata/log/forge_%(timestamp)s.log
-sqlLogfile: /geodata/log/sql_%(timestamp)s.log
-
+logfile: ${logfilefolder}forge_%(timestamp)s.log
+sqlLogfile: ${logfilefolder}sql_%(timestamp)s.log

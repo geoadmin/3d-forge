@@ -14,6 +14,8 @@ To clone use the --recursive option to get all submodules.
 
     export PROFILENAME=xxx
 
+    export LOGFILEFOLDER=xxx
+
 ## Getting started
 
     make all

@@ -55,7 +55,7 @@ help:
 
 
 .PHONY: all
-all: install apache/testapp.conf database.cfg tms.cfg test lint
+all: install apache/testapp.conf database.cfg tms.cfg logging.cfg test lint
 
 .PHONY: install
 install:
@@ -71,6 +71,9 @@ database.cfg: database.cfg.mako
 
 tms.cfg: tms.cfg.mako
 	$(VENV)/bin/mako-render --var "bucketname=$(BUCKETNAME)" --var "profilename=$(PROFILENAME)" $< > $@
+
+logging.cfg: logging.cfg.mako
+	$(VENV)/bin/mako-render --var "logfilefolder=$(LOGFILEFOLDER)" $< > $@
 
 .PHONY: test
 test:
