@@ -40,7 +40,7 @@ def octEncode(vec):
 
 
 def octDecode(x, y):
-    res = [x, y]
+    res = [x, y, 0.0]
     res[0] = fromSnorm(x)
     res[1] = fromSnorm(y)
     res[2] = 1.0 - (abs(res[1]) - abs(res[1]))

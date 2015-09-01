@@ -8,7 +8,7 @@ from collections import OrderedDict
 from forge.terrain.topology import TerrainTopology
 from forge.lib.bounding_sphere import BoundingSphere
 import forge.lib.horizon_occlusion_point as occ
-from forge.lib.oct_encoding import octEncode
+from forge.lib.oct_encoding import octEncode, octDecode
 from forge.lib.helpers import zigZagDecode, zigZagEncode, transformCoordinate
 from forge.lib.decoders import unpackEntry, unpackIndices, decodeIndices, packEntry, packIndices, encodeIndices
 
@@ -88,7 +88,7 @@ class TerrainTile:
     BYTESPLIT = 65636
 
     # Coordinates are given in lon/lat WSG84
-    def __init__(self, west=None, east=None, south=None, north=None):
+    def __init__(self, west=None, east=None, south=None, north=None, lightning=False):
         self._west = west if west is not None else -1.0
         self._east = east if east is not None else 1.0
         self._south = south if south is not None else -1.0
@@ -115,6 +115,7 @@ class TerrainTile:
         self.northI = []
 
         # Extension header
+        self.lightning = lightning
         self.vLight = []
 
     def __str__(self):
@@ -137,8 +138,9 @@ class TerrainTile:
         # output coordinates
         msg += '\nCoordinates in EPSG %s ----------------------------\n' % self.targetEPSG
         msg += '\n%s' % self.getVerticesCoordinates(epsg=self.targetEPSG)
-
         msg += '\nNumber of triangles: %s' % (len(self.indices) / 3)
+        # extension header
+        msg += '\nUnit vectors for lighting: %s' % self.vLight
         return msg
 
     def getVerticesCoordinates(self, epsg=4326):
@@ -188,7 +190,7 @@ class TerrainTile:
                 self._alts.append(p.GetZ())
 
     def fromFile(self, filePath, west, east, south, north):
-        self.__init__(west, east, south, north)
+        self.__init__(west, east, south, north, self.lightning)
         with open(filePath, 'rb') as f:
             # Header
             for k, v in TerrainTile.quantizedMeshHeader.iteritems():
@@ -234,6 +236,17 @@ class TerrainTile:
 
             northIndicesCount = unpackEntry(f, meta['northVertexCount'])
             self.northI = unpackIndices(f, northIndicesCount, meta['northIndices'])
+
+            if self.lightning:
+                # Light extension header
+                meta = TerrainTile.ExtensionHeader
+                extensionId = unpackEntry(f, meta['extensionId'])
+                if extensionId == 1:
+                    extensionLength = unpackEntry(f, meta['extensionLength'])
+                    for i in xrange(0, extensionLength / 2):
+                        x = unpackEntry(f, TerrainTile.OctEncodedVertexNormals['xy'])
+                        y = unpackEntry(f, TerrainTile.OctEncodedVertexNormals['xy'])
+                        self.vLight.append(octDecode(x, y))
 
             data = f.read(1)
             if data:
@@ -460,4 +473,5 @@ class TerrainTile:
 
         # Lighting extension header
         if topology.lightning:
+            self.lightning = True
             self.vLight = topology.verticesUnitVectors
