@@ -5,7 +5,6 @@ import cStringIO
 import shutil
 
 from forge.lib.tiler import grid
-from forge.lib.helpers import gzipFileObject
 from forge.lib.boto_conn import getBucket, writeToS3
 
 

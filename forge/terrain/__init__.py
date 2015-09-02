@@ -238,12 +238,15 @@ class TerrainTile:
             self.northI = unpackIndices(f, northIndicesCount, meta['northIndices'])
 
             if self.lightning:
+                # One byte of padding
                 # Light extension header
                 meta = TerrainTile.ExtensionHeader
                 extensionId = unpackEntry(f, meta['extensionId'])
                 if extensionId == 1:
                     extensionLength = unpackEntry(f, meta['extensionLength'])
-                    for i in xrange(0, extensionLength / 2):
+                    # Consider padding of 2 bits
+                    f.read(2)
+                    for i in xrange(0, (extensionLength / 2) - 1):
                         x = unpackEntry(f, TerrainTile.OctEncodedVertexNormals['xy'])
                         y = unpackEntry(f, TerrainTile.OctEncodedVertexNormals['xy'])
                         self.vLight.append(octDecode(x, y))
@@ -322,6 +325,9 @@ class TerrainTile:
 
         # Extension header for light
         if len(self.vLight) > 0:
+            # Add 2 bytes of padding
+            f.write(packEntry('B', 1))
+            f.write(packEntry('B', 1))
             meta = TerrainTile.ExtensionHeader
             # Extension header ID is 1 for lightening
             f.write(packEntry(meta['extensionId'], 1))
