@@ -5,7 +5,7 @@ import ConfigParser
 from geoalchemy2 import Geometry
 from sqlalchemy import event
 from sqlalchemy.schema import CreateSchema
-from sqlalchemy import Column, Sequence, Integer
+from sqlalchemy import Column, Sequence, Integer, BigInteger, Text
 from sqlalchemy.ext.declarative import declarative_base
 
 from forge.models import Vector
@@ -27,7 +27,8 @@ def modelFactory(BaseClass, tablename, shapefiles, classname):
         __tablename__ = tablename
         __table_args__ = table_args
         __shapefiles__ = shapefiles
-        id = Column(Integer(), sequence, nullable=False, primary_key=True)
+        id = Column(BigInteger(), sequence, nullable=False, primary_key=True)
+        shapefilepath = Column('shapefilepath',Text)
         the_geom = Column('the_geom', WGS84Polygon)
     NewClass.__name__ = classname
     return NewClass
