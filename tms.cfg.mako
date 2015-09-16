@@ -18,8 +18,11 @@ maxLat: 46.898
 fullonly: 0
 
 [Zooms]
-tileMinZ: 9
-tileMaxZ: 17
+tileMinZ: 8
+tileMaxZ: 18
+
+[8]
+tablename: dhm25_64m
 
 [9]
 tablename: bl_128m
@@ -43,10 +46,10 @@ tablename: bl_8m
 tablename: bl_4m
 
 [16]
-tablename: bl_4m
+tablename: bl_2m
 
 [17]
-tablename: bl_4m
+tablename: bl_1m
 
 [18]
-tablename: bl_4m
+tablename: bl_0_5m

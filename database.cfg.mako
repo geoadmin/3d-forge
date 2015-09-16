@@ -12,10 +12,10 @@ user: tileforge
 password: tileforge
 
 [Data]
-baseDir: /geodata/WGS84/
-shapefiles: 128/,64/,32/,16/,8/,4/
-tablenames: bl_128m,bl_64m,bl_32m,bl_16m,bl_8m,bl_4m
-modelnames: bl_128m,bl_64m,bl_32m,bl_16m,bl_8m,bl_4m
+baseDir: /geodata/smb/iwi/3DTerrain/2015/
+shapefiles: DHM25/64/,NW/128/,NW/64/,NW/32/,NW/16/,NW/8/,NW/4/,NW/2/,NW/1/,NW/0.5/
+tablenames: dhm25_64m,bl_128m,bl_64m,bl_32m,bl_16m,bl_8m,bl_4m,bl_2m,bl_1m,bl_0_5m
+modelnames: dhm25_64m,bl_128m,bl_64m,bl_32m,bl_16m,bl_8m,bl_4m,bl_2m,bl_1m,bl_0_5m
 
 # Paths must be absolute!
 [Reprojection]
