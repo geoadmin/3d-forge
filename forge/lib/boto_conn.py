@@ -10,6 +10,7 @@ from forge.lib.helpers import timestamp
 from boto import connect_s3
 from forge.lib.logs import getLogger
 from boto.s3.key import Key
+import boto.sqs
 
 from forge.lib.poolmanager import PoolManager
 
@@ -161,3 +162,24 @@ class S3Keys:
         print '%s could not be deleted.' % len(results.errors)
         print '%s have been deleted.' % nbDeleted
         self.counter += len(results.deleted)
+
+
+def _getSQSConn():
+    try:
+        conn = boto.sqs.connect_to_region('eu-west-1', profile_name=profileName)
+    except Exception as e:
+        raise Exception('SQS: Error during connection %s' % e)
+    return conn
+
+
+connSQS = _getSQSConn()
+
+
+def getSQS():
+    return connSQS
+
+
+def writeSQSMessage(q, message):
+    m = boto.sqs.message.Message()
+    m.set_body(message)
+    q.write(m)

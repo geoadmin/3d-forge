@@ -16,7 +16,7 @@ import forge.lib.cartesian2d as c2d
 from forge.models.terrain import TerrainTile
 from forge.models.terrain_metadata import TerrainMetadata
 from forge.models.tables import modelsPyramid
-from forge.lib.boto_conn import getBucket, writeToS3
+from forge.lib.boto_conn import getBucket, writeToS3, getSQS, writeSQSMessage
 from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate, createBBox
 from forge.lib.topology import TerrainTopology
 from forge.lib.global_geodetic import GlobalGeodetic
@@ -53,6 +53,46 @@ def grid(bounds, zoomLevels, fullonly):
 # shared counter
 tilecount = multiprocessing.Value('i', 0)
 skipcount = multiprocessing.Value('i', 0)
+
+
+def createTileFromQueue(tq):
+    try:
+        (qName, t0, dbConfigFile) = tq
+        sqs = getSQS()
+        q = sqs.get_queue(qName)
+        geodetic = GlobalGeodetic(True)
+        # we do this as long as we are finding messages in the queue
+        while True:
+            parseOk = True
+            try:
+                # 20 is maximum wait time
+                m = q.read(wait_time_seconds = 20)
+                if m is None:
+                    logger.info('No more messages found. Closing process')
+                    break
+                body = m.get_body()
+                tiles = map(int, body.split(','))
+            except Exception as e:
+                    parseOk = False
+
+            if not parseOk or len(tiles) % 3 != 0:
+                logger.warning('Unparsable message received. Skipping...and removing message [%s]' % (m.get_body()))
+                q.delete_message(m)
+                continue
+
+            for i in range(0, len(tiles), 3):
+                try:
+                    tileXYZ = [tiles[i], tiles[i + 1], tiles[i + 2]]
+                    tilebounds = geodetic.TileBounds(tileXYZ[0], tileXYZ[1], tileXYZ[2])
+                    createTile((tilebounds, tileXYZ, t0, dbConfigFile))
+                except Exception as e:
+                    logger.error('Error while processing specific tile ' + str(e))
+
+            # when successfull, we delete the message from the queue
+            q.delete_message(m)
+
+    except Exception as e:
+        logger.error('Error occured during processing. Halting process ' + str(e))
 
 
 def createTile(tile):
@@ -210,6 +250,18 @@ class Tiles:
             yield (bounds, tileXYZ, self.t0, self.dbConfigFile)
 
 
+class QueueTiles:
+    def __init__(self, qName, dbConfigFile, t0, num):
+        self.t0 = t0
+        self.dbConfigFile = dbConfigFile
+        self.qName = qName
+        self.num = num
+
+    def __iter__(self):
+        for i in range(0, self.num):
+            yield (self.qName, self.t0, self.dbConfigFile)
+
+
 class TilerManager:
 
     def __init__(self, dbConfigFile, tmsConfigFile):
@@ -244,6 +296,116 @@ class TilerManager:
         tend = time.time()
         logger.info('It took %s to create %s tiles (%s were skipped)' % (
             str(datetime.timedelta(seconds=tend - self.t0)), tilecount.value, skipcount.value))
+
+    # Create AWS sqs queue with all the tiles to create
+    # based on current configuration as well as meta data
+    def createQueue(self):
+        queueName = self.tmsConfig.get('General', 'sqsqueue')
+        maxChunks = int(self.tmsConfig.get('General', 'maxChunks'))
+        self.t0 = time.time()
+        if len(queueName) <= 0:
+            logger.error('Missing queueName')
+            return
+        try:
+            sqs = getSQS()
+            q = sqs.get_queue(queueName)
+            if q is not None:
+                logger.error('Queue already exists. Can\'t overwrite existing queue. [%s]' % (queueName))
+                return
+
+            # queue with default message visiblity time of 600. So each message is blocked
+            # for other users for 600 seconds. Default would be 30 seconds. It's that high
+            # because each message contains maxChunks tiles
+            q = sqs.create_queue(queueName, visibility_timeout=600)
+            # Assure queue is kept for maximum of 14 weeks (aws limit). default would be 4 days.
+            sqs.set_queue_attribute(q, 'MessageRetentionPeriod', 1209600)
+        except Exception as e:
+            logger.error('Error during creation of queue' + str(e))
+            return
+
+        if q.count() > 0:
+            logger.error('Queue already contains messages. Use a different queue or delete this queue first')
+            return
+
+        logger.info('Queue ' + queueName + ' has been created')
+        tiles = Tiles(self.dbConfigFile, self.tmsConfig, self.t0)
+        nbTiles = self.numOfTiles()
+        try:
+            logger.info('Starting creation of SQS queue with approx. %s tiles)' % (nbTiles))
+            totalcount = 0
+            tcount = 0
+            messagecount = 0
+            msg = ''
+            for tile in tiles:
+                (bounds, tileXYZ, t0, dbConfigFile) = tile
+                if len(msg) != 0:
+                    msg += ','
+                msg += ('%s,%s,%s' % (str(tileXYZ[0]), str(tileXYZ[1]), str(tileXYZ[2])))
+                tcount += 1
+                if tcount >= maxChunks:
+                    messagecount += 1
+                    writeSQSMessage(q, msg)
+                    tcount = 0
+                    msg = ''
+                totalcount = totalcount + 1
+            if len(msg) > 0:
+                messagecount += 1
+                writeSQSMessage(q, msg)
+                pass
+
+        except Exception as e:
+            logger.error('Error during writing of sqs message' + str(e))
+
+        tend = time.time()
+        logger.info('It took %s to create %s message in SQS gueue representing %s tiles' % (
+            str(datetime.timedelta(seconds=tend - self.t0)), messagecount, totalcount))
+
+    # To delete an existing queue. Be very carefull...alot of info
+    # will be deleted potentially
+    def deleteQueue(self):
+        queueName = self.tmsConfig.get('General', 'sqsqueue')
+        if len(queueName) <= 0:
+            logger.error('Missing queueName')
+            return
+        try:
+            sqs = getSQS()
+            q = sqs.get_queue(queueName)
+            sqs.delete_queue(q)
+        except Exception as e:
+            logger.error('Error during deletion of queue' + str(e))
+            return
+
+    # Create tiles based on given Queue
+    def createTiles(self):
+        tilecount.value = 0
+        skipcount.value = 0
+        queueName = self.tmsConfig.get('General', 'sqsqueue')
+        self.t0 = time.time()
+        if len(queueName) <= 0:
+            logger.error('Missing queueName')
+            return
+        pm = PoolManager(logger=logger)
+        qtiles = QueueTiles(queueName, self.dbConfigFile, self.t0, pm.numOfProcesses())
+
+        logger.info('Starting creation of tiles from queue %s ' % (queueName))
+        pm.process(qtiles, createTileFromQueue, 1)
+        tend = time.time()
+        logger.info('It took %s to create %s tiles (%s were skipped) from queue' % (
+            str(datetime.timedelta(seconds=tend - self.t0)), tilecount.value, skipcount.value))
+
+    def queueStats(self):
+        queueName = self.tmsConfig.get('General', 'sqsqueue')
+        if len(queueName) <= 0:
+            logger.error('Missing queueName')
+            return
+        try:
+            sqs = getSQS()
+            q = sqs.get_queue(queueName)
+            attrs = sqs.get_queue_attributes(q)
+        except Exception as e:
+            logger.error('Error during deletion of queue' + str(e))
+            return
+        print attrs
 
     def metadata(self):
         t0 = time.time()

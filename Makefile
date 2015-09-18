@@ -43,6 +43,10 @@ help:
 	@echo "- tmsmetadata        Create the layers.json file"
 	@echo "- tmsstats           Provide statistics about the TMS pyramid"
 	@echo "- tmsstatsnodb       Provide statistics about the TMS pyramid, without db stats"
+	@echo "- tmscreatequeue     Creates AWS SQS queue with given settings (all tiles)"
+	@echo "- tmstmsdeletequeue  Deletes current AWS SQS queue (you loose everything)"
+	@echo "- tmstmsqueuestats   Get stats of AWS SQS queue"
+	@echo "- tmsttmscreatetiles Create tilses using the AWS SQS queue"
 	@echo "- clean              Clean all generated files and folders"
 	@echo
 	@echo "Variables:"
@@ -153,6 +157,23 @@ tmsstats:
 tmsstatsnodb:
 	$(PYTHON_CMD) forge/scripts/tms_writer.py statsnodb
 
+.PHONY: tmscreatequeue
+tmscreatequeue:
+	$(PYTHON_CMD) forge/scripts/tms_writer.py createqueue
+
+.PHONY: tmsdeletequeue
+tmsdeletequeue:
+	$(PYTHON_CMD) forge/scripts/tms_writer.py deletequeue
+
+.PHONY: tmscreatetiles
+tmscreatetiles:
+	$(PYTHON_CMD) forge/scripts/tms_writer.py createtiles
+
+.PHONY: tmsqueuestats
+tmsqueuestats:
+	$(PYTHON_CMD) forge/scripts/tms_writer.py queuestats
+
+
 .PHONY: clean
 clean:
 	rm -rf venv
@@ -161,4 +182,5 @@ clean:
 	rm -f apache/testapp.conf
 	rm -f database.cfg
 	rm -f tms.cfg
+	rm -f logging.cfg
 	rm -f .tmp/*.*

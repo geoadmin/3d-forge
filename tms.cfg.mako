@@ -7,6 +7,8 @@ profileName: ${profilename}
 bucketpath: 1.0.0/ch.swisstopo.terrain.3d/default/20151231/4326/
 # chunks per process (that's a maximum)
 maxChunks: 50
+# when using aws sqs queue, the name of the queue
+sqsqueue: terrain_20150922
 
 [Extent]
 minLon: 5.86725126512748
