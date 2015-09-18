@@ -53,12 +53,20 @@ class TerrainMetadata:
             format       = kwargs.get('format', 'quantized-mesh-1.0'),
             attribution  = kwargs.get('attribution', None),
             scheme       = kwargs.get('scheme', 'tms'),
-            tiles        = [kwargs.get('tiles', '{z}/{x}/{y}.terrain?v={version}')],
+            tiles        = kwargs.get('tiles', [
+              "//terrain0.geo.admin.ch/1.0.0/ch.swisstopo.terrain.3d/default/20151231/4326/{z}/{x}/{y}.terrain?v={version}",
+              "//terrain1.geo.admin.ch/1.0.0/ch.swisstopo.terrain.3d/default/20151231/4326/{z}/{x}/{y}.terrain?v={version}",
+              "//terrain2.geo.admin.ch/1.0.0/ch.swisstopo.terrain.3d/default/20151231/4326/{z}/{x}/{y}.terrain?v={version}",
+              "//terrain3.geo.admin.ch/1.0.0/ch.swisstopo.terrain.3d/default/20151231/4326/{z}/{x}/{y}.terrain?v={version}",
+              "//terrain4.geo.admin.ch/1.0.0/ch.swisstopo.terrain.3d/default/20151231/4326/{z}/{x}/{y}.terrain?v={version}"
+            ]),
             minzoom      = self.tileMinZoom,
             maxzoom      = self.tileMaxZoom,
             bounds       = kwargs.get('bounds', [-180, -90, 180, 90]),
             projection   = kwargs.get('projection', 'EPSG:4326'),
-            available    = kwargs.get('available', self.available)
+            available    = kwargs.get('available', self.available),
+            version      = kwargs.get('version', '1.0.0')
+
         )
 
         self._initPyramidMetadata()
