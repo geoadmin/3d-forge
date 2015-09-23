@@ -105,8 +105,11 @@ def populateFeatures(args):
         bulk = BulkInsert(model, session, withAutoCommit=1000)
         for feature in shp.getFeatures():
             polygon = feature.GetGeometryRef()
+            # add shapefile path to dict
+            # self.shpFilePath
             bulk.add(dict(
-                the_geom=WKTElement(polygon.ExportToWkt(), 4326)
+                the_geom = WKTElement(polygon.ExportToWkt(), 4326),
+                shapefilepath=shpFile
             ))
             count += 1
         bulk.commit()
