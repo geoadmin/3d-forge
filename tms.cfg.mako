@@ -19,7 +19,7 @@ fullonly: 0
 
 [Zooms]
 tileMinZ: 8
-tileMaxZ: 18
+tileMaxZ: 17
 
 [8]
 tablename: dhm25_64m
@@ -31,25 +31,25 @@ tablename: bl_128m
 tablename: bl_64m
 
 [11]
-tablename: bl_64m
-
-[12]
 tablename: bl_32m
 
-[13]
+[12]
 tablename: bl_16m
 
-[14]
+[13]
 tablename: bl_8m
 
-[15]
+[14]
 tablename: bl_4m
 
-[16]
+[15]
 tablename: bl_2m
 
-[17]
+[16]
 tablename: bl_1m
+
+[17]
+tablename: bl_0_5m
 
 [18]
 tablename: bl_0_5m
