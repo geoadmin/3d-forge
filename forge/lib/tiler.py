@@ -56,6 +56,7 @@ skipcount = multiprocessing.Value('i', 0)
 
 
 def createTileFromQueue(tq):
+    pid = os.getpid()
     try:
         (qName, t0, dbConfigFile) = tq
         sqs = getSQS()
@@ -68,7 +69,7 @@ def createTileFromQueue(tq):
                 # 20 is maximum wait time
                 m = q.read(wait_time_seconds = 20)
                 if m is None:
-                    logger.info('No more messages found. Closing process')
+                    logger.info('[%s] No more messages found. Closing process' % pid)
                     break
                 body = m.get_body()
                 tiles = map(int, body.split(','))
@@ -76,7 +77,7 @@ def createTileFromQueue(tq):
                     parseOk = False
 
             if not parseOk or len(tiles) % 3 != 0:
-                logger.warning('Unparsable message received. Skipping...and removing message [%s]' % (m.get_body()))
+                logger.warning('[%s] Unparsable message received. Skipping...and removing message [%s]' % (pid, m.get_body()))
                 q.delete_message(m)
                 continue
 
@@ -86,13 +87,14 @@ def createTileFromQueue(tq):
                     tilebounds = geodetic.TileBounds(tileXYZ[0], tileXYZ[1], tileXYZ[2])
                     createTile((tilebounds, tileXYZ, t0, dbConfigFile))
                 except Exception as e:
-                    logger.error('Error while processing specific tile ' + str(e))
+                    logger.error('[%s] Error while processing specific tile %s' % (pid, str(e)))
 
             # when successfull, we delete the message from the queue
+            logger.info('[%s] Successfully treated an SQS message: %s' % (pid, body))
             q.delete_message(m)
 
     except Exception as e:
-        logger.error('Error occured during processing. Halting process ' + str(e))
+        logger.error('[%s] Error occured during processing. Halting process ' + str(e))
 
 
 def createTile(tile):
