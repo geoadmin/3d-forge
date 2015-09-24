@@ -280,8 +280,9 @@ class TilerManager:
         skipcount.value = 0
 
         tiles = Tiles(self.dbConfigFile, self.tmsConfig, self.t0)
+        procfactor = int(self.tmsConfig.get('General', 'procfactor'))
 
-        pm = PoolManager(logger=logger)
+        pm = PoolManager(logger=logger, factor = procfactor)
 
         maxChunks = int(self.tmsConfig.get('General', 'maxChunks'))
 
@@ -386,7 +387,9 @@ class TilerManager:
         if len(queueName) <= 0:
             logger.error('Missing queueName')
             return
-        pm = PoolManager(logger=logger)
+        procfactor = int(self.tmsConfig.get('General', 'procfactor'))
+
+        pm = PoolManager(logger=logger, factor = procfactor)
         qtiles = QueueTiles(queueName, self.dbConfigFile, self.t0, pm.numOfProcesses())
 
         logger.info('Starting creation of tiles from queue %s ' % (queueName))

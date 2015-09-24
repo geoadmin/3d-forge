@@ -9,6 +9,8 @@ bucketpath: 1.0.0/ch.swisstopo.terrain.3d/default/20151231/4326/
 maxChunks: 50
 # when using aws sqs queue, the name of the queue
 sqsqueue: terrain_20150924
+# proc factor (total processes = factor * num_cpus_on_machine
+procfactor: 2
 
 [Extent]
 # below is region around thun

@@ -7,8 +7,8 @@ import signal
 
 class PoolManager:
 
-    def __init__(self, logger, numProcs=multiprocessing.cpu_count()):
-        self._numProcs = numProcs
+    def __init__(self, logger, numProcs=multiprocessing.cpu_count(), factor=1):
+        self._numProcs = int(numProcs * factor)
         self.logger = logger
         self._pool = multiprocessing.Pool(self._numProcs, self._initProcess)
 
