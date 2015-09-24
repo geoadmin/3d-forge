@@ -54,6 +54,8 @@ def grid(bounds, zoomLevels, fullonly):
 tilecount = multiprocessing.Value('i', 0)
 skipcount = multiprocessing.Value('i', 0)
 
+visibility_timeout = 3600
+
 
 def createTileFromQueue(tq):
     pid = os.getpid()
@@ -67,7 +69,7 @@ def createTileFromQueue(tq):
             parseOk = True
             try:
                 # 20 is maximum wait time
-                m = q.read(wait_time_seconds = 20)
+                m = q.read(visibility_timeout = visibility_timeout, wait_time_seconds = 20)
                 if m is None:
                     logger.info('[%s] No more messages found. Closing process' % pid)
                     break
@@ -316,10 +318,10 @@ class TilerManager:
                 logger.error('Queue already exists. Can\'t overwrite existing queue. [%s]' % (queueName))
                 return
 
-            # queue with default message visiblity time of 600. So each message is blocked
-            # for other users for 600 seconds. Default would be 30 seconds. It's that high
+            # queue with default message visiblity time of 3600. So each message is blocked
+            # for other users for 3600 seconds. Default would be 30 seconds. It's that high
             # because each message contains maxChunks tiles
-            q = sqs.create_queue(queueName, visibility_timeout=600)
+            q = sqs.create_queue(queueName, visibility_timeout = visibility_timeout)
             # Assure queue is kept for maximum of 14 weeks (aws limit). default would be 4 days.
             sqs.set_queue_attribute(q, 'MessageRetentionPeriod', 1209600)
         except Exception as e:

@@ -10,7 +10,7 @@ maxChunks: 50
 # when using aws sqs queue, the name of the queue
 sqsqueue: terrain_20150924
 # proc factor (total processes = factor * num_cpus_on_machine
-procfactor: 3
+procfactor: 2
 
 [Extent]
 # below is region around thun
