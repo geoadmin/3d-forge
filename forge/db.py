@@ -13,7 +13,7 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.pool import NullPool
 from contextlib import contextmanager
 
-from forge.models.tables import modelsPyramid
+from forge.models.tables import modelsPyramid, Lakes
 from forge.lib.logs import getLogger
 from forge.lib.shapefile_utils import ShpToGDALFeatures
 from forge.lib.helpers import BulkInsert, timestamp, cleanup
@@ -63,6 +63,7 @@ def reprojectShp(shpFilePath, args):
         ))
         raise Exception(e)
 
+    # TODO new version has error codes this can now be changed
     # As we can't detect a success from an error with the current implementation
     # We determine if the output file exists and exit if not
     if not os.path.isfile(outFile):
@@ -273,6 +274,7 @@ class DB:
         try:
             for model in modelsPyramid.models:
                 model.__table__.create(self.userEngine, checkfirst=True)
+            Lakes.__table__.create(self.userEngine, checkfirst=True)
         except ProgrammingError as e:
             logger.warning('Could not setup database on %(name)s: %(err)s' % dict(
                 name=self.databaseConf.name,
@@ -371,6 +373,35 @@ class DB:
 
         tend = time.time()
         logger.info('All tables have been created. It took %s' % str(datetime.timedelta(seconds=tend - tstart)))
+
+    def populateLakes(self):
+        self.setupDatabase()
+        logger.info('Action: populateLakes()')
+
+        # For now we never reproject lakes
+        engine = sqlalchemy.create_engine(self.userEngine.url)
+        session = scoped_session(sessionmaker(bind=engine))
+        shpFile = self.config.get('Data', 'lakes')
+
+        if not os.path.exists(shpFile):
+            logger.error('Shapefile %s does not exists' % (shpFile))
+            sys.exit(1)
+
+        count = 1
+        shp = ShpToGDALFeatures(shpFile)
+        logger.info('Processing %s' % (shpFile))
+        bulk = BulkInsert(Lakes, session, withAutoCommit=1000)
+
+        for feature in shp.getFeatures():
+            polygon = feature.GetGeometryRef()
+            # add shapefile path to dict
+            # self.shpFilePath
+            bulk.add(dict(
+                the_geom = WKTElement(polygon.ExportToWkt(), 4326)
+            ))
+            count += 1
+        bulk.commit()
+        logger.info('Commit %s features for %s.' % (count, shpFile))
 
     def dropDatabase(self):
         logger.info('Action: dropDatabase()')

@@ -20,6 +20,13 @@ table_args = {'schema': 'data'}
 WGS84Polygon = Geometry(geometry_type='POLYGON', srid=4326, dimension=3, spatial_index=True, management=True)
 
 
+class Lakes(Base, Vector):
+    __tablename__ = 'lakes'
+    __table_args__ = table_args
+    id = Column(BigInteger(), Sequence('id_lakes_seq', schema=table_args['schema']), nullable=False, primary_key=True)
+    the_geom = Column('the_geom', WGS84Polygon)
+
+
 def modelFactory(BaseClass, tablename, shapefiles, classname):
     sequence = Sequence('id_%s_seq' % tablename, schema=table_args['schema'])
 

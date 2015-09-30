@@ -32,7 +32,8 @@ help:
 	@echo "- createuser         Create the user only"
 	@echo "- createdb           Create the database only"
 	@echo "- setupfunctions     Adds custom sql functions to the database"
-	@echo "- populate           Populate the database (shapefiles)"
+	@echo "- populate           Populate the database with the TINs (shps)"
+	@echo "- populatelakes      Populate the database with the lakes (polygons in WGS84)"
 	@echo "- dropdb             Drop the database only"
 	@echo "- dropuser           Drop the user only"
 	@echo "- destroy            Drop the databasen and user"
@@ -116,6 +117,10 @@ setupfunctions:
 .PHONY: populate
 populate:
 	$(PYTHON_CMD) forge/scripts/db_management.py populate
+
+.PHONY: populatelakes
+populatelakes:
+	$(PYTHON_CMD) forge/scripts/db_management.py populatelakes
 
 .PHONY: dropuser
 dropuser:
