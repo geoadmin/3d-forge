@@ -2,13 +2,12 @@
 
 import os
 import ConfigParser
-from geoalchemy2 import Geometry
 from sqlalchemy import event
 from sqlalchemy.schema import CreateSchema
 from sqlalchemy import Column, Sequence, BigInteger, Text
 from sqlalchemy.ext.declarative import declarative_base
 
-from forge.models import Vector
+from forge.models import Vector, Geometry
 from forge.lib.helpers import isShapefile
 
 

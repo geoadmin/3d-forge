@@ -4,7 +4,14 @@ from sqlalchemy.sql import func, and_
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 from geoalchemy2.elements import WKBElement
+from geoalchemy2.types import Geometry as GeoAlchemyGeometry
 from shapely.geometry import box, Point
+
+
+class Geometry(GeoAlchemyGeometry):
+
+    def column_expression(self, col):
+        return func.ST_AsEWKB(col, type_=self)
 
 
 class _interpolate_height_on_plane(FunctionElement):

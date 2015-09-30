@@ -66,7 +66,6 @@ all: install apache/testapp.conf database.cfg tms.cfg logging.cfg test lint
 install:
 	virtualenv $(VENV) --system-site-packages
 	$(PYTHON_CMD) setup.py develop
-	$(VENV)/bin/pip install local_eggs/GeoAlchemy2-0.2.4-ga3.tar.gz
 
 apache/testapp.conf: apache/testapp.conf.mako
 	$(VENV)/bin/mako-render --var "user=$(USERNAME)" --var "directory=$(CURDIR)" $< > $@
