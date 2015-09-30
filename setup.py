@@ -14,6 +14,7 @@ requires = [
         'numpy',
         'sqlalchemy',
         'shapely',
+        'geoalchemy>=0.2.5',
     ]
 
 setup(name='3d-forge',
