@@ -52,6 +52,15 @@ def main():
         tiler.stats()
     elif command == 'statsnodb':
         tiler.statsNoDb()
+    # aws queue specific functions
+    elif command == 'createqueue':
+        tiler.createQueue()
+    elif command == 'createtiles':
+        tiler.createTiles()
+    elif command == 'deletequeue':
+        tiler.deleteQueue()
+    elif command == 'queuestats':
+        tiler.queueStats()
     else:
         error("unknown command '%(command)s'" % {'command': command}, 4, usage=usage)
 

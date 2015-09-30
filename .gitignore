@@ -10,3 +10,4 @@ logging.cfg
 .*.swo
 apache/testapp.conf
 tmp/*
+forge_*.log
