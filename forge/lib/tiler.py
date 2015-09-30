@@ -76,7 +76,7 @@ def createTileFromQueue(tq):
                 body = m.get_body()
                 tiles = map(int, body.split(','))
             except Exception as e:
-                    parseOk = False
+                parseOk = False
 
             if not parseOk or len(tiles) % 3 != 0:
                 logger.warning('[%s] Unparsable message received. Skipping...and removing message [%s]' % (pid, m.get_body()))
@@ -255,6 +255,7 @@ class Tiles:
 
 
 class QueueTiles:
+
     def __init__(self, qName, dbConfigFile, t0, num):
         self.t0 = t0
         self.dbConfigFile = dbConfigFile

@@ -55,6 +55,7 @@ def writeToS3(b, path, content, origin, contentType='application/octet-stream'):
     headers['Content-Encoding'] = 'gzip'
     k.set_contents_from_file(content, headers=headers)
 
+
 def writeLayerJson(b, filename):
     headers = {'Content-Type': 'application/json'}
     k = Key(b)
