@@ -17,6 +17,7 @@ def usage():
             createdb:           create the DB only
             setupfunctions:     setup custom sql functions
             populate:           imports shapefiles
+            populatelakes:      imports lakes shapefile
             dropuser:           drop the user only
             dropdb:             drop the db only
             destroy:            destroy the database and users
@@ -50,6 +51,8 @@ def main():
         db.setupFunctions()
     elif command == 'populate':
         db.populate()
+    elif command == 'populatelakes':
+        db.populateLakes()
     elif command == 'dropuser':
         db.dropUser()
     elif command == 'dropdb':
