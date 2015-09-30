@@ -76,7 +76,7 @@ def createTileFromQueue(tq):
                 body = m.get_body()
                 tiles = map(int, body.split(','))
             except Exception as e:
-                    parseOk = False
+                parseOk = False
 
             if not parseOk or len(tiles) % 3 != 0:
                 logger.warning('[%s] Unparsable message received. Skipping...and removing message [%s]' % (pid, m.get_body()))
@@ -255,6 +255,7 @@ class Tiles:
 
 
 class QueueTiles:
+
     def __init__(self, qName, dbConfigFile, t0, num):
         self.t0 = t0
         self.dbConfigFile = dbConfigFile
@@ -284,7 +285,7 @@ class TilerManager:
         tiles = Tiles(self.dbConfigFile, self.tmsConfig, self.t0)
         procfactor = int(self.tmsConfig.get('General', 'procfactor'))
 
-        pm = PoolManager(logger=logger, factor = procfactor)
+        pm = PoolManager(logger=logger, factor=procfactor)
 
         maxChunks = int(self.tmsConfig.get('General', 'maxChunks'))
 
@@ -325,7 +326,7 @@ class TilerManager:
             # Assure queue is kept for maximum of 14 weeks (aws limit). default would be 4 days.
             sqs.set_queue_attribute(q, 'MessageRetentionPeriod', 1209600)
         except Exception as e:
-            logger.error('Error during creation of queue' + str(e))
+            logger.error('Error during creation of queue:\n' + str(e))
             return
 
         if q.count() > 0:
@@ -343,7 +344,7 @@ class TilerManager:
             msg = ''
             for tile in tiles:
                 (bounds, tileXYZ, t0, dbConfigFile) = tile
-                if len(msg) != 0:
+                if not msg:
                     msg += ','
                 msg += ('%s,%s,%s' % (str(tileXYZ[0]), str(tileXYZ[1]), str(tileXYZ[2])))
                 tcount += 1
@@ -353,13 +354,11 @@ class TilerManager:
                     tcount = 0
                     msg = ''
                 totalcount = totalcount + 1
-            if len(msg) > 0:
+            if not msg:
                 messagecount += 1
                 writeSQSMessage(q, msg)
-                pass
-
         except Exception as e:
-            logger.error('Error during writing of sqs message' + str(e))
+            logger.error('Error during writing of sqs message:\n' + str(e))
 
         tend = time.time()
         logger.info('It took %s to create %s message in SQS gueue representing %s tiles' % (
@@ -377,7 +376,7 @@ class TilerManager:
             q = sqs.get_queue(queueName)
             sqs.delete_queue(q)
         except Exception as e:
-            logger.error('Error during deletion of queue' + str(e))
+            logger.error('Error during deletion of queue:\n' + str(e))
             return
 
     # Create tiles based on given Queue
@@ -391,7 +390,7 @@ class TilerManager:
             return
         procfactor = int(self.tmsConfig.get('General', 'procfactor'))
 
-        pm = PoolManager(logger=logger, factor = procfactor)
+        pm = PoolManager(logger=logger, factor=procfactor)
         qtiles = QueueTiles(queueName, self.dbConfigFile, self.t0, pm.numOfProcesses())
 
         logger.info('Starting creation of tiles from queue %s ' % (queueName))
@@ -410,9 +409,9 @@ class TilerManager:
             q = sqs.get_queue(queueName)
             attrs = sqs.get_queue_attributes(q)
         except Exception as e:
-            logger.error('Error during deletion of queue' + str(e))
+            logger.error('Error during statistics collection:\n' + str(e))
             return
-        print attrs
+        logger.info(attrs)
 
     def metadata(self):
         t0 = time.time()
