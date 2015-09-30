@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from forge.models.terrain import TerrainTile
+from forge.terrain import TerrainTile
 from forge.lib.global_geodetic import GlobalGeodetic
 
 basename = '7_133_98'

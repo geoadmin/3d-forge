@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import os
-from forge.models.terrain import TerrainTile
+from forge.terrain import TerrainTile
+from forge.terrain.topology import TerrainTopology
 from forge.lib.shapefile_utils import ShpToGDALFeatures
-from forge.lib.topology import TerrainTopology
 from forge.lib.global_geodetic import GlobalGeodetic
 
 

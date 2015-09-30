@@ -5,7 +5,7 @@ import cStringIO
 import osgeo.ogr as ogr
 import osgeo.osr as osr
 from collections import OrderedDict
-from forge.lib.topology import TerrainTopology
+from forge.terrain.topology import TerrainTopology
 from forge.lib.bounding_sphere import BoundingSphere
 import forge.lib.horizon_occlusion_point as occ
 from forge.lib.helpers import zigZagDecode, zigZagEncode, transformCoordinate

@@ -2,7 +2,7 @@
 
 import unittest
 import forge.lib.cartesian3d as c3d
-from forge.models.terrain import TerrainTile
+from forge.terrain import TerrainTile
 from forge.lib.bounding_sphere import BoundingSphere
 from forge.lib.llh_ecef import LLH2ECEF
 

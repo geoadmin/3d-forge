@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import unittest
-from forge.lib.topology import TerrainTopology
+from forge.terrain.topology import TerrainTopology
 
 # Must be defined counter clock wise order
 vertices_1 = [
