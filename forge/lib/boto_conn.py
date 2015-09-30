@@ -47,20 +47,13 @@ def getBucket():
     return bucket
 
 
-def writeToS3(b, path, content, origin, contentType='application/octet-stream'):
+def writeToS3(b, path, content, origin, contentType='application/octet-stream', contentEnc='gzip'):
     headers = {'Content-Type': contentType}
     k = Key(b)
     k.key = basePath + path
     k.set_metadata('IWI_Origin', origin)
-    headers['Content-Encoding'] = 'gzip'
+    headers['Content-Encoding'] = contentEnc
     k.set_contents_from_file(content, headers=headers)
-
-
-def writeLayerJson(b, filename):
-    headers = {'Content-Type': 'application/json'}
-    k = Key(b)
-    k.key = basePath + 'layer.json'
-    k.set_contents_from_filename(filename, headers=headers)
 
 copycount = multiprocessing.Value('i', 0)
 
