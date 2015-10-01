@@ -22,7 +22,7 @@ WGS84Polygon2D = Geometry(geometry_type='POLYGON', srid=4326, dimension=2, spati
 
 class Lakes(Base, Vector):
     __tablename__ = 'lakes'
-    __table_args__ = table_args
+    __table_args__ = {'schema': 'public'}
     id = Column(BigInteger(), Sequence('id_lakes_seq', schema=table_args['schema']), nullable=False, primary_key=True)
     the_geom = Column('the_geom', WGS84Polygon2D)
 
