@@ -401,6 +401,8 @@ class DB:
 
         for feature in shp.getFeatures():
             polygon = feature.GetGeometryRef()
+            # Force 2D for lakes
+            polygon.FlattenTo2D()
             # add shapefile path to dict
             # self.shpFilePath
             bulk.add(dict(
