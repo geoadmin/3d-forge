@@ -16,7 +16,7 @@ import forge.lib.cartesian2d as c2d
 from forge.terrain import TerrainTile
 from forge.terrain.metadata import TerrainMetadata
 from forge.terrain.topology import TerrainTopology
-from forge.models.tables import modelsPyramid
+from forge.models.tables import modelsPyramid, Lakes
 from forge.lib.boto_conn import getBucket, writeToS3, getSQS, writeSQSMessage
 from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate, createBBox
 from forge.lib.global_geodetic import GlobalGeodetic
@@ -60,7 +60,7 @@ visibility_timeout = 3600
 def createTileFromQueue(tq):
     pid = os.getpid()
     try:
-        (qName, t0, dbConfigFile) = tq
+        (qName, t0, dbConfigFile, hasWatermask) = tq
         sqs = getSQS()
         q = sqs.get_queue(qName)
         geodetic = GlobalGeodetic(True)
@@ -87,7 +87,7 @@ def createTileFromQueue(tq):
                 try:
                     tileXYZ = [tiles[i], tiles[i + 1], tiles[i + 2]]
                     tilebounds = geodetic.TileBounds(tileXYZ[0], tileXYZ[1], tileXYZ[2])
-                    createTile((tilebounds, tileXYZ, t0, dbConfigFile))
+                    createTile((tilebounds, tileXYZ, t0, dbConfigFile, hasWatermask))
                 except Exception as e:
                     logger.error('[%s] Error while processing specific tile %s' % (pid, str(e)))
 
@@ -104,7 +104,7 @@ def createTile(tile):
     pid = os.getpid()
 
     try:
-        (bounds, tileXYZ, t0, dbConfigFile) = tile
+        (bounds, tileXYZ, t0, dbConfigFile, hasWatermask) = tile
 
         db = DB(dbConfigFile)
         session = sessionmaker()(bind=db.userEngine)
@@ -141,13 +141,23 @@ def createTile(tile):
 
         # Clip using the bounds
         clippedGeometry = model.bboxClippedGeom(bounds)
-        query = session.query(
-            model.id,
-            clippedGeometry.label('clip')
-        ).filter(model.bboxIntersects(bounds))
+        if hasWatermask:
+            query = session.query(
+                model.id,
+                clippedGeometry.label('clip'),
+                Lakes.watermaskRasterize(bounds).label('watermask')
+            ).filter(model.bboxIntersects(bounds))
+        else:
+            query = session.query(
+                model.id,
+                clippedGeometry.label('clip')
+            ).filter(model.bboxIntersects(bounds))
 
+        watermask = None
         terrainTopo = TerrainTopology()
         for q in query:
+            if hasWatermask:
+                watermask = q.watermask
             coords = list(to_shape(q.clip).exterior.coords)
             if q.id in cornerPts:
                 pt = cornerPts[q.id][0]
@@ -173,7 +183,7 @@ def createTile(tile):
         if verticesLength > 0:
             terrainTopo.create()
             # Prepare terrain tile
-            terrainFormat = TerrainTile()
+            terrainFormat = TerrainTile(watermask=watermask)
             terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
 
             # Bytes manipulation and compression
@@ -209,7 +219,7 @@ def createTile(tile):
 
 def scanTerrain(tMeta, tile, session, tilecount):
     try:
-        (bounds, tileXYZ, t0, dbConfigFile) = tile
+        (bounds, tileXYZ, t0, dbConfigFile, hasWatermask) = tile
 
         # Get the model according to the zoom level
         model = modelsPyramid.getModelByZoom(tileXYZ[2])
@@ -245,26 +255,30 @@ class Tiles:
         self.tileMinZ = int(tmsConfig.get('Zooms', 'tileMinZ'))
         self.tileMaxZ = int(tmsConfig.get('Zooms', 'tileMaxZ'))
 
+        self.hasWatermask = int(tmsConfig.get('Extensions', 'watermask'))
+
         self.dbConfigFile = dbConfigFile
 
     def __iter__(self):
         zRange = range(self.tileMinZ, self.tileMaxZ + 1)
 
         for bounds, tileXYZ in grid(self.bounds, zRange, self.fullonly):
-            yield (bounds, tileXYZ, self.t0, self.dbConfigFile)
+            yield (bounds, tileXYZ, self.t0, self.dbConfigFile, self.hasWatermask)
 
 
 class QueueTiles:
 
-    def __init__(self, qName, dbConfigFile, t0, num):
+    def __init__(self, qName, dbConfigFile, tmsConfig, t0, num):
         self.t0 = t0
         self.dbConfigFile = dbConfigFile
         self.qName = qName
         self.num = num
 
+        self.hasWatermask == int(tmsConfig.get('Extensions', 'watermask'))
+
     def __iter__(self):
         for i in range(0, self.num):
-            yield (self.qName, self.t0, self.dbConfigFile)
+            yield (self.qName, self.t0, self.dbConfigFile, self.hasWatermask)
 
 
 class TilerManager:
@@ -391,7 +405,7 @@ class TilerManager:
         procfactor = int(self.tmsConfig.get('General', 'procfactor'))
 
         pm = PoolManager(logger=logger, factor=procfactor)
-        qtiles = QueueTiles(queueName, self.dbConfigFile, self.t0, pm.numOfProcesses())
+        qtiles = QueueTiles(queueName, self.dbConfigFile, self.tmsConfig, self.t0, pm.numOfProcesses())
 
         logger.info('Starting creation of tiles from queue %s ' % (queueName))
         pm.process(qtiles, createTileFromQueue, 1)
@@ -415,12 +429,21 @@ class TilerManager:
 
     def metadata(self):
         t0 = time.time()
+        basePath = self.tmsConfig.get('General', 'bucketpath')
+        baseUrls = [
+            "//terrain0.geo.admin.ch/" + basePath + "{z}/{x}/{y}.terrain?v={version}",
+            "//terrain1.geo.admin.ch/" + basePath + "{z}/{x}/{y}.terrain?v={version}",
+            "//terrain2.geo.admin.ch/" + basePath + "{z}/{x}/{y}.terrain?v={version}",
+            "//terrain3.geo.admin.ch/" + basePath + "{z}/{x}/{y}.terrain?v={version}",
+            "//terrain4.geo.admin.ch/" + basePath + "{z}/{x}/{y}.terrain?v={version}"
+        ]
 
         db = DB('database.cfg')
         session = sessionmaker()(bind=db.userEngine)
         tiles = Tiles(self.dbConfigFile, self.tmsConfig, t0)
         tMeta = TerrainMetadata(
-            bounds=tiles.bounds, minzoom=tiles.tileMinZ, maxzoom=tiles.tileMaxZ, useGlobalTiles=True)
+            bounds=tiles.bounds, minzoom=tiles.tileMinZ, maxzoom=tiles.tileMaxZ,
+            useGlobalTiles=True, hasWatermask=tiles.hasWatermask, baseUrls=baseUrls)
 
         try:
             tilecount = 1

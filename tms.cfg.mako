@@ -4,7 +4,7 @@ bucketName: ${bucketname}
 # user specific
 profileName: ${profilename}
 # terrain files base path
-bucketpath: 1.0.0/ch.swisstopo.terrain.3d/default/20151231/4326/
+bucketpath: 1.0.0/ch.swisstopo.terrain.3d_water/default/20151231/4326/
 # chunks per process (that's a maximum)
 maxChunks: 50
 # when using aws sqs queue, the name of the queue
@@ -14,18 +14,23 @@ procfactor: 2
 
 [Extent]
 # below is region around thun
-#minLon: 7.49432
-#maxLon: 7.69554
-#minLat: 46.68688
-#maxLat: 46.83431
+minLon: 7.49432
+maxLon: 7.69554
+minLat: 46.68688
+maxLat: 46.83431
 # below is whole switzerland
-minLon: 5.86725126512748
-maxLon: 10.9209100671547
-minLat: 45.8026860136571
-maxLat: 47.8661652478939
+#minLon: 5.86725126512748
+#maxLon: 10.9209100671547
+#minLat: 45.8026860136571
+#maxLat: 47.8661652478939
 # fullonly: 0 -> inludes all tiles that intersect, even partly, with extent
 # fullonly: 1 -> include only tiles that fully intersect with extent
 fullonly: 0
+
+[Extensions]
+# watermask: 0 -> no watermask
+# watermask: 1 -> include watermask (use table public.lakes per default)
+watermask: 1
 
 [Zooms]
 tileMinZ: 8
