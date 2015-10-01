@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import unittest
-from forge.models.terrain_metadata import TerrainMetadata
+from forge.terrain.metadata import TerrainMetadata
 
 # 0 means that there is no tile
 # 1 means that there is a tile

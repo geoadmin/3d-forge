@@ -10,11 +10,11 @@ from textwrap import dedent
 
 from forge.lib.global_geodetic import GlobalGeodetic
 from forge.lib.helpers import error
-from forge.models.terrain import TerrainTile
+from forge.terrain import TerrainTile
+# from forge.terrain.topology import TerrainTopology
 from forge.lib.helpers import gzipFileObject
 from forge.lib.boto_conn import getBucket, writeToS3
 # from forge.lib.shapefile_utils import ShpToGDALFeatures
-# from forge.lib.topology import TerrainTopology
 
 
 poc_base_url = "http://ec2-54-220-242-89.eu-west-1.compute.amazonaws.com/stk-terrain/tilesets/swisseudem/tiles/"

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from forge.models.terrain import TerrainTile
+from forge.terrain import TerrainTile
 
 ter = TerrainTile()
 # ter.fromFile('forge/data/quantized-mesh/0.terrain')

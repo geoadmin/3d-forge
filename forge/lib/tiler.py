@@ -13,12 +13,12 @@ from geoalchemy2.shape import to_shape
 
 from forge.db import DB
 import forge.lib.cartesian2d as c2d
-from forge.models.terrain import TerrainTile
-from forge.models.terrain_metadata import TerrainMetadata
+from forge.terrain import TerrainTile
+from forge.terrain.metadata import TerrainMetadata
+from forge.terrain.topology import TerrainTopology
 from forge.models.tables import modelsPyramid
 from forge.lib.boto_conn import getBucket, writeToS3, getSQS, writeSQSMessage
 from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate, createBBox
-from forge.lib.topology import TerrainTopology
 from forge.lib.global_geodetic import GlobalGeodetic
 from forge.lib.collapse_geom import processRingCoordinates
 from forge.lib.logs import getLogger

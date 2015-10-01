@@ -2,7 +2,7 @@
 
 import unittest
 import os
-from forge.models.terrain import TerrainTile
+from forge.terrain import TerrainTile
 
 
 class TestTerrainTile(unittest.TestCase):
