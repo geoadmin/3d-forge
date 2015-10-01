@@ -220,6 +220,13 @@ class DB:
         yield conn
         conn.close()
 
+    @contextmanager
+    def userSession(self):
+        engine = sqlalchemy.create_engine(self.userEngine.url)
+        session = scoped_session(sessionmaker(bind=engine))
+        yield session
+        session.close()
+
     def createUser(self):
         logger.info('Action: createUser()')
         with self.superConnection() as conn:
@@ -454,3 +461,16 @@ class DB:
         logger.info('Action: destroy()')
         self.dropDatabase()
         self.dropUser()
+
+    def console(self):
+        logger.info('Action: console()')
+        os.environ['PGPASSWORD'] = self.databaseConf.password
+        cmdline = 'psql -h %(host)s -p %(port)d -U %(user)s %(name)s' % dict(
+            host    = self.serverConf.host,
+            port    = self.serverConf.port,
+            user    = self.databaseConf.user,
+            name    = self.databaseConf.name
+        )
+        cmd = cmdline.split()
+        os.spawnvpe(os.P_WAIT, cmd[0], cmd, os.environ)
+        del os.environ['PGPASSWORD']
