@@ -151,9 +151,9 @@ class TerrainMetadata:
         # Add global tiles config to the metadata
         if self.useGlobalTiles:
             # Make sure not to add an existing zoom level
-            for z in range(0, len(globalTilesConfig)):
+            for z in reversed(range(0, len(globalTilesConfig) - 1)):
                 if z < self.meta['minzoom']:
-                    self.meta['available'] = self.meta['available'] + z
+                    self.meta['available'] = [globalTilesConfig[z]] + self.meta['available']
             self.meta['minzoom'] = 0
 
         return json.dumps(self.meta)
