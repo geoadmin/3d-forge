@@ -28,6 +28,7 @@ help:
 	@echo "- all                All of the above"
 	@echo "- autolint           Auto lint code styling"
 	@echo "- updatesubmodule    Update 3d testapp"
+	@echo "- console            Interactive psql console"
 	@echo "- create             Create the database and user"
 	@echo "- createuser         Create the user only"
 	@echo "- createdb           Create the database only"
@@ -96,6 +97,10 @@ autolint:
 updatesubmodule:
 	git submodule update
 	git submodule foreach git pull origin master
+
+.PHONY: console
+console:
+	$(PYTHON_CMD) forge/scripts/db_management.py console
 
 .PHONY: create
 create:

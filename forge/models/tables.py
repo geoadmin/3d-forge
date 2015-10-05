@@ -16,14 +16,15 @@ event.listen(Base.metadata, 'before_create', CreateSchema('data'))
 
 table_args = {'schema': 'data'}
 # management to true only for postgis 1.5
-WGS84Polygon = Geometry(geometry_type='POLYGON', srid=4326, dimension=3, spatial_index=True, management=True)
+WGS84Polygon3D = Geometry(geometry_type='POLYGON', srid=4326, dimension=3, spatial_index=True, management=True)
+WGS84Polygon2D = Geometry(geometry_type='POLYGON', srid=4326, dimension=2, spatial_index=True, management=True)
 
 
 class Lakes(Base, Vector):
     __tablename__ = 'lakes'
-    __table_args__ = table_args
+    __table_args__ = {'schema': 'public'}
     id = Column(BigInteger(), Sequence('id_lakes_seq', schema=table_args['schema']), nullable=False, primary_key=True)
-    the_geom = Column('the_geom', WGS84Polygon)
+    the_geom = Column('the_geom', WGS84Polygon2D)
 
 
 def modelFactory(BaseClass, tablename, shapefiles, classname):
@@ -35,7 +36,7 @@ def modelFactory(BaseClass, tablename, shapefiles, classname):
         __shapefiles__ = shapefiles
         id = Column(BigInteger(), sequence, nullable=False, primary_key=True)
         shapefilepath = Column('shapefilepath', Text)
-        the_geom = Column('the_geom', WGS84Polygon)
+        the_geom = Column('the_geom', WGS84Polygon3D)
     NewClass.__name__ = classname
     return NewClass
 
