@@ -14,9 +14,9 @@ DECLARE
     outside integer;
 BEGIN
     IF EXISTS ( 
-        select * from information_schema.columns
-        where table_name=watermask_table::text
-        and column_name=watermask_geom_column
+        SELECT * FROM information_schema.columns
+        WHERE table_name=watermask_table::text
+        AND column_name=watermask_geom_column
     ) THEN 
 
     -- this query returns a raster with a stable extent of 256x256 pixels
@@ -26,39 +26,46 @@ BEGIN
     -- if the tile geometry lies completely inside a lake a raster with one pixel with value 1 will be returned
     -- if the tile geometry lies completely outside the lakes a raster with one pixel with value 0 will be returned
     EXECUTE format('SELECT count(1) FROM %I where ST_ContainsProperly(%I,%L)',watermask_table,watermask_geom_column,bbox) INTO inside;
-    EXECUTE format('SELECT count(1) FROM %I where st_intersects(%L,%I)',watermask_table,bbox,watermask_geom_column) INTO outside;
+    EXECUTE format('SELECT count(1) FROM %I where ST_Intersects(%L,%I)',watermask_table,bbox,watermask_geom_column) INTO outside;
     IF outside = 0 THEN
         --RAISE NOTICE 'tile lies completely outside lakes';
-        sql := 'SELECT st_addband(ST_MakeEmptyRaster(1,1,'|| xmin ||', '|| ymax ||', '|| (xmax-xmin) ||', '|| -(ymax-ymin) ||' , 0, 0, 4326),''1BB''::text,0,0)';
+        sql := 'SELECT ST_AddBand(ST_MakeEmptyRaster(1,1,0,0,1,1 , 0, 0, 4326),''1BB''::text,0,0)';
         RETURN QUERY EXECUTE sql;
         RETURN;
     END IF;
     
     IF inside > 0 THEN
         --RAISE NOTICE 'tile lies completely inside a lake';
-        sql := 'SELECT st_addband(ST_MakeEmptyRaster(1,1,'|| xmin ||', '|| ymax ||', '|| (xmax-xmin) ||', '|| -(ymax-ymin) ||', 0, 0, 4326),''1BB''::text,1,0)';
+        sql := 'SELECT ST_AddBand(ST_MakeEmptyRaster(1,1,0,0,1,1 , 0, 0, 4326),''1BB''::text,1,0)';
         RETURN QUERY EXECUTE sql;
         RETURN;
     END IF;
+
     sql := '
-    with  empty_raster as (SELECT ST_MakeEmptyRaster('|| width ||', '|| height ||', '|| xmin ||', '|| ymax ||', '|| scalex ||', '|| scaley ||', 0, 0, 4326) as empty) 
-    SELECT st_clip(raster,st_envelope(empty_raster.empty)) 
-    FROM (
-        SELECT st_union(raster) as raster
-        FROM (
-            select 
-                st_asraster(
-                st_intersection('|| watermask_geom_column ||',st_envelope(empty_raster.empty))
-                ,empty_raster.empty
-                ,''1BB''
-                ,1
-                ,0
-                , true
-                ) as raster 
-            FROM '|| watermask_table ||' vector,empty_raster WHERE st_intersects(vector.'|| watermask_geom_column ||',st_envelope(empty_raster.empty))
-            UNION SELECT  empty as raster from empty_raster 
-        )  sub
-    )sub2,empty_raster;';
+    WITH input as (
+        SELECT ST_AddBand(ST_MakeEmptyRaster('|| width ||', '|| height ||', '|| xmin ||', '|| ymax ||', '|| scalex ||', '|| scaley ||', 0, 0, 4326),''1BB''::text,1,0) raster 
+    ),
+    intersected as ( 
+        SELECT 
+        ST_Union(ST_AsRaster(ST_Intersection('|| watermask_geom_column ||',ST_Envelope(raster)),raster,''1BB'',1,0,true)) as raster 
+        FROM '|| watermask_table ||' vector, input
+        WHERE ST_Intersects(vector.'|| watermask_geom_column ||',ST_Envelope(input.raster))
+    )
+    SELECT 
+        ST_MapAlgebra(
+        input.raster
+        , 1
+        , intersected.raster
+        , 1
+        , ''[rast2.val] + [rast1.val]''
+        , ''1BB''
+        , ''FIRST''
+        , NULL
+        , NULL
+        , NULL)
+    FROM 
+        input, intersected 
+    ';
 
     --RAISE NOTICE 'function parameters: xmin: % ymin: % xmax: % ymax: % scalex: % scaley: % watermask_table: % watermask_column % ', xmin,ymin,xmax,ymax,scalex,scaley,watermask_table,watermask_geom_column;
     --RAISE NOTICE 'sql: %',sql;
@@ -71,4 +78,3 @@ END
 $BODY$
 LANGUAGE plpgsql STABLE
 COST 100;
-
