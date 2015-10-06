@@ -23,7 +23,7 @@ def loadTileContent(baseURL, key, headers):
 def copyAGITiles(zooms, bounds):
     count = 0
     fullonly = 0
-    headers = {'Accept': 'application/vnd.quantized-mesh;extensions=watermask'}
+    headers = {'Accept': 'application/vnd.quantized-mesh;extensions=octvertexnormals-watermask,application/octet-stream;q=0.9,*/*;q=0.01'}
     baseURL = 'http://assets.agi.com/stk-terrain/world/'
     bucket = getBucket()
     for bxyz in grid(bounds, zooms, fullonly):
