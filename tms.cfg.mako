@@ -32,25 +32,26 @@ tileMinZ: 8
 tileMaxZ: 17
 
 [8]
-tablename: dhm25_64m
+# Should be replaced with dhm25_256
+tablename: dhm25_128m
 
 [9]
-tablename: bl_128m
+tablename: dhm25_128m
 
 [10]
-tablename: bl_64m
+tablename: dhm25_64m
 
 [11]
-tablename: bl_32m
+tablename: bl_128m
 
 [12]
-tablename: bl_16m
+tablename: bl_64m
 
 [13]
-tablename: bl_8m
+tablename: bl_32m
 
 [14]
-tablename: bl_4m
+tablename: bl_8m
 
 [15]
 tablename: bl_2m
