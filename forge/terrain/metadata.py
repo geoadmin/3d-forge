@@ -46,10 +46,13 @@ class TerrainMetadata:
         self.useGlobalTiles = kwargs.get('useGlobalTiles', False)
         self.baseUrls = kwargs.get('baseUrls',
             ['//3d.geo.admin.ch/1.0.0/ch.swisstopo.terrain.3d_water/default/20151231/4326/{z}/{x}/{y}.terrain'])
+        self.hasLighting = kwargs.get('hasLighting', False)
         self.hasWatermask = kwargs.get('hasWatermask', False)
 
         extensions = []
 
+        if self.hasLighting:
+            extensions.append('octvertexnormals')
         if self.hasWatermask:
             extensions.append('watermask')
 

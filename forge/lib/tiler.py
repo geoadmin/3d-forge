@@ -60,7 +60,7 @@ visibility_timeout = 3600
 def createTileFromQueue(tq):
     pid = os.getpid()
     try:
-        (qName, t0, dbConfigFile, hasWatermask) = tq
+        (qName, t0, dbConfigFile, hasLighting, hasWatermask) = tq
         sqs = getSQS()
         q = sqs.get_queue(qName)
         geodetic = GlobalGeodetic(True)
@@ -87,7 +87,7 @@ def createTileFromQueue(tq):
                 try:
                     tileXYZ = [tiles[i], tiles[i + 1], tiles[i + 2]]
                     tilebounds = geodetic.TileBounds(tileXYZ[0], tileXYZ[1], tileXYZ[2])
-                    createTile((tilebounds, tileXYZ, t0, dbConfigFile, hasWatermask))
+                    createTile((tilebounds, tileXYZ, t0, dbConfigFile, hasLighting, hasWatermask))
                 except Exception as e:
                     logger.error('[%s] Error while processing specific tile %s' % (pid, str(e)), exc_info=True)
 
@@ -104,7 +104,7 @@ def createTile(tile):
     pid = os.getpid()
 
     try:
-        (bounds, tileXYZ, t0, dbConfigFile, hasWatermask) = tile
+        (bounds, tileXYZ, t0, dbConfigFile, hasLighting, hasWatermask) = tile
 
         db = DB(dbConfigFile)
         session = sessionmaker()(bind=db.userEngine)
@@ -154,7 +154,7 @@ def createTile(tile):
             ).filter(model.bboxIntersects(bounds))
 
         watermask = []
-        terrainTopo = TerrainTopology()
+        terrainTopo = TerrainTopology(hasLighting=hasLighting)
         for q in query:
             if hasWatermask:
                 watermask = q.watermask
@@ -219,7 +219,7 @@ def createTile(tile):
 
 def scanTerrain(tMeta, tile, session, tilecount):
     try:
-        (bounds, tileXYZ, t0, dbConfigFile, hasWatermask) = tile
+        (bounds, tileXYZ, t0, dbConfigFile, hasLighting, hasWatermask) = tile
 
         # Get the model according to the zoom level
         model = modelsPyramid.getModelByZoom(tileXYZ[2])
@@ -255,6 +255,7 @@ class Tiles:
         self.tileMinZ = int(tmsConfig.get('Zooms', 'tileMinZ'))
         self.tileMaxZ = int(tmsConfig.get('Zooms', 'tileMaxZ'))
 
+        self.hasLighting = int(tmsConfig.get('Extensions', 'lighting'))
         self.hasWatermask = int(tmsConfig.get('Extensions', 'watermask'))
 
         self.dbConfigFile = dbConfigFile
@@ -263,7 +264,7 @@ class Tiles:
         zRange = range(self.tileMinZ, self.tileMaxZ + 1)
 
         for bounds, tileXYZ in grid(self.bounds, zRange, self.fullonly):
-            yield (bounds, tileXYZ, self.t0, self.dbConfigFile, self.hasWatermask)
+            yield (bounds, tileXYZ, self.t0, self.dbConfigFile, self.hasLighting, self.hasWatermask)
 
 
 class QueueTiles:
@@ -274,11 +275,12 @@ class QueueTiles:
         self.qName = qName
         self.num = num
 
+        self.hasLighting = int(tmsConfig.get('Extensions', 'lighting'))
         self.hasWatermask == int(tmsConfig.get('Extensions', 'watermask'))
 
     def __iter__(self):
         for i in range(0, self.num):
-            yield (self.qName, self.t0, self.dbConfigFile, self.hasWatermask)
+            yield (self.qName, self.t0, self.dbConfigFile, self.hasLighting, self.hasWatermask)
 
 
 class TilerManager:
@@ -443,7 +445,8 @@ class TilerManager:
         tiles = Tiles(self.dbConfigFile, self.tmsConfig, t0)
         tMeta = TerrainMetadata(
             bounds=tiles.bounds, minzoom=tiles.tileMinZ, maxzoom=tiles.tileMaxZ,
-            useGlobalTiles=True, hasWatermask=tiles.hasWatermask, baseUrls=baseUrls)
+            useGlobalTiles=True, hasLighting=tiles.hasLighting, hasWatermask=tiles.hasWatermask,
+            baseUrls=baseUrls)
 
         try:
             tilecount = 1

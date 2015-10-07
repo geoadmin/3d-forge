@@ -10,7 +10,6 @@ from forge.lib.bounding_sphere import BoundingSphere
 import forge.lib.horizon_occlusion_point as occ
 from forge.lib.oct_encoding import octEncode, octDecode
 from forge.lib.helpers import zigZagDecode, zigZagEncode, transformCoordinate
-from forge.lib.llh_ecef import LLH2ECEF
 from forge.lib.decoders import unpackEntry, unpackIndices, decodeIndices, packEntry, packIndices, encodeIndices
 
 MAX = 32767.0
@@ -197,6 +196,8 @@ class TerrainTile:
 
     def fromFile(self, filePath, west, east, south, north, hasLighting=False, hasWatermask=False):
         self.__init__(west=west, east=east, south=south, north=north)
+        self.hasLighting = hasLighting
+        self.hasWatermask = hasWatermask
         with open(filePath, 'rb') as f:
             # Header
             for k, v in TerrainTile.quantizedMeshHeader.iteritems():
@@ -243,7 +244,7 @@ class TerrainTile:
             northIndicesCount = unpackEntry(f, meta['northVertexCount'])
             self.northI = unpackIndices(f, northIndicesCount, meta['northIndices'])
 
-            if hasLighting:
+            if self.hasLighting:
                 # One byte of padding
                 # Light extension header
                 meta = TerrainTile.ExtensionHeader
@@ -259,7 +260,7 @@ class TerrainTile:
                         y = unpackEntry(f, TerrainTile.OctEncodedVertexNormals['xy'])
                         self.vLight.append(octDecode(x, y))
 
-            if hasWatermask:
+            if self.hasWatermask:
                 meta = TerrainTile.ExtensionHeader
                 extensionId = unpackEntry(f, meta['extensionId'])
                 if extensionId == 2:
@@ -347,6 +348,7 @@ class TerrainTile:
 
         # Extension header for light
         if len(self.vLight) > 0:
+            self.hasLighting = True
             meta = TerrainTile.ExtensionHeader
             # Extension header ID is 1 for lightening
             f.write(packEntry(meta['extensionId'], 1))
@@ -364,6 +366,7 @@ class TerrainTile:
                 f.write(packEntry(metaV['xy'], y))
 
         if len(self.watermask) > 0:
+            self.hasWatermask = True
             # Extension header ID is 2 for lightening
             meta = TerrainTile.ExtensionHeader
             f.write(packEntry(meta['extensionId'], 2))
@@ -443,39 +446,24 @@ class TerrainTile:
             self._south = topology.minLat
             self._north = topology.maxLat
 
-        llh2ecef = lambda x: LLH2ECEF(x[0], x[1], x[2])
-        ecefCoords = map(llh2ecef, topology.vertices)
         bSphere = BoundingSphere()
-        bSphere.fromPoints(ecefCoords)
+        bSphere.fromPoints(topology.cartesianVertices)
 
-        ecefMinX = float('inf')
-        ecefMinY = float('inf')
-        ecefMinZ = float('inf')
-        ecefMaxX = float('-inf')
-        ecefMaxY = float('-inf')
-        ecefMaxZ = float('-inf')
+        ecefMinX = topology.ecefMinX
+        ecefMinY = topology.ecefMinY
+        ecefMinZ = topology.ecefMinZ
+        ecefMaxX = topology.ecefMaxX
+        ecefMaxY = topology.ecefMaxY
+        ecefMaxZ = topology.ecefMaxZ
 
-        for coord in ecefCoords:
-            if coord[0] < ecefMinX:
-                ecefMinX = coord[0]
-            if coord[1] < ecefMinY:
-                ecefMinY = coord[1]
-            if coord[2] < ecefMinZ:
-                ecefMinZ = coord[2]
-            if coord[0] > ecefMaxX:
-                ecefMaxX = coord[0]
-            if coord[1] > ecefMaxY:
-                ecefMaxY = coord[1]
-            if coord[2] > ecefMaxZ:
-                ecefMaxZ = coord[2]
-
+        # Center of the bounding box 3d (TODO verify)
         centerCoords = [
             ecefMinX + (ecefMaxX - ecefMinX) * 0.5,
             ecefMinY + (ecefMaxY - ecefMinY) * 0.5,
             ecefMinZ + (ecefMaxZ - ecefMinZ) * 0.5
         ]
 
-        occlusionPCoords = occ.fromPoints(ecefCoords, bSphere)
+        occlusionPCoords = occ.fromPoints(topology.cartesianVertices, bSphere)
 
         for k, v in TerrainTile.quantizedMeshHeader.iteritems():
             if k == 'centerX':
@@ -540,3 +528,7 @@ class TerrainTile:
                 self.southI.append(indice)
             elif lat == self._north and indice not in self.northI:
                 self.northI.append(indice)
+
+        if topology.hasLighting:
+            self.hasLighting = True
+            self.vLight = topology.verticesUnitVectors
