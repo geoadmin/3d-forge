@@ -270,7 +270,8 @@ class TerrainTile:
                         if len(row) == 256:
                             self.watermask.append(row)
                             row = []
-                    self.watermask.append(row)
+                    if len(row) > 0:
+                        self.watermask.append(row)
 
             data = f.read(1)
             if data:
