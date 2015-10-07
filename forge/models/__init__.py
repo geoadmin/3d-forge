@@ -111,7 +111,7 @@ class Vector(object):
         # ST_DumpValues(Raster, Band Number, True -> returns None and False -> returns numerical vals)
         return func.ST_DumpValues(bgdi_watermask_rasterize(
             wkbGeometry, width, height,
-            '.'.join((cls.__table_args__['schema'], cls.__tablename__)), geomColumn.name), 1, True)
+            '.'.join((cls.__table_args__['schema'], cls.__tablename__)), geomColumn.name), 1, False)
 
 
 """

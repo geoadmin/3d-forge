@@ -375,18 +375,18 @@ class TerrainTile:
                 if nbRows != 256:
                     raise Exception('Unexpected number of rows for the watermask: %s' % nbRows)
                 # From North to South
-                for i in xrange(0, nbRows - 1):
+                for i in xrange(0, nbRows):
                     x = self.watermask[i]
                     if len(x) != 256:
                         raise Exception('Unexpected number of columns for the watermask: %s' % len(x))
                     # From West to East
                     for y in x:
-                        val = 255 if y is not None else 0
-                        f.write(packEntry(TerrainTile.WaterMask['xy'], val))
+                        f.write(packEntry(TerrainTile.WaterMask['xy'], int(y)))
             else:
                 f.write(packEntry(meta['extensionLength'], 1))
-                val = 255 if self.watermask[0][0] is not None else 0
-                f.write(packEntry(TerrainTile.WaterMask['xy'], val))
+                if self.watermask[0][0] is None:
+                    self.watermask[0][0] = 0
+                f.write(packEntry(TerrainTile.WaterMask['xy'], int(self.watermask[0][0])))
 
     def toShapefile(self, filePath, epsg=4326):
         if not filePath.endswith('.shp'):

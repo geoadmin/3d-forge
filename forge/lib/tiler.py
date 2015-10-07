@@ -153,7 +153,7 @@ def createTile(tile):
                 clippedGeometry.label('clip')
             ).filter(model.bboxIntersects(bounds))
 
-        watermask = None
+        watermask = []
         terrainTopo = TerrainTopology()
         for q in query:
             if hasWatermask:
