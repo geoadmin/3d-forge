@@ -189,7 +189,8 @@ def createTile(tile):
             # Bytes manipulation and compression
             fileObject = terrainFormat.toStringIO()
             compressedFile = gzipFileObject(fileObject)
-            writeToS3(bucket, bucketKey, compressedFile, model.__tablename__)
+            writeToS3(bucket, bucketKey, compressedFile, model.__tablename__,
+                contentType=terrainFormat.getContentType())
             tend = time.time()
             tilecount.value += 1
             val = tilecount.value

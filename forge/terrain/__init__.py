@@ -111,6 +111,7 @@ class TerrainTile:
         # Extensions
         self.vLight = []
         self.watermask = kwargs.get('watermask', [])
+        self.hasWatermask = kwargs.get('hasWatermask', bool(len(self.watermask) > 0))
 
         self.header = OrderedDict()
         for k, v in TerrainTile.quantizedMeshHeader.iteritems():
@@ -147,6 +148,17 @@ class TerrainTile:
 
         msg += '\nNumber of triangles: %s' % (len(self.indices) / 3)
         return msg
+
+    def getContentType(self):
+        baseContent = 'application/vnd.quantized-mesh'
+        if self.hasLighting and self.hasWatermask:
+            return baseContent + ';extensions=octvertexnormals-watermask'
+        elif self.hasLighting:
+            return baseContent + ';extensions=octvertexnormals'
+        elif self.hasWatermask:
+            return baseContent + ';extensions=watermask'
+        else:
+            return baseContent
 
     def getVerticesCoordinates(self, epsg=4326):
         coordinates = []
@@ -529,6 +541,6 @@ class TerrainTile:
             elif lat == self._north and indice not in self.northI:
                 self.northI.append(indice)
 
-        if topology.hasLighting:
-            self.hasLighting = True
+        self.hasLighting = topology.hasLighting
+        if self.hasLighting:
             self.vLight = topology.verticesUnitVectors
