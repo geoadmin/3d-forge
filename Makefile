@@ -47,9 +47,9 @@ help:
 	@echo "- tmsstats           Provide statistics about the TMS pyramid"
 	@echo "- tmsstatsnodb       Provide statistics about the TMS pyramid, without db stats"
 	@echo "- tmscreatequeue     Creates AWS SQS queue with given settings (all tiles)"
-	@echo "- tmstmsdeletequeue  Deletes current AWS SQS queue (you loose everything)"
-	@echo "- tmstmsqueuestats   Get stats of AWS SQS queue"
-	@echo "- tmsttmscreatetiles Create tilses using the AWS SQS queue"
+	@echo "- tmsdeletequeue     Deletes current AWS SQS queue (you loose everything)"
+	@echo "- tmsqueuestats      Get stats of AWS SQS queue"
+	@echo "- tmscreatetiles     Create tilses using the AWS SQS queue"
 	@echo "- clean              Clean all generated files and folders"
 	@echo
 	@echo "Variables:"
