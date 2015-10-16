@@ -16,7 +16,8 @@ import forge.lib.cartesian2d as c2d
 from forge.terrain import TerrainTile
 from forge.terrain.metadata import TerrainMetadata
 from forge.terrain.topology import TerrainTopology
-from forge.models.tables import modelsPyramid, Lakes
+from forge.models.tables import modelsPyramid
+from forge.lib.tiles import Tiles, QueueTiles
 from forge.lib.boto_conn import getBucket, writeToS3, getSQS, writeSQSMessage
 from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate, createBBox
 from forge.lib.global_geodetic import GlobalGeodetic
@@ -30,25 +31,6 @@ loggingConfig = ConfigParser.RawConfigParser()
 loggingConfig.read('logging.cfg')
 logger = getLogger(loggingConfig, __name__, suffix=timestamp())
 
-
-def isInside(tile, bounds):
-    if tile[0] >= bounds[0] and tile[1] >= bounds[1] and tile[2] <= bounds[2] and tile[3] <= bounds[3]:
-        return True
-    return False
-
-
-def grid(bounds, zoomLevels, fullonly):
-    geodetic = GlobalGeodetic(True)
-
-    for tileZ in zoomLevels:
-        tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], tileZ)
-        tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], tileZ)
-
-        for tileX in xrange(tileMinX, tileMaxX + 1):
-            for tileY in xrange(tileMinY, tileMaxY + 1):
-                tilebounds = geodetic.TileBounds(tileX, tileY, tileZ)
-                if fullonly == 0 or isInside(tilebounds, bounds):
-                    yield (tilebounds, (tileX, tileY, tileZ))
 
 # shared counter
 tilecount = multiprocessing.Value('i', 0)
@@ -112,6 +94,13 @@ def createTile(tile):
 
         # Get the model according to the zoom level
         model = modelsPyramid.getModelByZoom(tileXYZ[2])
+        lakeModel = modelsPyramid.getLakeModelByZoom(tileXYZ[2])
+
+        watermask = []
+        if hasWatermask:
+            query = session.query(lakeModel.watermaskRasterize(bounds).label('watermask'))
+            for q in query:
+                watermask = q.watermask
 
         # Get the interpolated point at the 4 corners
         # 0: (minX, minY), 1: (minX, maxY), 2: (maxX, maxY), 3: (maxX, minY)
@@ -141,23 +130,14 @@ def createTile(tile):
 
         # Clip using the bounds
         clippedGeometry = model.bboxClippedGeom(bounds)
-        if hasWatermask:
-            query = session.query(
-                model.id,
-                clippedGeometry.label('clip'),
-                Lakes.watermaskRasterize(bounds).label('watermask')
-            ).filter(model.bboxIntersects(bounds))
-        else:
-            query = session.query(
-                model.id,
-                clippedGeometry.label('clip')
-            ).filter(model.bboxIntersects(bounds))
+        query = session.query(
+            model.id,
+            clippedGeometry.label('clip')
+        ).filter(model.bboxIntersects(bounds))
 
         watermask = []
         terrainTopo = TerrainTopology(hasLighting=hasLighting)
         for q in query:
-            if hasWatermask:
-                watermask = q.watermask
             coords = list(to_shape(q.clip).exterior.coords)
             if q.id in cornerPts:
                 pt = cornerPts[q.id][0]
@@ -241,49 +221,6 @@ def scanTerrain(tMeta, tile, session, tilecount):
     return tMeta
 
 
-class Tiles:
-
-    def __init__(self, dbConfigFile, tmsConfig, t0):
-        self.t0 = t0
-
-        self.minLon = float(tmsConfig.get('Extent', 'minLon'))
-        self.maxLon = float(tmsConfig.get('Extent', 'maxLon'))
-        self.minLat = float(tmsConfig.get('Extent', 'minLat'))
-        self.maxLat = float(tmsConfig.get('Extent', 'maxLat'))
-        self.fullonly = int(tmsConfig.get('Extent', 'fullonly'))
-        self.bounds = (self.minLon, self.minLat, self.maxLon, self.maxLat)
-
-        self.tileMinZ = int(tmsConfig.get('Zooms', 'tileMinZ'))
-        self.tileMaxZ = int(tmsConfig.get('Zooms', 'tileMaxZ'))
-
-        self.hasLighting = int(tmsConfig.get('Extensions', 'lighting'))
-        self.hasWatermask = int(tmsConfig.get('Extensions', 'watermask'))
-
-        self.dbConfigFile = dbConfigFile
-
-    def __iter__(self):
-        zRange = range(self.tileMinZ, self.tileMaxZ + 1)
-
-        for bounds, tileXYZ in grid(self.bounds, zRange, self.fullonly):
-            yield (bounds, tileXYZ, self.t0, self.dbConfigFile, self.hasLighting, self.hasWatermask)
-
-
-class QueueTiles:
-
-    def __init__(self, qName, dbConfigFile, tmsConfig, t0, num):
-        self.t0 = t0
-        self.dbConfigFile = dbConfigFile
-        self.qName = qName
-        self.num = num
-
-        self.hasLighting = int(tmsConfig.get('Extensions', 'lighting'))
-        self.hasWatermask == int(tmsConfig.get('Extensions', 'watermask'))
-
-    def __iter__(self):
-        for i in range(0, self.num):
-            yield (self.qName, self.t0, self.dbConfigFile, self.hasLighting, self.hasWatermask)
-
-
 class TilerManager:
 
     def __init__(self, dbConfigFile, tmsConfigFile):
@@ -360,8 +297,8 @@ class TilerManager:
             messagecount = 0
             msg = ''
             for tile in tiles:
-                (bounds, tileXYZ, t0, dbConfigFile) = tile
-                if not msg:
+                (bounds, tileXYZ, t0, dbConfigFile, hasLighting, hasWatermask) = tile
+                if msg:
                     msg += ','
                 msg += ('%s,%s,%s' % (str(tileXYZ[0]), str(tileXYZ[1]), str(tileXYZ[2])))
                 tcount += 1
@@ -371,7 +308,7 @@ class TilerManager:
                     tcount = 0
                     msg = ''
                 totalcount = totalcount + 1
-            if not msg:
+            if msg:
                 messagecount += 1
                 writeSQSMessage(q, msg)
         except Exception as e:

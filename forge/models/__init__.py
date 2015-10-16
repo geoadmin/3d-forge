@@ -22,6 +22,10 @@ class bgdi_watermask_rasterize(FunctionElement):
     name = "bgdi_watermask_rasterize"
 
 
+class create_simplified_geom_table(FunctionElement):
+    name = "create_simplified_geom_table"
+
+
 @compiles(_interpolate_height_on_plane)
 def _compile_interpolate_height(element, compiler, **kw):
     return "_interpolate_height_on_plane(%s)" % compiler.process(element.clauses)
@@ -30,6 +34,11 @@ def _compile_interpolate_height(element, compiler, **kw):
 @compiles(bgdi_watermask_rasterize)
 def _compile_watermask(element, compiler, **kw):
     return "bgdi_watermask_rasterize(%s)" % compiler.process(element.clauses)
+
+
+@compiles(create_simplified_geom_table)
+def _compile_create_simplified_geom_table(element, compiler, **kw):
+    return "create_simplified_geom_table(%s)" % compiler.process(element.clauses)
 
 
 class Vector(object):
