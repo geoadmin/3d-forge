@@ -6,7 +6,6 @@ import ConfigParser
 import multiprocessing
 import os
 from sqlalchemy.sql import and_
-from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 from geoalchemy2 import WKBElement
 from geoalchemy2.shape import to_shape
@@ -89,111 +88,109 @@ def createTile(tile):
         (bounds, tileXYZ, t0, dbConfigFile, hasLighting, hasWatermask) = tile
 
         db = DB(dbConfigFile)
-        session = sessionmaker()(bind=db.userEngine)
-        bucket = getBucket()
+        with db.userSession() as session:
+            bucket = getBucket()
 
-        # Get the model according to the zoom level
-        model = modelsPyramid.getModelByZoom(tileXYZ[2])
-        lakeModel = modelsPyramid.getLakeModelByZoom(tileXYZ[2])
+            # Get the model according to the zoom level
+            model = modelsPyramid.getModelByZoom(tileXYZ[2])
+            lakeModel = modelsPyramid.getLakeModelByZoom(tileXYZ[2])
 
-        watermask = []
-        if hasWatermask:
-            query = session.query(lakeModel.watermaskRasterize(bounds).label('watermask'))
+            watermask = []
+            if hasWatermask:
+                query = session.query(lakeModel.watermaskRasterize(bounds).label('watermask'))
+                for q in query:
+                    watermask = q.watermask
+
+            # Get the interpolated point at the 4 corners
+            # 0: (minX, minY), 1: (minX, maxY), 2: (maxX, maxY), 3: (maxX, minY)
+            pts = [
+                (bounds[0], bounds[1], 0),
+                (bounds[0], bounds[3], 0),
+                (bounds[2], bounds[3], 0),
+                (bounds[2], bounds[1], 0)
+            ]
+
+            def toSubQuery(x):
+                return session.query(model.id, model.interpolateHeightOnPlane(pts[x])).filter(
+                    and_(model.bboxIntersects(createBBox(pts[x], 0.01)), model.pointIntersects(pts[x]))).subquery('p%s' % x)
+            subqueries = [toSubQuery(i) for i in range(0, len(pts))]
+
+            # Get the height of the corner points as postgis cannot properly clip
+            # a polygon
+            cornerPts = {}
+            step = 2
+            j = step
+            query = session.query(*subqueries)
             for q in query:
-                watermask = q.watermask
+                for i in range(0, len(q), step):
+                    sub = q[i:j]
+                    j += step
+                    cornerPts[sub[0]] = list(to_shape(WKBElement(sub[1])).coords)
 
-        # Get the interpolated point at the 4 corners
-        # 0: (minX, minY), 1: (minX, maxY), 2: (maxX, maxY), 3: (maxX, minY)
-        pts = [
-            (bounds[0], bounds[1], 0),
-            (bounds[0], bounds[3], 0),
-            (bounds[2], bounds[3], 0),
-            (bounds[2], bounds[1], 0)
-        ]
+            # Clip using the bounds
+            clippedGeometry = model.bboxClippedGeom(bounds)
+            query = session.query(
+                model.id,
+                clippedGeometry.label('clip')
+            ).filter(model.bboxIntersects(bounds))
 
-        def toSubQuery(x):
-            return session.query(model.id, model.interpolateHeightOnPlane(pts[x])).filter(
-                and_(model.bboxIntersects(createBBox(pts[x], 0.01)), model.pointIntersects(pts[x]))).subquery('p%s' % x)
-        subqueries = [toSubQuery(i) for i in range(0, len(pts))]
+            watermask = []
+            terrainTopo = TerrainTopology(hasLighting=hasLighting)
+            for q in query:
+                coords = list(to_shape(q.clip).exterior.coords)
+                if q.id in cornerPts:
+                    pt = cornerPts[q.id][0]
+                    for i in range(0, len(coords)):
+                        c = coords[i]
+                        if c[0] == pt[0] and c[1] == pt[1]:
+                            coords[i] = [c[0], c[1], pt[2]]
 
-        # Get the height of the corner points as postgis cannot properly clip
-        # a polygon
-        cornerPts = {}
-        step = 2
-        j = step
-        query = session.query(*subqueries)
-        for q in query:
-            for i in range(0, len(q), step):
-                sub = q[i:j]
-                j += step
-                cornerPts[sub[0]] = list(to_shape(WKBElement(sub[1])).coords)
+                try:
+                    rings = processRingCoordinates(coords)
+                except Exception as e:
+                    msg = '[%s] --------- ERROR ------- occured while collapsing non triangular shapes\n' % pid
+                    msg += '[%s]: %s' % (pid, e)
+                    logger.error(msg, exc_info=True)
+                    raise Exception(e)
+                # Redundant coord has been remove already
+                for vertices in rings:
+                    terrainTopo.addVertices(vertices)
 
-        # Clip using the bounds
-        clippedGeometry = model.bboxClippedGeom(bounds)
-        query = session.query(
-            model.id,
-            clippedGeometry.label('clip')
-        ).filter(model.bboxIntersects(bounds))
+            bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
+            verticesLength = len(terrainTopo.vertices)
+            # Skip empty tiles for now, we should instead write an empty tile to S3
+            if verticesLength > 0:
+                terrainTopo.create()
+                # Prepare terrain tile
+                terrainFormat = TerrainTile(watermask=watermask)
+                terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
 
-        watermask = []
-        terrainTopo = TerrainTopology(hasLighting=hasLighting)
-        for q in query:
-            coords = list(to_shape(q.clip).exterior.coords)
-            if q.id in cornerPts:
-                pt = cornerPts[q.id][0]
-                for i in range(0, len(coords)):
-                    c = coords[i]
-                    if c[0] == pt[0] and c[1] == pt[1]:
-                        coords[i] = [c[0], c[1], pt[2]]
+                # Bytes manipulation and compression
+                fileObject = terrainFormat.toStringIO()
+                compressedFile = gzipFileObject(fileObject)
+                writeToS3(bucket, bucketKey, compressedFile, model.__tablename__,
+                    contentType=terrainFormat.getContentType())
+                tend = time.time()
+                tilecount.value += 1
+                val = tilecount.value
+                total = val + skipcount.value
+                if val % 10 == 0:
+                    logger.info('[%s] Last tile %s (%s rings). %s to write %s tiles. (total processed: %s)' % (
+                        pid, bucketKey, verticesLength, str(datetime.timedelta(seconds=tend - t0)), val, total))
 
-            try:
-                rings = processRingCoordinates(coords)
-            except Exception as e:
-                msg = '[%s] --------- ERROR ------- occured while collapsing non triangular shapes\n' % pid
-                msg += '[%s]: %s' % (pid, e)
-                logger.error(msg, exc_info=True)
-                raise Exception(e)
-            # Redundant coord has been remove already
-            for vertices in rings:
-                terrainTopo.addVertices(vertices)
-
-        bucketKey = '%s/%s/%s.terrain' % (tileXYZ[2], tileXYZ[0], tileXYZ[1])
-        verticesLength = len(terrainTopo.vertices)
-        # Skip empty tiles for now, we should instead write an empty tile to S3
-        if verticesLength > 0:
-            terrainTopo.create()
-            # Prepare terrain tile
-            terrainFormat = TerrainTile(watermask=watermask)
-            terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
-
-            # Bytes manipulation and compression
-            fileObject = terrainFormat.toStringIO()
-            compressedFile = gzipFileObject(fileObject)
-            writeToS3(bucket, bucketKey, compressedFile, model.__tablename__,
-                contentType=terrainFormat.getContentType())
-            tend = time.time()
-            tilecount.value += 1
-            val = tilecount.value
-            total = val + skipcount.value
-            if val % 10 == 0:
-                logger.info('[%s] Last tile %s (%s rings). %s to write %s tiles. (total processed: %s)' % (
-                    pid, bucketKey, verticesLength, str(datetime.timedelta(seconds=tend - t0)), val, total))
-
-        else:
-            skipcount.value += 1
-            val = skipcount.value
-            total = val + tilecount.value
-            # One should write an empyt tile
-            logger.info('[%s] Skipping %s %s because no features found for this tile (%s skipped from %s total)' % (
-                pid, bucketKey, bounds, val, total))
+            else:
+                skipcount.value += 1
+                val = skipcount.value
+                total = val + tilecount.value
+                # One should write an empyt tile
+                logger.info('[%s] Skipping %s %s because no features found for this tile (%s skipped from %s total)' % (
+                    pid, bucketKey, bounds, val, total))
 
     except Exception as e:
         logger.error(e, exc_info=True)
         raise Exception(e)
     finally:
-        if session is not None:
-            session.close_all()
-            db.userEngine.dispose()
+        db.userEngine.dispose()
 
     return 0
 
@@ -379,7 +376,6 @@ class TilerManager:
         ]
 
         db = DB('database.cfg')
-        session = sessionmaker()(bind=db.userEngine)
         tiles = Tiles(self.dbConfigFile, self.tmsConfig, t0)
         tMeta = TerrainMetadata(
             bounds=tiles.bounds, minzoom=tiles.tileMinZ, maxzoom=tiles.tileMaxZ,
@@ -387,20 +383,20 @@ class TilerManager:
             baseUrls=baseUrls)
 
         try:
-            tilecount = 1
-            for tile in tiles:
-                tMeta = scanTerrain(tMeta, tile, session, tilecount)
-                tilecount += 1
+            with db.userSession() as session:
+                tilecount = 1
+                for tile in tiles:
+                    tMeta = scanTerrain(tMeta, tile, session, tilecount)
+                    tilecount += 1
 
-            tend = time.time()
-            logger.info('It took %s to scan %s tiles' % (
-                str(datetime.timedelta(seconds=tend - t0)), tilecount))
+                tend = time.time()
+                logger.info('It took %s to scan %s tiles' % (
+                    str(datetime.timedelta(seconds=tend - t0)), tilecount))
         except Exception as e:
             logger.error('An error occured during layer.json creation')
             logger.error('%s' % e, exc_info=True)
             raise Exception(e)
         finally:
-            session.close_all()
             db.userEngine.dispose()
 
         with open('.tmp/layer.json', 'w') as f:
@@ -417,43 +413,49 @@ class TilerManager:
         zooms = range(tiles.tileMinZ, tiles.tileMaxZ + 1)
 
         db = DB('database.cfg')
-        self.DBSession = scoped_session(sessionmaker(bind=db.userEngine))
-
-        for i in xrange(0, len(zooms)):
-            zoom = zooms[i]
-            model = modelsPyramid.getModelByZoom(zoom)
-            nbObjects = None
-            if withDb:
-                nbObjects = self.DBSession.query(model).filter(model.bboxIntersects(bounds)).count()
-            tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], zoom)
-            tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], zoom)
-            # Fast approach, but might not be fully correct
-            if tiles.fullonly == 1:
-                tileMinX += 1
-                tileMinY += 1
-                tileMaxX -= 1
-                tileMaxY -= 1
-            tileBounds = geodetic.TileBounds(tileMinX, tileMinY, zoom)
-            xCount = tileMaxX - tileMinX + 1
-            yCount = tileMaxY - tileMinY + 1
-            nbTiles = xCount * yCount
-            total += nbTiles
-            pointA = transformCoordinate('POINT(%s %s)' % (tileBounds[0], tileBounds[1]), 4326, 21781).GetPoints()[0]
-            pointB = transformCoordinate('POINT(%s %s)' % (tileBounds[2], tileBounds[3]), 4326, 21781).GetPoints()[0]
-            length = c2d.distance(pointA, pointB)
-            if tiles.fullonly == 1:
-                msg += 'WARNING: stats are approximative because fullonly is activated!\n'
-            msg += 'At zoom %s:\n' % zoom
-            msg += 'We expect %s tiles overall\n' % nbTiles
-            msg += 'Min X is %s, Max X is %s\n' % (tileMinX, tileMaxX)
-            msg += '%s columns over X\n' % xCount
-            msg += 'Min Y is %s, Max Y is %s\n' % (tileMinY, tileMaxY)
-            msg += '%s rows over Y\n' % yCount
-            msg += '\n'
-            msg += 'A tile side is around %s meters long\n' % int(round(length))
-            if nbTiles > 0 and nbObjects is not None:
-                msg += 'We have an average of about %s triangles per tile\n' % int(round(nbObjects / nbTiles))
-            msg += '\n'
+        try:
+            with db.userSession() as session:
+                for i in xrange(0, len(zooms)):
+                    zoom = zooms[i]
+                    model = modelsPyramid.getModelByZoom(zoom)
+                    nbObjects = None
+                    if withDb:
+                        nbObjects = session.query(model).filter(model.bboxIntersects(bounds)).count()
+                    tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], zoom)
+                    tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], zoom)
+                    # Fast approach, but might not be fully correct
+                    if tiles.fullonly == 1:
+                        tileMinX += 1
+                        tileMinY += 1
+                        tileMaxX -= 1
+                        tileMaxY -= 1
+                    tileBounds = geodetic.TileBounds(tileMinX, tileMinY, zoom)
+                    xCount = tileMaxX - tileMinX + 1
+                    yCount = tileMaxY - tileMinY + 1
+                    nbTiles = xCount * yCount
+                    total += nbTiles
+                    pointA = transformCoordinate('POINT(%s %s)' % (tileBounds[0], tileBounds[1]), 4326, 21781).GetPoints()[0]
+                    pointB = transformCoordinate('POINT(%s %s)' % (tileBounds[2], tileBounds[3]), 4326, 21781).GetPoints()[0]
+                    length = c2d.distance(pointA, pointB)
+                    if tiles.fullonly == 1:
+                        msg += 'WARNING: stats are approximative because fullonly is activated!\n'
+                    msg += 'At zoom %s:\n' % zoom
+                    msg += 'We expect %s tiles overall\n' % nbTiles
+                    msg += 'Min X is %s, Max X is %s\n' % (tileMinX, tileMaxX)
+                    msg += '%s columns over X\n' % xCount
+                    msg += 'Min Y is %s, Max Y is %s\n' % (tileMinY, tileMaxY)
+                    msg += '%s rows over Y\n' % yCount
+                    msg += '\n'
+                    msg += 'A tile side is around %s meters long\n' % int(round(length))
+                    if nbTiles > 0 and nbObjects is not None:
+                        msg += 'We have an average of about %s triangles per tile\n' % int(round(nbObjects / nbTiles))
+                    msg += '\n'
+        except Exception as e:
+            logger.error('An error occured during statistics collection')
+            logger.error('%s' % e, exc_info=True)
+            raise Exception(e)
+        finally:
+            db.userEngine.dispose()
 
         return (total, msg)
 
