@@ -3,6 +3,7 @@
 import os
 import datetime
 import time
+import math
 import subprocess
 import sys
 import ConfigParser
@@ -13,10 +14,14 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.pool import NullPool
 from contextlib import contextmanager
 
+import forge.lib.cartesian2d as c2d
+from forge.models import create_simplified_geom_table
+from forge.lib.tiles import Tiles
+from forge.lib.global_geodetic import GlobalGeodetic
 from forge.models.tables import modelsPyramid, Lakes
 from forge.lib.logs import getLogger
 from forge.lib.shapefile_utils import ShpToGDALFeatures
-from forge.lib.helpers import BulkInsert, timestamp, cleanup
+from forge.lib.helpers import BulkInsert, timestamp, cleanup, transformCoordinate
 from forge.lib.poolmanager import PoolManager
 
 
@@ -60,7 +65,7 @@ def reprojectShp(shpFilePath, args):
             inFile  = shpFilePath,
             outFile = outFile,
             err     = e
-        ))
+        ), exc_info=True)
         raise Exception(e)
 
     # TODO new version has error codes this can now be changed
@@ -116,7 +121,7 @@ def populateFeatures(args):
         bulk.commit()
         logger.info('[%s]: Commit %s features for %s.' % (pid, count, shpFile))
     except Exception as e:
-        logger.error(e)
+        logger.error(e, exc_info=True)
         raise Exception(e)
     finally:
         if session is not None:
@@ -241,7 +246,7 @@ class DB:
                 logger.error('Could not create user %(role)s: %(err)s' % dict(
                     role=self.databaseConf.user,
                     err=str(e)
-                ))
+                ), exc_info=True)
 
     def createDatabase(self):
         logger.info('Action: createDatabase()')
@@ -258,7 +263,7 @@ class DB:
                     name=self.databaseConf.name,
                     role=self.databaseConf.user,
                     err=str(e)
-                ))
+                ), exc_info=True)
 
         with self.adminConnection() as conn:
             try:
@@ -274,7 +279,7 @@ class DB:
                     name=self.databaseConf.name,
                     role=self.databaseConf.user,
                     err=str(e)
-                ))
+                ), exc_info=True)
 
     def setupDatabase(self):
         logger.info('Action: setupDatabase()')
@@ -308,7 +313,7 @@ class DB:
                     logger.error('Could not add custom functions %s to the database: %(err)s' % dict(
                         fileName=fileName,
                         err=str(e)
-                    ))
+                    ), exc_info=True)
                     logger.error(command)
             else:
                 with self.adminConnection() as conn:
@@ -327,7 +332,7 @@ class DB:
                         except Exception as e:
                             logger.error('Could not install postgis 2.1 legacy functions to the database: %(err)s' % dict(
                                 err=str(e)
-                            ))
+                            ), exc_info=True)
                             logger.error(command)
 
         del os.environ['PGPASSWORD']
@@ -386,31 +391,55 @@ class DB:
         logger.info('Action: populateLakes()')
 
         # For now we never reproject lakes
-        engine = sqlalchemy.create_engine(self.userEngine.url)
-        session = scoped_session(sessionmaker(bind=engine))
-        shpFile = self.config.get('Data', 'lakes')
+        with self.userSession() as session:
+            shpFile = self.config.get('Data', 'lakes')
 
-        if not os.path.exists(shpFile):
-            logger.error('Shapefile %s does not exists' % (shpFile))
-            sys.exit(1)
+            if not os.path.exists(shpFile):
+                logger.error('Shapefile %s does not exists' % (shpFile))
+                sys.exit(1)
 
-        count = 1
-        shp = ShpToGDALFeatures(shpFile)
-        logger.info('Processing %s' % (shpFile))
-        bulk = BulkInsert(Lakes, session, withAutoCommit=1000)
+            count = 1
+            shp = ShpToGDALFeatures(shpFile)
+            logger.info('Processing %s' % (shpFile))
+            bulk = BulkInsert(Lakes, session, withAutoCommit=1000)
 
-        for feature in shp.getFeatures():
-            polygon = feature.GetGeometryRef()
-            # Force 2D for lakes
-            polygon.FlattenTo2D()
-            # add shapefile path to dict
-            # self.shpFilePath
-            bulk.add(dict(
-                the_geom = WKTElement(polygon.ExportToWkt(), 4326)
-            ))
-            count += 1
-        bulk.commit()
-        logger.info('Commit %s features for %s.' % (count, shpFile))
+            for feature in shp.getFeatures():
+                polygon = feature.GetGeometryRef()
+                # Force 2D for lakes
+                polygon.FlattenTo2D()
+                # add shapefile path to dict
+                # self.shpFilePath
+                bulk.add(dict(
+                    the_geom = WKTElement(polygon.ExportToWkt(), 4326)
+                ))
+                count += 1
+            bulk.commit()
+            logger.info('Commit %s features for %s.' % (count, shpFile))
+            # Once all features have been commited, start creating all
+            # the simplified versions of the lakes
+            logger.info('Simplifying lakes')
+            tmsConfig = ConfigParser.RawConfigParser()
+            tmsConfig.read('tms.cfg')
+            tiles = Tiles('database.cfg', tmsConfig, time.time())
+            geodetic = GlobalGeodetic(True)
+            bounds = (tiles.minLon, tiles.minLat, tiles.maxLon, tiles.maxLat)
+            zooms = range(tiles.tileMinZ, tiles.tileMaxZ + 1)
+            for i in xrange(0, len(zooms)):
+                zoom = zooms[i]
+                tablename = 'lakes_%s' % zoom
+                tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], zoom)
+                tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], zoom)
+                tileBounds = geodetic.TileBounds(tileMinX, tileMinY, zoom)
+                pointA = transformCoordinate('POINT(%s %s)' % (tileBounds[0], tileBounds[1]), 4326, 21781).GetPoints()[0]
+                pointB = transformCoordinate('POINT(%s %s)' % (tileBounds[2], tileBounds[3]), 4326, 21781).GetPoints()[0]
+                length = c2d.distance(pointA, pointB)
+                pixelArea = pow(length, 2) / pow(256.0, 2)
+                pixelLength = math.sqrt(pixelArea)
+                session.execute(
+                    create_simplified_geom_table(tablename, pixelLength)
+                )
+                session.commit()
+                logger.info('Commit table public.%s with %s meters tolerance' % (tablename, pixelLength))
 
     def dropDatabase(self):
         logger.info('Action: dropDatabase()')
@@ -425,7 +454,7 @@ class DB:
                 logger.error('Could not drop database %(name)s: %(err)s' % dict(
                     name=self.databaseConf.name,
                     err=str(e)
-                ))
+                ), exc_info=True)
 
     def dropUser(self):
         logger.info('Action: dropUser()')
@@ -440,7 +469,7 @@ class DB:
                 logger.error('Could not drop user %(role)s: %(err)s' % dict(
                     role=self.databaseConf.user,
                     err=str(e)
-                ))
+                ), exc_info=True)
 
     def create(self):
         logger.info('Action: create()')

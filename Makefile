@@ -2,6 +2,7 @@ VENV = venv
 PYTHON_CMD = $(VENV)/bin/python
 FLAKE8_CMD = $(VENV)/bin/flake8
 AUTOPEP8_CMD = $(VENV)/bin/autopep8
+MAKO_CMD = $(VENV)/bin/mako-render
 PREFIX ?= 1/
 PYTHON_FILES := $(shell find forge/ -name '*.py')
 USERNAME := $(shell whoami)
@@ -46,9 +47,9 @@ help:
 	@echo "- tmsstats           Provide statistics about the TMS pyramid"
 	@echo "- tmsstatsnodb       Provide statistics about the TMS pyramid, without db stats"
 	@echo "- tmscreatequeue     Creates AWS SQS queue with given settings (all tiles)"
-	@echo "- tmstmsdeletequeue  Deletes current AWS SQS queue (you loose everything)"
-	@echo "- tmstmsqueuestats   Get stats of AWS SQS queue"
-	@echo "- tmsttmscreatetiles Create tilses using the AWS SQS queue"
+	@echo "- tmsdeletequeue     Deletes current AWS SQS queue (you loose everything)"
+	@echo "- tmsqueuestats      Get stats of AWS SQS queue"
+	@echo "- tmscreatetiles     Create tilses using the AWS SQS queue"
 	@echo "- clean              Clean all generated files and folders"
 	@echo
 	@echo "Variables:"
@@ -69,16 +70,16 @@ install:
 	$(PYTHON_CMD) setup.py develop
 
 apache/testapp.conf: apache/testapp.conf.mako
-	$(VENV)/bin/mako-render --var "user=$(USERNAME)" --var "directory=$(CURDIR)" $< > $@
+	$(MAKO_CMD) --var "user=$(USERNAME)" --var "directory=$(CURDIR)" $< > $@
 
 database.cfg: database.cfg.mako
-	$(VENV)/bin/mako-render --var "pgpass=$(PGPASS)" --var "dbtarget=$(DBTARGET)" --var "username=$(USERNAME)" $< > $@
+	$(MAKO_CMD) --var "pgpass=$(PGPASS)" --var "dbtarget=$(DBTARGET)" --var "username=$(USERNAME)" $< > $@
 
 tms.cfg: tms.cfg.mako
-	$(VENV)/bin/mako-render --var "bucketname=$(BUCKETNAME)" --var "profilename=$(PROFILENAME)" $< > $@
+	$(MAKO_CMD) --var "bucketname=$(BUCKETNAME)" --var "profilename=$(PROFILENAME)" $< > $@
 
 logging.cfg: logging.cfg.mako
-	$(VENV)/bin/mako-render --var "logfilefolder=$(LOGFILEFOLDER)" $< > $@
+	$(MAKO_CMD) --var "logfilefolder=$(LOGFILEFOLDER)" $< > $@
 
 .PHONY: test
 test:

@@ -91,5 +91,19 @@ class ModelsPyramid:
             ]
         return None
 
+    def getLakeModelByZoom(self, zoom):
+        class LakeNewClass(Base, Vector):
+            __tablename__ = 'lakes_%s' % zoom
+            __table_args__ = {'schema': 'public', 'extend_existing': True}
+            id = Column(BigInteger(), nullable=False, primary_key=True)
+            the_geom = Column('the_geom', WGS84Polygon2D)
+        return LakeNewClass
+
+
+def isInside(tile, bounds):
+    if tile[0] >= bounds[0] and tile[1] >= bounds[1] and tile[2] <= bounds[2] and tile[3] <= bounds[3]:
+        return True
+    return False
+
 
 modelsPyramid = ModelsPyramid('database.cfg', 'tms.cfg')
