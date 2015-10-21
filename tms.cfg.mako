@@ -50,7 +50,7 @@ tablename: dhm25_128m
 tablename: dhm25_64m
 
 [11]
-tablename: bl_128m
+tablename: dhm25_32m
 
 [12]
 tablename: bl_64m
