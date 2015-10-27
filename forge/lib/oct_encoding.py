@@ -10,7 +10,7 @@ def clamp(val, minVal, maxVal):
 
 
 def signNotZero(v):
-    return -1.0 if v > 0.0 else 1.0
+    return -1.0 if v < 0.0 else 1.0
 
 
 # Converts a scalar value in the range [-1.0, 1.0] to a 8-bit 2's complement number.
@@ -23,6 +23,7 @@ def fromSnorm(v):
 
 
 # Compress x, y, z 96-bit floating point into x, z 16-bit representation (2 snorm values)
+# https://github.com/AnalyticalGraphicsInc/cesium/blob/b161b6429b9201c99e5fb6f6e6283f3e8328b323/Source/Core/AttributeCompression.js#L43
 def octEncode(vec):
     res = [0.0, 0.0]
     l1Norm = float(abs(vec[0]) + abs(vec[1]) + abs(vec[2]))

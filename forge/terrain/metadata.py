@@ -53,6 +53,7 @@ class TerrainMetadata:
 
         if self.hasLighting:
             extensions.append('octvertexnormals')
+            extensions.append('vertexnormals')
         if self.hasWatermask:
             extensions.append('watermask')
 
