@@ -9,7 +9,8 @@ from forge.lib.helpers import error
 
 def usage():
     print(dedent('''\
-        Usage: venv/bin/python forge/script/db_management.py [-c database.cfg|--config=database.cfg] <command>')
+        Usage: venv/bin/python forge/script/db_management.py
+               [-c database.cfg|--config=database.cfg] <command>')
 
         Commands:
             console:            enter interactive psql console
@@ -31,15 +32,15 @@ def main():
     except getopt.GetoptError as err:
         error(str(err), 2, usage=usage)
 
-    config = 'database.cfg'
+    dbConfigFile = 'configs/terrain/database.cfg'
     for o, a in opts:
         if o in ('-c', '--config'):
-            config = a
+            dbConfigFile = a
 
     if len(args) < 1:
         error('you must specify a command', 3, usage=usage)
 
-    db = DB(config)
+    db = DB(dbConfigFile)
 
     command = args[0]
     if command == 'console':

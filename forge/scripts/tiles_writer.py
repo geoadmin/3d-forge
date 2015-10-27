@@ -3,6 +3,7 @@
 import os
 import time
 import datetime
+from forge.configs import tmsConfig
 from forge.terrain import TerrainTile
 from forge.terrain.topology import TerrainTopology
 from forge.lib.shapefile_utils import ShpToGDALFeatures
@@ -18,6 +19,7 @@ t0 = time.time()
 getShapefiles = lambda x: x.endswith('.shp')
 shapefilesNames = filter(getShapefiles, os.listdir(basePath))
 bucket = getBucket()
+bucketBasePath = tmsConfig.get('General', 'bucketpath')
 
 for f in shapefilesNames:
     filePathSource = basePath + f
@@ -36,7 +38,7 @@ for f in shapefilesNames:
     # for now
     keyPath = f[1:3] + '/' + f[3:9] + '/' + f[9:14] + extension
     print 'Writing %s to S3' % keyPath
-    writeToS3(bucket, keyPath, compressedFile, basePath,
+    writeToS3(bucket, keyPath, compressedFile, basePath, bucketBasePath,
         contentType=terrainFormat.getContentType())
     i += 1
     t1 = time.time()

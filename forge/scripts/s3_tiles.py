@@ -3,6 +3,7 @@
 import sys
 import getopt
 from textwrap import dedent
+from forge.configs import tmsConfig
 from forge.lib.helpers import error
 from forge.lib.boto_conn import S3Keys
 
@@ -33,7 +34,8 @@ def main():
     if len(args) < 1:
         error('you must specify a command', 3, usage=usage)
 
-    s3Keys = S3Keys(prefix)
+    bucketBasePath = tmsConfig.get('General', 'bucketpath')
+    s3Keys = S3Keys(prefix, bucketBasePath)
 
     command = args[0]
     if command == 'delete':

@@ -16,7 +16,7 @@ from forge.terrain import TerrainTile
 from forge.terrain.metadata import TerrainMetadata
 from forge.terrain.topology import TerrainTopology
 from forge.models.tables import modelsPyramid
-from forge.lib.tiles import Tiles, QueueTiles
+from forge.lib.tiles import TerrainTiles, QueueTerrainTiles
 from forge.lib.boto_conn import getBucket, writeToS3, getSQS, writeSQSMessage
 from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate, createBBox
 from forge.lib.global_geodetic import GlobalGeodetic
@@ -85,7 +85,8 @@ def createTile(tile):
     pid = os.getpid()
 
     try:
-        (bounds, tileXYZ, t0, dbConfigFile, hasLighting, hasWatermask) = tile
+        (bounds, tileXYZ, t0, dbConfigFile, bucketBasePath,
+            hasLighting, hasWatermask) = tile
 
         db = DB(dbConfigFile)
         with db.userSession() as session:
@@ -169,7 +170,7 @@ def createTile(tile):
                 fileObject = terrainFormat.toStringIO()
                 compressedFile = gzipFileObject(fileObject)
                 writeToS3(bucket, bucketKey, compressedFile, model.__tablename__,
-                    contentType=terrainFormat.getContentType())
+                    bucketBasePath, contentType=terrainFormat.getContentType())
                 tend = time.time()
                 tilecount.value += 1
                 val = tilecount.value
@@ -233,7 +234,7 @@ class TilerManager:
         tilecount.value = 0
         skipcount.value = 0
 
-        tiles = Tiles(self.dbConfigFile, self.tmsConfig, self.t0)
+        tiles = TerrainTiles(self.dbConfigFile, self.tmsConfig, self.t0)
         procfactor = int(self.tmsConfig.get('General', 'procfactor'))
 
         pm = PoolManager(logger=logger, factor=procfactor)
@@ -285,7 +286,7 @@ class TilerManager:
             return
 
         logger.info('Queue ' + queueName + ' has been created')
-        tiles = Tiles(self.dbConfigFile, self.tmsConfig, self.t0)
+        tiles = TerrainTiles(self.dbConfigFile, self.tmsConfig, self.t0)
         nbTiles = self.numOfTiles()
         try:
             logger.info('Starting creation of SQS queue with approx. %s tiles)' % (nbTiles))
@@ -342,7 +343,7 @@ class TilerManager:
         procfactor = int(self.tmsConfig.get('General', 'procfactor'))
 
         pm = PoolManager(logger=logger, factor=procfactor)
-        qtiles = QueueTiles(queueName, self.dbConfigFile, self.tmsConfig, self.t0, pm.numOfProcesses())
+        qtiles = QueueTerrainTiles(queueName, self.dbConfigFile, self.tmsConfig, self.t0, pm.numOfProcesses())
 
         logger.info('Starting creation of tiles from queue %s ' % (queueName))
         pm.process(qtiles, createTileFromQueue, 1)
@@ -375,8 +376,8 @@ class TilerManager:
             "//terrain4.geo.admin.ch/" + basePath + "{z}/{x}/{y}.terrain?v={version}"
         ]
 
-        db = DB('database.cfg')
-        tiles = Tiles(self.dbConfigFile, self.tmsConfig, t0)
+        db = DB('configs/terrain/database.cfg')
+        tiles = TerrainTiles(self.dbConfigFile, self.tmsConfig, t0)
         tMeta = TerrainMetadata(
             bounds=tiles.bounds, minzoom=tiles.tileMinZ, maxzoom=tiles.tileMaxZ,
             useGlobalTiles=True, hasLighting=tiles.hasLighting, hasWatermask=tiles.hasWatermask,
@@ -407,12 +408,12 @@ class TilerManager:
         total = 0
 
         msg = '\n'
-        tiles = Tiles(self.dbConfigFile, self.tmsConfig, self.t0)
+        tiles = TerrainTiles(self.dbConfigFile, self.tmsConfig, self.t0)
         geodetic = GlobalGeodetic(True)
         bounds = (tiles.minLon, tiles.minLat, tiles.maxLon, tiles.maxLat)
         zooms = range(tiles.tileMinZ, tiles.tileMaxZ + 1)
 
-        db = DB('database.cfg')
+        db = DB('configs/terrain/database.cfg')
         try:
             with db.userSession() as session:
                 for i in xrange(0, len(zooms)):

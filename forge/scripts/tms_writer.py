@@ -10,15 +10,18 @@ from forge.lib.helpers import error
 
 def usage():
     print(dedent('''\
-        Usage: venv/bin/python forge/script/tms_writer.py [-d database.cfg|--database=database.cfg]
-                                                          [-c tms.cfg|--config=tms.cfg]
-                                                          <command>
+        Usage: venv/bin/python forge/script/tms_writer.py
+                  [-d database.cfg|--database=database.cfg]
+                  [-c tms.cfg|--config=tms.cfg]
+                  <command>
 
         Commands:
             create:            create the tiles and write them to S3
             metadata:          create the metadata file (layer.json)
-            stats:             provides a report containing the stats for a given TMS config
-            statsnodb:         provides a short report containing the stats for a given TMS config
+            stats:             provides a report containing the stats
+                               for a given TMS config
+            statsnodb:         provides a short report containing the stats
+                               for a given TMS config
     '''))
 
 
@@ -28,20 +31,20 @@ def main():
     except getopt.GetoptError as err:
         error(str(err), 2, usage=usage)
 
-    dbConfig = 'database.cfg'
-    tmsConfig = 'tms.cfg'
+    dbConfigFile = 'configs/terrain/database.cfg'
+    tmsConfigFile = 'configs/terrain/tms.cfg'
     for o, a in opts:
         if o in ('-d', '--database'):
-            dbConfig = a
+            dbConfigFile = a
         elif o in ('-c', '--config'):
-            tmsConfig = a
+            tmsConfigFile = a
 
-    if not os.path.exists(dbConfig) and os.path.exists(tmsConfig):
+    if not os.path.exists(dbConfigFile) and os.path.exists(tmsConfigFile):
         error('config file(s) does/do not exist(s)', 1, usage=usage)
 
     if len(args) < 1:
         error('you must specify a command', 3, usage=usage)
-    tiler = TilerManager(dbConfig, tmsConfig)
+    tiler = TilerManager(dbConfigFile, tmsConfigFile)
 
     command = args[0]
     if command == 'create':
@@ -62,8 +65,9 @@ def main():
     elif command == 'queuestats':
         tiler.queueStats()
     else:
-        error("unknown command '%(command)s'" % {'command': command}, 4, usage=usage)
-
+        error("unknown command '%(command)s'" % {
+            'command': command}, 4, usage=usage
+        )
 
 if __name__ == '__main__':
     main()

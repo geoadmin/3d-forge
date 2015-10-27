@@ -70,9 +70,11 @@ class Vector(object):
     :params srid: Spatial reference system numerical ID
     """
     @classmethod
-    def bboxIntersects(cls, bbox, srid=4326):
+    def bboxIntersects(cls, bbox, fromSrid=4326, toSrid=4326):
         bboxGeom = shapelyBBox(bbox)
-        wkbGeometry = WKBElement(buffer(bboxGeom.wkb), srid)
+        wkbGeometry = WKBElement(buffer(bboxGeom.wkb), fromSrid)
+        if fromSrid != toSrid:
+            wkbGeometry = func.ST_Transform(wkbGeometry, toSrid)
         geomColumn = cls.geometryColumn()
         return and_(geomColumn.intersects(wkbGeometry), func.ST_Intersects(geomColumn, wkbGeometry))
 

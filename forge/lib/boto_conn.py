@@ -6,21 +6,19 @@ import datetime
 import logging
 import multiprocessing
 import ConfigParser
-from forge.lib.helpers import timestamp
-from boto import connect_s3
-from forge.lib.logs import getLogger
-from boto.s3.key import Key
 import boto.sqs
+from boto import connect_s3
+from boto.s3.key import Key
 
+from forge.lib.helpers import timestamp
+from forge.configs import tmsConfig
+from forge.lib.logs import getLogger
 from forge.lib.poolmanager import PoolManager
 
 logging.getLogger('boto').setLevel(logging.CRITICAL)
 
-tmsConfig = ConfigParser.RawConfigParser()
-tmsConfig.read('tms.cfg')
 bucketName = tmsConfig.get('General', 'bucketName')
 profileName = tmsConfig.get('General', 'profileName')
-basePath = tmsConfig.get('General', 'bucketpath')
 
 # Init logging
 loggingConfig = ConfigParser.RawConfigParser()
@@ -47,10 +45,11 @@ def getBucket():
     return bucket
 
 
-def writeToS3(b, path, content, origin, contentType='application/octet-stream', contentEnc='gzip'):
+def writeToS3(b, path, content, origin, bucketBasePath,
+        contentType='application/octet-stream', contentEnc='gzip'):
     headers = {'Content-Type': contentType}
     k = Key(b)
-    k.key = basePath + path
+    k.key = bucketBasePath + path
     k.set_metadata('IWI_Origin', origin)
     headers['Content-Encoding'] = contentEnc
     headers['Access-Control-Allow-Origin'] = '*'
@@ -118,10 +117,10 @@ def copyKeys(fromPrefix, toPrefix, zooms):
 
 class S3Keys:
 
-    def __init__(self, prefix):
+    def __init__(self, prefix, bucketBasePath):
         self.bucket = getBucket()
         self.counter = 0
-        self.prefix = basePath
+        self.prefix = bucketBasePath
         if prefix is not None:
             self.prefix += prefix
         else:

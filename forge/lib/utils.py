@@ -20,7 +20,7 @@ def loadTileContent(baseURL, key, headers):
     return r.content
 
 
-def copyAGITiles(zooms, bounds):
+def copyAGITiles(zooms, bounds, bucketBasePath):
     count = 0
     fullonly = 0
     headers = {'Accept': 'application/vnd.quantized-mesh;extensions=octvertexnormals-' +
@@ -34,7 +34,8 @@ def copyAGITiles(zooms, bounds):
         f.write(loadTileContent(baseURL, bucketKey, headers))
         f.seek(0)
         compressedFile = gzipFileObject(f)
-        writeToS3(bucket, bucketKey, compressedFile, 'poc_watermask')
+        writeToS3(bucket, bucketKey, compressedFile,
+            'poc_watermask', bucketBasePath)
         count += 1
         if count % 20 == 0:
             print 'Copying %s...' % bucketKey

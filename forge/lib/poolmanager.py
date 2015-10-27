@@ -7,9 +7,11 @@ import signal
 
 class PoolManager:
 
-    def __init__(self, logger, numProcs=multiprocessing.cpu_count(), factor=1):
+    def __init__(self, logger, numProcs=multiprocessing.cpu_count(), factor=1, store=False):
         self._numProcs = int(numProcs * factor)
         self.logger = logger
+        self.store = store
+        self.results = None
         self._pool = multiprocessing.Pool(self._numProcs, self._initProcess)
 
     def _abort(self):
@@ -26,7 +28,11 @@ class PoolManager:
 
     # Blocking call
     def process(self, iterable, func, chunks):
-        self._pool.imap_unordered(func, iterable, chunks)
+        if self.store:
+            # Store results
+            self.results = self._pool.imap_unordered(func, iterable, chunks)
+        else:
+            self._pool.imap_unordered(func, iterable, chunks)
         self._pool.close()
         try:
             while len([p for p in self._pool._pool if p.is_alive()]) > 0:

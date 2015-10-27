@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from textwrap import dedent
+from forge.configs import tmsConfig
 from forge.lib.utils import copyAGITiles
 
 
@@ -14,7 +15,8 @@ def usage():
 def main():
     zooms = range(0, 8)
     bounds = [-180, -90, 180, 90]
-    copyAGITiles(zooms, bounds)
+    bucketBasePath = tmsConfig.get('General', 'bucketpath')
+    copyAGITiles(zooms, bounds, bucketBasePath)
 
 if __name__ == '__main__':
     main()
