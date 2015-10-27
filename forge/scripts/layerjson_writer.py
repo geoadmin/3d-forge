@@ -5,7 +5,7 @@ from forge.lib.helpers import gzipFileObject
 from forge.lib.boto_conn import getBucket, writeToS3
 
 bucket = getBucket()
-layerJSONPath = 'forge/data/json-conf/layer.json'
+layerJSONPath = '.tmp/layer.json'
 
 with open(layerJSONPath) as f:
     fileObj = cStringIO.StringIO()
