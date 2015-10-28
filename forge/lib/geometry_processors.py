@@ -33,27 +33,25 @@ def computeNormals(vertices, faces):
         v0 = vertices[face[0]]
         v1 = vertices[face[1]]
         v2 = vertices[face[2]]
-        ctrd = centroid(v0, v1, v2)
+        area = triangleArea(v0, v1)
+        areasPerFace[i] = area
 
         v1A = c3d.subtract(v1, v0)
         v2A = c3d.subtract(v2, v0)
         normalA = np.cross(v1A, v2A)
-        viewPointA = c3d.add(ctrd, normalA)
 
-        v1B = c3d.subtract(v0, v1)
-        v2B = c3d.subtract(v2, v1)
-        normalB = np.cross(v1B, v2B)
-        viewPointB = c3d.add(ctrd, normalB)
-
-        area = triangleArea(v0, v1)
-        areasPerFace[i] = area
-        squaredDistanceA = c3d.magnitudeSquared(viewPointA)
-        squaredDistanceB = c3d.magnitudeSquared(viewPointB)
-
-        # Always take the furthest point
-        if squaredDistanceA > squaredDistanceB:
+        # The viewpoint is the center of the Earth in earth fixed coordinates
+        # We check if the points unwind counter-clock wise
+        # (So in cartesian space (0, 0, 0)) so v0 - (0, 0, 0)
+        dotA = np.dot(normalA, v0)
+        # Unwinding clockwise for the earth center perspective
+        # Meaning counter-clockwise from above
+        if dotA > 0:
             normalsPerFace[i] = normalA
         else:
+            v1B = c3d.subtract(v0, v1)
+            v2B = c3d.subtract(v2, v1)
+            normalB = np.cross(v1B, v2B)
             normalsPerFace[i] = normalB
 
     for i in xrange(0, numFaces):
