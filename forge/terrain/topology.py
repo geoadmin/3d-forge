@@ -4,6 +4,7 @@ import math
 import numpy as np
 from osgeo import ogr
 from forge.lib.llh_ecef import LLH2ECEF
+from forge.lib.geometry_processors import computeNormals
 
 
 class TerrainTopology(object):
@@ -53,13 +54,17 @@ class TerrainTopology(object):
         vertices = self._assureCounterClockWise(vertices)
         face = []
         for vertex in vertices:
-            lookupKey = ','.join([str(vertex[0]), str(vertex[1]), str(vertex[2])])
+            lookupKey = ','.join(
+                ["{:.14f}".format(vertex[0]),
+                 "{:.14f}".format(vertex[1]),
+                 "{:.14f}".format(vertex[2])]
+            )
             faceIndex = self._lookupVertexIndex(lookupKey)
             if faceIndex is not None:
                 # Sometimes we can have triangles with zero area (due to unfortunate clipping)
                 # In that case skip them
-                if faceIndex in face:
-                    break
+                # if faceIndex in face:
+                #    break
                 face.append(faceIndex)
             else:
                 self.vertices.append(vertex)
@@ -68,8 +73,8 @@ class TerrainTopology(object):
                 faceIndex = len(self.vertices) - 1
                 self.verticesLookup[lookupKey] = faceIndex
                 face.append(faceIndex)
-        if len(face) == 3:
-            self.faces.append(face)
+        # if len(face) == 3:
+        self.faces.append(face)
 
     """
     Builds a terrain topology from a list of GDAL features.
@@ -99,7 +104,8 @@ class TerrainTopology(object):
         self.cartesianVertices = np.array(self.cartesianVertices, dtype='float')
         self.faces = np.array(self.faces, dtype='int')
         if self.hasLighting:
-            self._computeUnitVectors()
+            self.verticesUnitVectors = computeNormals(
+                self.cartesianVertices, self.faces)
         self.verticesLookup = {}
 
     """
@@ -121,25 +127,6 @@ class TerrainTopology(object):
         # Remove last point of the polygon and keep only 3 coordinates
         vertices = points[0: len(points) - 1]
         return vertices
-
-    def _computeUnitVectors(self):
-        norm = np.zeros(self.cartesianVertices.shape, dtype=self.cartesianVertices.dtype)
-        triangles = self.cartesianVertices[self.faces]
-        # Calculate the normals for all the triangle
-        n = np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0])
-        n = self._normalizeUnitVectors(n)
-        norm[self.faces[:, 0]] += n
-        norm[self.faces[:, 1]] += n
-        norm[self.faces[:, 2]] += n
-        # Normalize again on the vertices
-        self.verticesUnitVectors = self._normalizeUnitVectors(norm)
-
-    def _normalizeUnitVectors(self, n):
-        lens = np.sqrt(n[:, 0] ** 2 + n[:, 1] ** 2 + n[:, 2] ** 2)
-        n[:, 0] /= lens
-        n[:, 1] /= lens
-        n[:, 2] /= lens
-        return n
 
     """
     Inspired by http://stackoverflow.com/questions/1709283/how-can-i-sort-a-coordinate-list-for-a-rectangle-counterclockwise

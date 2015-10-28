@@ -20,7 +20,7 @@ from forge.lib.tiles import Tiles, QueueTiles
 from forge.lib.boto_conn import getBucket, writeToS3, getSQS, writeSQSMessage
 from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate, createBBox
 from forge.lib.global_geodetic import GlobalGeodetic
-from forge.lib.collapse_geom import processRingCoordinates
+from forge.lib.geometry_processors import processRingCoordinates
 from forge.lib.logs import getLogger
 from forge.lib.poolmanager import PoolManager
 
