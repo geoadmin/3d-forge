@@ -67,7 +67,7 @@ all: install apache/testapp.conf configs/terrain/database.cfg configs/terrain/tm
 
 .PHONY: install
 install:
-	virtualenv $(VENV) --system-site-packages
+	( if [ -d "$(VENV)" ] ; then echo 'Skipping venv creation'; else virtualenv $(VENV) --system-site-packages; fi ); \
 	$(PYTHON_CMD) setup.py develop
 
 apache/testapp.conf: apache/testapp.conf.mako
