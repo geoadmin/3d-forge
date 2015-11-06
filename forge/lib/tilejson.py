@@ -122,6 +122,13 @@ class _TileJSON:
                     self.meta['available'] = [globalTilesConfig[z]] + self.meta['available']
             self.meta['minzoom'] = 0
 
+        # The number of ranges must be equal to maxzoom + 1
+        nbRanges = len(self.meta['available'])
+        nbZooms = self.meta['maxzoom'] + 1
+        if nbRanges < nbZooms:
+            for i in range(0, nbZooms - nbRanges):
+                self.meta['available'] = [[]] + self.meta['available']
+        print self.meta['available']
         return json.dumps(self.meta)
 
     def _createRectangle(self, startX, endX, startY, endY):
