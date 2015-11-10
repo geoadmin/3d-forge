@@ -12,8 +12,9 @@ from sqlalchemy import Column
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.ext.declarative import declarative_base
+from geoalchemy2.types import Geometry
 
-from forge.models import Vector, Geometry
+from forge.models import Vector
 from forge.layers.metadata import LayerMetadata
 from forge.lib.helpers import timestamp
 from forge.lib.tiles import Tiles
@@ -152,7 +153,7 @@ def main(template):
     fileObj = cStringIO.StringIO()
     fileObj.write(tMeta.toJSON())
     fileObj = gzipFileObject(fileObj)
-    logger.info('Uploading %s/layer.json to S3' % bucketBasePath)
+    logger.info('Uploading %slayer.json to S3' % bucketBasePath)
     writeToS3(bucket, 'layer.json', fileObj,
         bucketBasePath, 'application/json')
     logger.info('layer.json has been uploaded successfully')

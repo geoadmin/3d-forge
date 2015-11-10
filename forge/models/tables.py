@@ -4,8 +4,9 @@ import os
 import ConfigParser
 from sqlalchemy import Column, Sequence, BigInteger, Text
 from sqlalchemy.ext.declarative import declarative_base
+from geoalchemy2.types import Geometry
 
-from forge.models import Vector, Geometry
+from forge.models import Vector
 from forge.lib.helpers import isShapefile
 
 
