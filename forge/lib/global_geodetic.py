@@ -49,10 +49,14 @@ class GlobalGeodetic(object):
             # Adhers to OSGeo TMS spec
             # http://wiki.osgeo.org/wiki/Tile_Map_Service_Specification#global-geodetic
             self.resFact = 180.0 / self.tileSize
+            self._numberOfLevelZeroTilesX = 2
+            self._numberOfLevelZeroTilesY = 1
         else:
             # Defaults the resolution factor to 1.40625 (1 tile @ level 0)
             # Adheres OpenLayers, MapProxy, etc default resolution for WMTS
             self.resFact = 360.0 / self.tileSize
+            self._numberOfLevelZeroTilesX = 1
+            self._numberOfLevelZeroTilesY = 1
 
     def LonLatToPixels(self, lon, lat, zoom):
         "Converts lon/lat to pixel coordinates in given zoom of the EPSG:4326 pyramid"
@@ -105,3 +109,11 @@ class GlobalGeodetic(object):
         "Returns bounds of the given tile in the SWNE form"
         b = self.TileBounds(tx, ty, zoom)
         return (b[1], b[0], b[3], b[2])
+
+    def GetNumberOfXTilesAtZoom(self, zoom):
+        "Returns the number of tiles over x at a given zoom level (only 256px)"
+        return self._numberOfLevelZeroTilesX << zoom
+
+    def GetNumberOfYTilesAtZoom(self, zoom):
+        "Returns the number of tiles over y at a given zoom level (only 256px)"
+        return self._numberOfLevelZeroTilesY << zoom

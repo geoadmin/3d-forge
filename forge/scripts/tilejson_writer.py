@@ -41,6 +41,8 @@ def resourceExists(path, headers={}):
     try:
         r = requests.head(path, headers=headers)
     except requests.exceptions.ConnectionError:
+        logger.info('Connection Error')
+        logger.info('%s was skipped' % path)
         return False
     return r.status_code == requests.codes.ok
 
@@ -244,6 +246,7 @@ def createTerrainBasedTileJSON(params):
     return json.dumps(terrainConfig)
 
 tilecount = multiprocessing.Value('i', 0)
+tileskipped = multiprocessing.Value('i', 0)
 # Return None if the tile exists and a list with x,y,z coordinates otherwise
 
 
@@ -253,15 +256,27 @@ def tileNotExists(tile):
     servers = range(5, 10)
     entryPoint = 'http://wmts%s.geo.admin.ch/' % (random.choice(servers))
     (bounds, tileXYZ, t0, basePath, tFormat) = tile
-    tileAdress = '/'.join((str(tileXYZ[2]), str(tileXYZ[0]), str(tileXYZ[1])))
+    # Account for a different origin
+    geodetic = GlobalGeodetic(True)
+    nbYTiles = geodetic.GetNumberOfYTilesAtZoom(tileXYZ[2])
+    tilexyz = (tileXYZ[0], nbYTiles - tileXYZ[1] - 1, tileXYZ[2])
+
+    tileAdress = '/'.join((str(tilexyz[2]), str(tilexyz[1]), str(tilexyz[0])))
     url = '%s%s%s.%s' % (entryPoint, basePath, tileAdress, tFormat)
     tilecount.value += 1
+    exists = resourceExists(url, headers=h)
+    if not exists:
+        tileskipped.value += 1
     if tilecount.value % 1000 == 0:
         tend = time.time()
-        logger.info('It took %s to (HEAD) request %s tiles.' % (
-            str(datetime.timedelta(seconds=tend - t0)), tilecount.value))
-    if not resourceExists(url, headers=h):
-        return tileXYZ
+        logger.info('It took %s to (HEAD) request %s tiles. %s skipped' % (
+            str(datetime.timedelta(seconds=tend - t0)),
+            tilecount.value, tileskipped.value)
+        )
+        logger.info('Last tile checked:')
+        logger.info(url)
+    if not exists:
+        return tilexyz
 
 
 def createS3BasedTileJSON(params):
@@ -273,7 +288,7 @@ def createS3BasedTileJSON(params):
         t0, fullonly=params.fullonly, basePath=params.bucketBasePath,
         tFormat=params.format
     )
-    pm = PoolManager(logger=logger, factor=2, store=True)
+    pm = PoolManager(logger=logger, numProcs=4, factor=1, store=True)
     tMeta = LayerMetadata(
         bounds=params.bounds, minzoom=params.minZoom,
         maxzoom=params.maxZoom, baseUrls=baseUrls,

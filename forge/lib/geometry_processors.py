@@ -22,7 +22,7 @@ def triangleArea(a, b):
 # Inspired by
 # https://github.com/AnalyticalGraphicsInc/cesium/wiki/Geometry-and-Appearances
 # https://github.com/AnalyticalGraphicsInc/cesium/blob/master/
-# Source/Core/GeometryPipeline.js#L1071
+#     Source/Core/GeometryPipeline.js#L1071
 def computeNormals(vertices, faces):
     numVertices = len(vertices)
     numFaces = len(faces)
