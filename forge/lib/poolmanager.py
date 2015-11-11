@@ -11,12 +11,17 @@ class PoolManager:
         self._numProcs = int(numProcs * factor)
         self.logger = logger
         self.store = store
-        self.results = None
+        self.results = []
         self._pool = multiprocessing.Pool(self._numProcs, self._initProcess)
 
     def _abort(self):
         self._pool.terminate()
         self._pool.join()
+
+    def _writer(self, records):
+        for r in records:
+            if r:
+                self.results.append(r)
 
     # Assure that sub processes don't get keyborad interrupts
     def _initProcess(self):
@@ -29,8 +34,9 @@ class PoolManager:
     # Blocking call
     def process(self, iterable, func, chunks):
         if self.store:
-            # Store results
-            self.results = self._pool.imap_unordered(func, iterable, chunks)
+            self._writer(self._pool.imap_unordered(
+                func, iterable, chunksize=chunks
+            ))
         else:
             self._pool.imap_unordered(func, iterable, chunks)
         self._pool.close()

@@ -25,18 +25,24 @@ def grid(bounds, zoomLevels, fullonly):
 
 class Tiles:
 
-    def __init__(self, bounds, minZoom, maxZoom, t0, fullonly=False):
+    def __init__(self, bounds, minZoom, maxZoom, t0,
+            fullonly=False, basePath=None, tFormat=None):
         self.t0 = t0
         self.bounds = bounds
         self.tileMinZ = minZoom
         self.tileMaxZ = maxZoom
         self.fullonly = fullonly
+        self.basePath = basePath
+        self.tFormat = tFormat
 
     def __iter__(self):
         zRange = range(self.tileMinZ, self.tileMaxZ + 1)
 
         for bounds, tileXYZ in grid(self.bounds, zRange, self.fullonly):
-            yield (bounds, tileXYZ, self.t0)
+            if self.basePath and self.tFormat:
+                yield (bounds, tileXYZ, self.t0, self.basePath, self.tFormat)
+            else:
+                yield (bounds, tileXYZ, self.t0)
 
 
 class TerrainTiles:
