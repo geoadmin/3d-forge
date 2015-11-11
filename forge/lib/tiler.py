@@ -512,12 +512,12 @@ class TilerManager:
                     msg += 'Min Y is %s, Max Y is %s\n' % (tileMinY, tileMaxY)
                     msg += '%s rows over Y\n' % yCount
                     msg += '\n'
-                    msg += 'A tile side is around %s meters ' \
-                           'long\n' % int(round(length))
+                    msg += 'A tile side is around %s meters' % int(round(length))
                     if nbTiles > 0 and nbObjects is not None:
                         msg += 'We have an average of about %s triangles ' \
                                'per tile\n' % int(round(nbObjects / nbTiles))
-                    msg += '\n'
+                    msg += '\n\n'
+            msg += '%s tiles in total.' % total
         except Exception as e:
             logger.error('An error occured during statistics collection')
             logger.error('%s' % e, exc_info=True)
