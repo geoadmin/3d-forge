@@ -58,10 +58,13 @@ for tz in range(MINZOOM, MAXZOOM + 1):
             print 'Tile bounds'
             print geodetic.TileBounds(tx, ty, tz)
             # Create polygon from bounds
-            # https://pcjericks.github.io/py-gdalogr-cookbook/vector_layers.html#create-a-new-shapefile-and-add-data
+            # https://pcjericks.github.io/py-gdalogr-cookbook/
+            #     vector_layers.html#create-a-new-shapefile-and-add-data
             feature = ogr.Feature(layer.GetLayerDefn())
             feature.SetField('Key', tileKey)
-            wkt = 'POLYGON ((%f %f, %f %f, %f %f, %f %f, %f %f))' % (xmin, ymin, xmax, ymin, xmax, ymax, xmin, ymax, xmin, ymin)
+            wkt = 'POLYGON ((%f %f, %f %f, %f %f, %f %f, %f %f))' % (
+                xmin, ymin, xmax, ymin, xmax, ymax, xmin, ymax, xmin, ymin
+            )
             polygon = ogr.CreateGeometryFromWkt(wkt)
             feature.SetGeometry(polygon)
             layer.CreateFeature(feature)

@@ -17,7 +17,8 @@ from forge.lib.boto_conn import getBucket, writeToS3
 # from forge.lib.shapefile_utils import ShpToGDALFeatures
 
 
-poc_base_url = "http://ec2-54-220-242-89.eu-west-1.compute.amazonaws.com/stk-terrain/tilesets/swisseudem/tiles/"
+poc_base_url = "http://ec2-54-220-242-89.eu-west-1.compute.amazonaws.com/' \
+    'stk-terrain/tilesets/swisseudem/tiles/"
 temp_file_name = "tmp/poc.terrain"
 gzip_file_name = temp_file_name + ".gzip"
 tms_file_name = "tmp/tms.terrain"
@@ -27,7 +28,8 @@ tms_from_shape_file_name = "tmp/tms.from.shape.terrain"
 
 def usage():
     print(dedent('''\
-        Usage: venv/bin/python forge/script/poctiles2tmstiles.py [-f <nr>|--from=<nr>] [-t <nr>|--to=<nr>] [<file>]')
+        Usage: venv/bin/python forge/script/poctiles2tmstiles.py
+               [-f <nr>|--from=<nr>] [-t <nr>|--to=<nr>] [<file>]')
 
         - f (from zoom level, as read from top-level layers.json
         - t (to zoom level, as read from top-level layers.json
@@ -104,7 +106,10 @@ def main():
                 fp.write(ff.read())
 
             ter = TerrainTile()
-            ter.fromFile(temp_file_name, tilebounds[0], tilebounds[2], tilebounds[1], tilebounds[3])
+            ter.fromFile(
+                temp_file_name, tilebounds[0],
+                tilebounds[2], tilebounds[1], tilebounds[3]
+            )
             '''
             if os.path.isfile(tms_file_name):
                 os.remove(tms_file_name)
@@ -124,7 +129,9 @@ def main():
             topology.fromGDALFeatures()
 
             terFromPoc = TerrainTile()
-            terFromPoc.fromFile(tms_file_name, tilebounds[0], tilebounds[2], tilebounds[1], tilebounds[3])
+            terFromPoc.fromFile(
+                tms_file_name, tilebounds[0], tilebounds[2], tilebounds[1], tilebounds[3]
+            )
 
             terFromShape = TerrainTile()
             terFromShape.fromTerrainTopology(topology)

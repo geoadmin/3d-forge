@@ -16,14 +16,17 @@ def loadTileContent(baseURL, key, headers):
     url = '%s%s' % (baseURL, key)
     r = requests.get(url, headers=headers)
     if r.status_code != requests.codes.ok:
-        raise Exception('Failed to request %s, status code: %s' % (url, r.status_code))
+        raise Exception('Failed to request %s, status code: %s' % (
+            url, r.status_code
+        ))
     return r.content
 
 
 def copyAGITiles(zooms, bounds, bucketBasePath):
     count = 0
     fullonly = 0
-    headers = {'Accept': 'application/vnd.quantized-mesh;extensions=octvertexnormals-' +
+    headers = {'Accept': 'application/vnd.quantized-mesh;' +
+        'extensions=octvertexnormals-' +
         'watermask,application/octet-stream;q=0.9,*/*;q=0.01'}
     baseURL = 'http://assets.agi.com/stk-terrain/world/'
     bucket = getBucket()

@@ -43,4 +43,6 @@ for f in shapefilesNames:
     i += 1
     t1 = time.time()
     ti = t1 - t0
-    print 'It took %s secs to write %s/%s tiles' % (str(datetime.timedelta(seconds=ti)), i, len(shapefilesNames))
+    print 'It took %s secs to write %s/%s tiles' % (
+        str(datetime.timedelta(seconds=ti)), i, len(shapefilesNames)
+    )

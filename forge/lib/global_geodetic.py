@@ -46,7 +46,8 @@ class GlobalGeodetic(object):
         self.tileSize = tileSize
         if tmscompatible is not None:
             # Defaults the resolution factor to 0.703125 (2 tiles @ level 0)
-            # Adhers to OSGeo TMS spec http://wiki.osgeo.org/wiki/Tile_Map_Service_Specification#global-geodetic
+            # Adhers to OSGeo TMS spec
+            # http://wiki.osgeo.org/wiki/Tile_Map_Service_Specification#global-geodetic
             self.resFact = 180.0 / self.tileSize
         else:
             # Defaults the resolution factor to 1.40625 (1 tile @ level 0)

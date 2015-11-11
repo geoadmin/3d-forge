@@ -19,8 +19,10 @@ def triangleArea(a, b):
     return 0.5 * math.sqrt(i + j + k)
 
 
-# Inspired by https://github.com/AnalyticalGraphicsInc/cesium/wiki/Geometry-and-Appearances
-# https://github.com/AnalyticalGraphicsInc/cesium/blob/master/Source/Core/GeometryPipeline.js#L1071
+# Inspired by
+# https://github.com/AnalyticalGraphicsInc/cesium/wiki/Geometry-and-Appearances
+# https://github.com/AnalyticalGraphicsInc/cesium/blob/master/
+# Source/Core/GeometryPipeline.js#L1071
 def computeNormals(vertices, faces):
     numVertices = len(vertices)
     numFaces = len(faces)
@@ -98,7 +100,10 @@ def processRingCoordinates(ringCoordinates):
         # If this condition is not respected it means that we clipped
         # geometries that were not triangles
         if nbPoints not in (4, 5, 6, 7):
-            raise Exception('Error while processing the clipped geometries: %s coords have been found' % nbPoints)
+            raise Exception(
+                'Error while processing the clipped geometries:'
+                ' %s coords have been found' % nbPoints
+            )
         return collapseIntoTriangles(ringCoordinates)
     else:
         return [ringCoordinates[0: len(ringCoordinates) - 1]]

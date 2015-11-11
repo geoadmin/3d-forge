@@ -8,7 +8,7 @@ PYTHON_FILES := $(shell find forge/ -name '*.py')
 USERNAME := $(shell whoami)
 TILEJSON_TEMPLATE ?= configs/raster/ch_swisstopo_swisstlm3d-wanderwege.cfg
 
-MAX_LINE_LENGTH=130
+MAX_LINE_LENGTH=90
 PEP8_IGNORE="E128,E221,E241,E251,E272,E711"
 
 # E128: continuation line under-indented for visual indent

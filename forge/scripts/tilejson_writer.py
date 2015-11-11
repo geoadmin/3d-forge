@@ -250,7 +250,7 @@ tilecount = multiprocessing.Value('i', 0)
 def tileNotExists(tile):
     h = {'Referer': 'http://geo.admin.ch'}
     # Only native tiles
-    servers = range(5, 10) 
+    servers = range(5, 10)
     entryPoint = 'http://wmts%s.geo.admin.ch/' % (random.choice(servers))
     (bounds, tileXYZ, t0, basePath, tFormat) = tile
     tileAdress = '/'.join((str(tileXYZ[2]), str(tileXYZ[0]), str(tileXYZ[1])))

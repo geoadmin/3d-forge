@@ -11,7 +11,8 @@ from forge.lib.boto_conn import S3Keys
 # One might want to provide an extent also later on
 def usage():
     print(dedent('''\
-        Usage: venv/bin/python forge/script/s3_tiles.py [-p <prefix>|--prefix=<prefix>] <command>')
+        Usage: venv/bin/python forge/script/s3_tiles.py
+               [-p <prefix>|--prefix=<prefix>] <command>')
 
         Commands:
             delete:             delete all keys (tiles)
