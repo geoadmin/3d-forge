@@ -7,6 +7,7 @@ class TerrainMetadata(_TileJSON):
 
     def __init__(self, *args, **kwargs):
 
+        self.gridOrigin = 'bottomLeft'
         self.tileMinZoom = kwargs.get('minzoom')
         self.tileMaxZoom = kwargs.get('maxzoom')
         self.useGlobalTiles = kwargs.get('useGlobalTiles', False)

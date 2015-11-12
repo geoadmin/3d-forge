@@ -12,11 +12,16 @@ class LayerMetadata(_TileJSON):
             10.9209100671547, 47.8661652478939
         ]
         self.useGlobalTiles = False
+        # Take into account that the origin may be different
+        self.gridOrigin = kwargs.get('gridOrigin', 'bottomLeft')
         self.tileMinZoom = kwargs.get('minzoom')
         self.tileMaxZoom = kwargs.get('maxzoom')
         self.baseUrls = kwargs.get('baseUrls')
         if not self.baseUrls:
             raise ValueError('No base URL(s) provided, please complete the config file.')
+        if self.gridOrigin not in ('bottomLeft', 'topLeft'):
+            raise ValueError('gridOrigin parameter should be \'bottomLeft\' or' \
+                 '\'topLeft\'')
 
         self.available = [[] for i in range(self.tileMinZoom, self.tileMaxZoom + 1)]
 

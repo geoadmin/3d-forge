@@ -166,6 +166,11 @@ class _TileJSON:
         for z in range(self.tileMinZoom, self.tileMaxZoom + 1):
             tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], z)
             tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], z)
+            # One has to take into account the grid origin to determine y
+            if self.gridOrigin == 'topLeft':
+                nbTilesY = geodetic.GetNumberOfYTilesAtZoom(z)
+                tileMinY = nbTilesY - tileMinY - 1
+                tileMaxY = nbTilesY - tileMaxY - 1
             self.metadata[z] = dict(
                 x=[tileMinX, tileMaxX],
                 y=[tileMinY, tileMaxY]

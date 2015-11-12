@@ -109,6 +109,7 @@ def parseModelBasedLayer(dbConfig, layerConfig):
             dbName         = layerConfig.get('Database', 'dbName'),
             dbSchema       = layerConfig.get('Database', 'dbSchema'),
             tableName      = layerConfig.get('Database', 'tableName'),
+            gridOrigin     = layerConfig.get('Grid', 'gridOrigin'),
             bucketBasePath = layerConfig.get('Grid', 'bucketPath'),
             sridFrom       = layerConfig.getint('Grid', 'sridFrom'),
             sridTo         = layerConfig.getint('Grid', 'sridTo'),
@@ -133,6 +134,7 @@ def parseModelBasedLayer(dbConfig, layerConfig):
 def parseTerrainBasedLayer(layerConfig):
     try:
         return AttributeDict(
+            gridOrigin     = layerConfig.get('Grid', 'gridOrigin'),
             bucketBasePath = layerConfig.get('Grid', 'bucketPath'),
             bounds         = map(float,
                 layerConfig.get('Grid', 'bounds').split(',')),
@@ -288,12 +290,12 @@ def createS3BasedTileJSON(params):
         t0, fullonly=params.fullonly, basePath=params.bucketBasePath,
         tFormat=params.format
     )
-    pm = PoolManager(logger=logger, numProcs=4, factor=1, store=True)
+    pm = PoolManager(logger=logger, factor=1, store=True)
     tMeta = LayerMetadata(
         bounds=params.bounds, minzoom=params.minZoom,
         maxzoom=params.maxZoom, baseUrls=baseUrls,
         description=params.description, attribution=params.attribution,
-        name=params.name
+        name=params.name, gridOrigin=params.gridOrigin
     )
     pm.process(tiles, tileNotExists, maxChunks)
     for xyz in pm.results:
