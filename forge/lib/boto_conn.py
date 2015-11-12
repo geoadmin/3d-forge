@@ -67,7 +67,8 @@ def copyKey(args):
         copycount.value += 1
         val = copycount.value
         if val % 100 == 0:
-            log.info('Created %s copies in %s.' % (val, str(datetime.timedelta(seconds=time.time() - t0))))
+            log.info('Created %s copies in %s.' % (
+                val, str(datetime.timedelta(seconds=time.time() - t0))))
             log.info('%s was copied to %s' % (prefix + keyname, toPrefix + keyname))
     except Exception as e:
         log.info('Caught an exception when copying %s exception: %s' % (keyname, str(e)))
@@ -129,7 +130,8 @@ class S3Keys:
 
     def delete(self):
         keysToDelete = []
-        print 'Are you sure you want to delete all tiles starting with %s? (y/n)' % self.prefix
+        print 'Are you sure you want to delete all tiles ' \
+            'starting with %s? (y/n)' % self.prefix
         answer = raw_input('> ')
         if answer.lower() != 'y':
             sys.exit(1)

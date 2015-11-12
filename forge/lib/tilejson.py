@@ -71,8 +71,10 @@ class _TileJSON:
                         ]
 
                     newRow = [[tileMinX, tileMaxX]]
-                    # Current row over x is equal to previous row -> increase rectangle size over y
-                    if previousRow[0][0] == newRow[0][0] and previousRow[0][1] == newRow[0][1]:
+                    # Current row over x is equal to previous row
+                    # -> increase rectangle size over y
+                    if previousRow[0][0] == newRow[0][0] and \
+                            previousRow[0][1] == newRow[0][1]:
                         previousRec[0]['endY'] = y
                     # Move temp rectangle in the final list, create new temp rec
                     else:
@@ -119,7 +121,8 @@ class _TileJSON:
             # Make sure not to add an existing zoom level
             for z in reversed(range(0, len(globalTilesConfig) - 1)):
                 if z < self.meta['minzoom']:
-                    self.meta['available'] = [globalTilesConfig[z]] + self.meta['available']
+                    self.meta['available'] = [globalTilesConfig[z]] + \
+                        self.meta['available']
             self.meta['minzoom'] = 0
 
         # The number of ranges must be equal to maxzoom + 1

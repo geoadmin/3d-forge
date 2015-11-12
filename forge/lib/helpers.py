@@ -123,7 +123,8 @@ class BulkInsert:
     def __init__(self, model, session, withAutoCommit=None):
         self.model = model
         self.session = session
-        self.autoCommit = withAutoCommit if withAutoCommit is not None else BulkInsert.NO_LIMIT
+        self.autoCommit = withAutoCommit if withAutoCommit is not None else \
+            BulkInsert.NO_LIMIT
         self.bulk = Bulk()
 
     def add(self, row):

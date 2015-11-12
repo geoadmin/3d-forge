@@ -61,7 +61,8 @@ class TerrainTopology(object):
             )
             faceIndex = self._lookupVertexIndex(lookupKey)
             if faceIndex is not None:
-                # Sometimes we can have triangles with zero area (due to unfortunate clipping)
+                # Sometimes we can have triangles with zero area
+                # (due to unfortunate clipping)
                 # In that case skip them
                 # if faceIndex in face:
                 #    break
@@ -109,7 +110,8 @@ class TerrainTopology(object):
         self.verticesLookup = {}
 
     """
-    Check if the vertex has already been discovered and return its index (or None if not found)
+    Check if the vertex has already been discovered
+    and return its index (or None if not found)
     """
 
     def _lookupVertexIndex(self, lookupKey):
@@ -129,7 +131,9 @@ class TerrainTopology(object):
         return vertices
 
     """
-    Inspired by http://stackoverflow.com/questions/1709283/how-can-i-sort-a-coordinate-list-for-a-rectangle-counterclockwise
+    Inspired by:
+    http://stackoverflow.com/questions/1709283/
+        how-can-i-sort-a-coordinate-list-for-a-rectangle-counterclockwise
     Helper function to make sure vertices unwind in counterwise order
     """
 
@@ -141,7 +145,9 @@ class TerrainTopology(object):
         mlon = sum(coord[1] for coord in vertices) / float(len(vertices))
 
         def algo(coord):
-            return (math.atan2(coord[0] - mlat, coord[1] - mlon) + 2 * math.pi) % (2 * math.pi)
+            return (math.atan2(coord[0] - mlat, coord[1] - mlon) + 2 * math.pi) % (
+                2 * math.pi
+            )
 
         vertices.sort(key=algo, reverse=True)
         return vertices

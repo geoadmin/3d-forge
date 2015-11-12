@@ -24,9 +24,15 @@ class TestTerrainTile(unittest.TestCase):
         We compare the results
         '''
         ter = TerrainTile()
-        # ter.fromFile('forge/data/quantized-mesh/0.terrain', 7.80938, 7.81773, 46.30261, 46.3079)
-        # ter.fromFile('forge/data/quantized-mesh/raron.flat.1.terrain', 7.80938, 7.81773, 46.30261, 46.30790)
-        ter.fromFile('forge/data/quantized-mesh/goms.mountains.1.terrain', 7.80938, 7.81773, 46.30261, 46.30799)
+        # ter.fromFile(
+        #     'forge/data/quantized-mesh/0.terrain', 7.80938, 7.81773, 46.30261, 46.3079)
+        # ter.fromFile(
+        #    'forge/data/quantized-mesh/raron.flat.1.terrain',
+        #    7.80938, 7.81773, 46.30261, 46.30790)
+        ter.fromFile(
+            'forge/data/quantized-mesh/goms.mountains.1.terrain',
+            7.80938, 7.81773, 46.30261, 46.30799
+        )
         ter.toFile(self.tmpfile)
         ter2 = TerrainTile()
         ter2.fromFile(self.tmpfile, 7.80938, 7.81773, 46.30261, 46.30799)
@@ -116,8 +122,10 @@ class TestTerrainTile(unittest.TestCase):
 
         ter = TerrainTile()
         [minx, miny, maxx, maxy] = geodetic.TileBounds(x, y, z)
-        ter.fromFile('forge/data/quantized-mesh/%s_%s_%s_light_watermask.terrain' % (z, x, y),
-            minx, miny, maxx, maxy, hasLighting=True, hasWatermask=True)
+        ter.fromFile(
+            'forge/data/quantized-mesh/%s_%s_%s_light_watermask.terrain' % (z, x, y),
+            minx, miny, maxx, maxy, hasLighting=True, hasWatermask=True
+        )
 
         # check indices
         self.assertTrue(len(ter.indices) > 0)
@@ -145,6 +153,7 @@ class TestTerrainTile(unittest.TestCase):
         sign = lambda a: 1 if a > 0 else -1 if a < 0 else 0
         for i in range(0, len(ter.vLight)):
             for j in range(0, 3):
-                # We cannot have an exact equality with successive oct encoding and decoding
+                # We cannot have an exact equality with successive
+                # oct encoding and decoding
                 # Thus we only check the sign
                 self.assertEqual(sign(ter.vLight[i][j]), sign(ter2.vLight[i][j]))

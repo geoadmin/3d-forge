@@ -69,7 +69,10 @@ class Vector(object):
         if fromSrid != toSrid:
             wkbGeometry = func.ST_Transform(wkbGeometry, toSrid)
         geomColumn = cls.geometryColumn()
-        return and_(geomColumn.intersects(wkbGeometry), func.ST_Intersects(geomColumn, wkbGeometry))
+        return and_(
+            geomColumn.intersects(wkbGeometry),
+            func.ST_Intersects(geomColumn, wkbGeometry)
+        )
 
     """
     Returns a slqalchemy.sql.functions.Function (interesects function)
@@ -89,7 +92,7 @@ class Vector(object):
     Returns a slqalchemy.sql.functions.Function
     Use it as a point filter to determine if a geometry should be returned (True or False)
     :params point: A list of dim 3 representing one point [X, Y, Z]
-    :params geomColumn: A sqlAlchemy Column representing a postgis geometry (Must be a triangle)
+    :params geomColumn: A sqlAlchemy Column representing a postgis geometry
     :params srid: Spatial reference system numerical ID
     """
     @classmethod
@@ -112,10 +115,15 @@ class Vector(object):
         geomColumn = cls.geometryColumn()
         bboxGeom = shapelyBBox(bbox)
         wkbGeometry = WKBElement(buffer(bboxGeom.wkb), srid)
-        # ST_DumpValues(Raster, Band Number, True -> returns None and False -> returns numerical vals)
-        return func.ST_DumpValues(bgdi_watermask_rasterize(
-            wkbGeometry, width, height,
-            '.'.join((cls.__table_args__['schema'], cls.__tablename__)), geomColumn.name), 1, False)
+        # ST_DumpValues(Raster, Band Number, True -> returns None
+        # and False -> returns numerical vals)
+        return func.ST_DumpValues(
+            bgdi_watermask_rasterize(
+                wkbGeometry, width, height,
+                '.'.join((cls.__table_args__['schema'], cls.__tablename__)),
+                geomColumn.name
+            ), 1, False
+        )
 
 
 """

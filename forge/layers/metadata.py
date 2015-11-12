@@ -7,7 +7,10 @@ class LayerMetadata(_TileJSON):
 
     def __init__(self, *args, **kwargs):
 
-        defaultExtent = [5.86725126512748, 45.8026860136571, 10.9209100671547, 47.8661652478939]
+        defaultExtent = [
+            5.86725126512748, 45.8026860136571,
+            10.9209100671547, 47.8661652478939
+        ]
         self.useGlobalTiles = False
         self.tileMinZoom = kwargs.get('minzoom')
         self.tileMaxZoom = kwargs.get('maxzoom')

@@ -7,7 +7,8 @@ import signal
 
 class PoolManager:
 
-    def __init__(self, logger, numProcs=multiprocessing.cpu_count(), factor=1, store=False):
+    def __init__(self, logger, numProcs=multiprocessing.cpu_count(),
+            factor=1, store=False):
         self._numProcs = int(numProcs * factor)
         self.logger = logger
         self.store = store
@@ -25,7 +26,9 @@ class PoolManager:
 
     # Assure that sub processes don't get keyborad interrupts
     def _initProcess(self):
-        self.logger.info('Starting process id: %s' % multiprocessing.current_process().pid)
+        self.logger.info(
+            'Starting process id: %s' % multiprocessing.current_process().pid
+        )
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     def numOfProcesses(self):
