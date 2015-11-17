@@ -122,6 +122,7 @@ def parseModelBasedLayer(dbConfig, layerConfig):
             maxScanZoom    = layerConfig.getint('Grid', 'maxScanZoom'),
             name           = layerConfig.get('Metadata', 'name'),
             format         = layerConfig.get('Metadata', 'format'),
+            tileTemplate   = layerConfig.get('Metadata', 'tileTemplate'),
             description    = layerConfig.get('Metadata', 'description'),
             attribution    = layerConfig.get('Metadata', 'attribution'),
             tilesURLs      = layerConfig.get('Metadata', 'tilesURLs').split(',')
@@ -144,6 +145,7 @@ def parseTerrainBasedLayer(layerConfig):
             fullonly       = layerConfig.getint('Grid', 'fullonly'),
             name           = layerConfig.get('Metadata', 'name'),
             format         = layerConfig.get('Metadata', 'format'),
+            tileTemplate   = layerConfig.get('Metadata', 'tileTemplate'),
             description    = layerConfig.get('Metadata', 'description'),
             attribution    = layerConfig.get('Metadata', 'attribution'),
             tilesURLs      = layerConfig.get('Metadata', 'tilesURLs').split(',')
@@ -157,7 +159,7 @@ def getBaseUrls(params):
     baseUrls = []
     for tURL in params.tilesURLs:
         baseUrls.append(
-            tURL + params.bucketBasePath + "{z}/{x}/{y}." + params.format
+            tURL + params.bucketBasePath + params.tileTemplate + "." + params.format
         )
     return baseUrls
 
@@ -254,16 +256,19 @@ tileskipped = multiprocessing.Value('i', 0)
 
 def tileNotExists(tile):
     h = {'Referer': 'http://geo.admin.ch'}
-    # Only native tiles
-    servers = range(5, 10)
-    entryPoint = 'http://wmts%s.geo.admin.ch/' % (random.choice(servers))
-    (bounds, tileXYZ, t0, basePath, tFormat) = tile
-    # Account for a different origin
-    geodetic = GlobalGeodetic(True)
-    nbYTiles = geodetic.GetNumberOfYTilesAtZoom(tileXYZ[2])
-    tilexyz = (tileXYZ[0], nbYTiles - tileXYZ[1] - 1, tileXYZ[2])
+    (bounds, tileXYZ, t0, basePath, tFormat, gridOrigin, tilesURLs) = tile
+    # Only native tiles for now
+    entryPoint = 'http:%s' % (random.choice(tilesURLs))
 
-    tileAdress = '/'.join((str(tilexyz[2]), str(tilexyz[1]), str(tilexyz[0])))
+    # Account for a different origin
+    if gridOrigin == 'topLeft':
+        geodetic = GlobalGeodetic(True)
+        nbYTiles = geodetic.GetNumberOfYTilesAtZoom(tileXYZ[2])
+        tilexyz = (tileXYZ[0], nbYTiles - tileXYZ[1] - 1, tileXYZ[2])
+        tileAdress = '/'.join((str(tilexyz[2]), str(tilexyz[1]), str(tilexyz[0])))
+    else:
+        tileAdress = '/'.join((str(tileXYZ[2]), str(tileXYZ[1]), str(tileXYZ[0])))
+
     url = '%s%s%s.%s' % (entryPoint, basePath, tileAdress, tFormat)
     tilecount.value += 1
     exists = resourceExists(url, headers=h)
@@ -292,14 +297,15 @@ def createS3BasedTileJSON(params):
     tiles = Tiles(
         params.bounds, params.minZoom, params.maxScanZoom,
         t0, fullonly=params.fullonly, basePath=params.bucketBasePath,
-        tFormat=params.format
+        tFormat=params.format, gridOrigin=params.gridOrigin,
+        tilesURLs=params.tilesURLs
     )
     pm = PoolManager(logger=logger, factor=1, store=True)
     tMeta = LayerMetadata(
         bounds=params.bounds, minzoom=params.minZoom,
         maxzoom=params.maxZoom, baseUrls=baseUrls,
         description=params.description, attribution=params.attribution,
-        name=params.name
+        format=params.format, name=params.name
     )
     pm.process(tiles, tileNotExists, maxChunks)
     for xyz in pm.results:
