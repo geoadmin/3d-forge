@@ -87,7 +87,8 @@ class _TileJSON:
                 else:
                     isEqual = True
                     newRow = self.ranges[z][y]
-                    if y == tileMinY:
+                    # In case the new row is empty equality is not met
+                    if y == tileMinY or len(newRow) == 0:
                         isEqual = False
                     else:
                         for i in xrange(0, len(newRow)):
@@ -110,7 +111,9 @@ class _TileJSON:
                             self.available[z - self.tileMinZoom] += previousRec
                         previousRec = []
                         for r in newRow:
-                            previousRec.append(self._createRectangle(r[0], r[1], y, y))
+                            previousRec.append(
+                                self._createRectangle(r[0], r[1], y, y)
+                            )
                 previousRow = newRow
 
             # Finally push the last rec
