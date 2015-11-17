@@ -14,7 +14,7 @@ requires = [
         'numpy',
         'sqlalchemy',
         'shapely',
-        'geoalchemy2>=0.2.5',
+        'geoalchemy2==0.3.0.dev1',
         'requests',
     ]
 

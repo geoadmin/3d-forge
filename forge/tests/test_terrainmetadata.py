@@ -51,19 +51,21 @@ class TestTerrainMetadata(unittest.TestCase):
         self.assertTrue(len(tMeta.available) == 2)
 
         # Assume all tiles are here
+        # from metadata to meta
         tMeta.toJSON()
-        self.assertTrue(len(tMeta.available[0]) == 1)
-        self.assertTrue(len(tMeta.available[1]) == 1)
+        self.assertTrue(len(tMeta.meta['available'][0]) == 0)
+        self.assertTrue(len(tMeta.meta['available'][1]) == 1)
+        self.assertTrue(len(tMeta.meta['available'][2]) == 1)
 
-        self.assertTrue(tMeta.available[0][0]['startX'] == 0)
-        self.assertTrue(tMeta.available[0][0]['endX'] == 3)
-        self.assertTrue(tMeta.available[0][0]['startY'] == 0)
-        self.assertTrue(tMeta.available[0][0]['endY'] == 1)
+        self.assertTrue(tMeta.meta['available'][1][0]['startX'] == 0)
+        self.assertTrue(tMeta.meta['available'][1][0]['endX'] == 3)
+        self.assertTrue(tMeta.meta['available'][1][0]['startY'] == 0)
+        self.assertTrue(tMeta.meta['available'][1][0]['endY'] == 1)
 
-        self.assertTrue(tMeta.available[1][0]['startX'] == 0)
-        self.assertTrue(tMeta.available[1][0]['endX'] == 7)
-        self.assertTrue(tMeta.available[1][0]['startY'] == 0)
-        self.assertTrue(tMeta.available[1][0]['endY'] == 3)
+        self.assertTrue(tMeta.meta['available'][2][0]['startX'] == 0)
+        self.assertTrue(tMeta.meta['available'][2][0]['endX'] == 7)
+        self.assertTrue(tMeta.meta['available'][2][0]['startY'] == 0)
+        self.assertTrue(tMeta.meta['available'][2][0]['endY'] == 3)
 
     def testTerrainMetadataSubset(self):
         minZoom = 1
@@ -89,44 +91,47 @@ class TestTerrainMetadata(unittest.TestCase):
 
         tMeta.toJSON()
 
+        # Zoom 0 (empty ranges if not define)
+        self.assertTrue(len(tMeta.meta['available'][0]) == 0)
+
         # Zoom 1
-        self.assertTrue(tMeta.meta['available'][0][0]['startX'] == 0)
-        self.assertTrue(tMeta.meta['available'][0][0]['endX'] == 1)
-        self.assertTrue(tMeta.meta['available'][0][0]['startY'] == 0)
-        self.assertTrue(tMeta.meta['available'][0][0]['endY'] == 0)
+        self.assertTrue(tMeta.meta['available'][1][0]['startX'] == 0)
+        self.assertTrue(tMeta.meta['available'][1][0]['endX'] == 1)
+        self.assertTrue(tMeta.meta['available'][1][0]['startY'] == 0)
+        self.assertTrue(tMeta.meta['available'][1][0]['endY'] == 0)
 
-        self.assertTrue(tMeta.meta['available'][0][1]['startX'] == 3)
-        self.assertTrue(tMeta.meta['available'][0][1]['endX'] == 3)
-        self.assertTrue(tMeta.meta['available'][0][1]['startY'] == 0)
-        self.assertTrue(tMeta.meta['available'][0][1]['endY'] == 0)
+        self.assertTrue(tMeta.meta['available'][1][1]['startX'] == 3)
+        self.assertTrue(tMeta.meta['available'][1][1]['endX'] == 3)
+        self.assertTrue(tMeta.meta['available'][1][1]['startY'] == 0)
+        self.assertTrue(tMeta.meta['available'][1][1]['endY'] == 0)
 
-        self.assertTrue(tMeta.meta['available'][0][2]['startX'] == 0)
-        self.assertTrue(tMeta.meta['available'][0][2]['endX'] == 0)
-        self.assertTrue(tMeta.meta['available'][0][2]['startY'] == 1)
-        self.assertTrue(tMeta.meta['available'][0][2]['endY'] == 1)
+        self.assertTrue(tMeta.meta['available'][1][2]['startX'] == 0)
+        self.assertTrue(tMeta.meta['available'][1][2]['endX'] == 0)
+        self.assertTrue(tMeta.meta['available'][1][2]['startY'] == 1)
+        self.assertTrue(tMeta.meta['available'][1][2]['endY'] == 1)
 
-        self.assertTrue(tMeta.meta['available'][0][3]['startX'] == 2)
-        self.assertTrue(tMeta.meta['available'][0][3]['endX'] == 3)
-        self.assertTrue(tMeta.meta['available'][0][3]['startY'] == 1)
-        self.assertTrue(tMeta.meta['available'][0][3]['endY'] == 1)
+        self.assertTrue(tMeta.meta['available'][1][3]['startX'] == 2)
+        self.assertTrue(tMeta.meta['available'][1][3]['endX'] == 3)
+        self.assertTrue(tMeta.meta['available'][1][3]['startY'] == 1)
+        self.assertTrue(tMeta.meta['available'][1][3]['endY'] == 1)
 
         # Zoom 2
-        self.assertTrue(tMeta.meta['available'][1][0]['startX'] == 0)
-        self.assertTrue(tMeta.meta['available'][1][0]['endX'] == 3)
-        self.assertTrue(tMeta.meta['available'][1][0]['startY'] == 0)
-        self.assertTrue(tMeta.meta['available'][1][0]['endY'] == 1)
+        self.assertTrue(tMeta.meta['available'][2][0]['startX'] == 0)
+        self.assertTrue(tMeta.meta['available'][2][0]['endX'] == 3)
+        self.assertTrue(tMeta.meta['available'][2][0]['startY'] == 0)
+        self.assertTrue(tMeta.meta['available'][2][0]['endY'] == 1)
 
-        self.assertTrue(tMeta.meta['available'][1][1]['startX'] == 5)
-        self.assertTrue(tMeta.meta['available'][1][1]['endX'] == 7)
-        self.assertTrue(tMeta.meta['available'][1][1]['startY'] == 0)
-        self.assertTrue(tMeta.meta['available'][1][1]['endY'] == 1)
+        self.assertTrue(tMeta.meta['available'][2][1]['startX'] == 5)
+        self.assertTrue(tMeta.meta['available'][2][1]['endX'] == 7)
+        self.assertTrue(tMeta.meta['available'][2][1]['startY'] == 0)
+        self.assertTrue(tMeta.meta['available'][2][1]['endY'] == 1)
 
-        self.assertTrue(tMeta.meta['available'][1][2]['startX'] == 4)
-        self.assertTrue(tMeta.meta['available'][1][2]['endX'] == 7)
-        self.assertTrue(tMeta.meta['available'][1][2]['startY'] == 2)
-        self.assertTrue(tMeta.meta['available'][1][2]['endY'] == 2)
+        self.assertTrue(tMeta.meta['available'][2][2]['startX'] == 4)
+        self.assertTrue(tMeta.meta['available'][2][2]['endX'] == 7)
+        self.assertTrue(tMeta.meta['available'][2][2]['startY'] == 2)
+        self.assertTrue(tMeta.meta['available'][2][2]['endY'] == 2)
 
-        self.assertTrue(tMeta.meta['available'][1][3]['startX'] == 0)
-        self.assertTrue(tMeta.meta['available'][1][3]['endX'] == 7)
-        self.assertTrue(tMeta.meta['available'][1][3]['startY'] == 3)
-        self.assertTrue(tMeta.meta['available'][1][3]['endY'] == 3)
+        self.assertTrue(tMeta.meta['available'][2][3]['startX'] == 0)
+        self.assertTrue(tMeta.meta['available'][2][3]['endX'] == 7)
+        self.assertTrue(tMeta.meta['available'][2][3]['startY'] == 3)
+        self.assertTrue(tMeta.meta['available'][2][3]['endY'] == 3)

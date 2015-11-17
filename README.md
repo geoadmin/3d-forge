@@ -89,9 +89,9 @@ To clone use the --recursive option to get all submodules.
 
 - install with `make install`
 
-- create db with `make createdb`, adapt `database.cfg` for different data sets
+- create db with `make createdb`, adapt `configs/terrain/database.cfg` for different data sets
 
-- create tiles with `tmspyramid`, adapt `tms.cfg` for different tiler
+- create tiles with `tmspyramid`, adapt `configs/terrain/tms.cfg` for different tiler
   configurations
 
 - you can also deactivate stats collection by setting `track_activities` to off in `/etc/postgresql/9.1/main/postgresql.conf`

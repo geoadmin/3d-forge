@@ -16,14 +16,17 @@ def loadTileContent(baseURL, key, headers):
     url = '%s%s' % (baseURL, key)
     r = requests.get(url, headers=headers)
     if r.status_code != requests.codes.ok:
-        raise Exception('Failed to request %s, status code: %s' % (url, r.status_code))
+        raise Exception('Failed to request %s, status code: %s' % (
+            url, r.status_code
+        ))
     return r.content
 
 
-def copyAGITiles(zooms, bounds):
+def copyAGITiles(zooms, bounds, bucketBasePath):
     count = 0
     fullonly = 0
-    headers = {'Accept': 'application/vnd.quantized-mesh;extensions=octvertexnormals-' +
+    headers = {'Accept': 'application/vnd.quantized-mesh;' +
+        'extensions=octvertexnormals-' +
         'watermask,application/octet-stream;q=0.9,*/*;q=0.01'}
     baseURL = 'http://assets.agi.com/stk-terrain/world/'
     bucket = getBucket()
@@ -34,7 +37,8 @@ def copyAGITiles(zooms, bounds):
         f.write(loadTileContent(baseURL, bucketKey, headers))
         f.seek(0)
         compressedFile = gzipFileObject(f)
-        writeToS3(bucket, bucketKey, compressedFile, 'poc_watermask')
+        writeToS3(bucket, bucketKey, compressedFile,
+            'poc_watermask', bucketBasePath)
         count += 1
         if count % 20 == 0:
             print 'Copying %s...' % bucketKey

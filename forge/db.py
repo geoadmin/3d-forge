@@ -9,14 +9,16 @@ import sys
 import ConfigParser
 import sqlalchemy
 from geoalchemy2 import WKTElement
+from sqlalchemy.sql import exists, select, text
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.pool import NullPool
 from contextlib import contextmanager
 
+from forge.configs import tmsConfig
 import forge.lib.cartesian2d as c2d
 from forge.models import create_simplified_geom_table
-from forge.lib.tiles import Tiles
+from forge.lib.tiles import TerrainTiles
 from forge.lib.global_geodetic import GlobalGeodetic
 from forge.models.tables import modelsPyramid, Lakes
 from forge.lib.logs import getLogger
@@ -46,8 +48,10 @@ def reprojectShp(shpFilePath, args):
         # If out file already exists clean it up first
         cleanup(outFile)
 
-        command = 'mono %(geosuiteCmd)s -calc reframe -in %(inFile)s -out %(outFile)s -pframes %(fromPFrames)s,%(toPFrames)s ' \
-            '-aframes %(fromAFrames)s,%(toAFrames)s -log %(logfile)s -err %(errorfile)s' % dict(
+        command = 'mono %(geosuiteCmd)s -calc reframe -in %(inFile)s ' \
+            '-out %(outFile)s -pframes %(fromPFrames)s,%(toPFrames)s ' \
+            '-aframes %(fromAFrames)s,%(toAFrames)s -log %(logfile)s ' \
+            '-err %(errorfile)s' % dict(
                 geosuiteCmd = args.geosuiteCmd,
                 inFile      = args.shpFile,
                 outFile     = outFile,
@@ -61,11 +65,12 @@ def reprojectShp(shpFilePath, args):
         logger.info('Command: %s' % command)
         subprocess.call(command, shell=True)
     except Exception as e:
-        logger.error('Could not reproject %(inFile)s into %(outFile)s: %(err)s' % dict(
-            inFile  = shpFilePath,
-            outFile = outFile,
-            err     = e
-        ), exc_info=True)
+        logger.error('Could not reproject %(inFile)s into '
+            '%(outFile)s: %(err)s' % dict(
+                inFile  = shpFilePath,
+                outFile = outFile,
+                err     = e
+            ), exc_info=True)
         raise Exception(e)
 
     # TODO new version has error codes this can now be changed
@@ -73,10 +78,11 @@ def reprojectShp(shpFilePath, args):
     # We determine if the output file exists and exit if not
     if not os.path.isfile(outFile):
         logger.error('File could not be reprojected')
-        logger.error('Have a look at %(logfile)s or %(errorfile)s for more information.' % dict(
-            logfile   = args.logfile,
-            errorfile = args.errorfile
-        ))
+        logger.error('Have a look at %(logfile)s or %(errorfile)s for '
+            'more information.' % dict(
+                logfile   = args.logfile,
+                errorfile = args.errorfile
+            ))
         raise Exception('File could not be reprojected!!')
 
     return outFile
@@ -158,21 +164,23 @@ class DB:
             self.user = config.get('Database', 'user')
             self.password = config.get('Database', 'password')
 
-    def __init__(self, configFile):
+    def __init__(self, dbConfigFile):
 
-        if isinstance(configFile, str):
-            config = ConfigParser.RawConfigParser()
-            config.read(configFile)
-            self.config = config
-        else:
-            config = configFile
+        if not os.path.exists(dbConfigFile):
+            raise OSError('%s not found' % dbConfigFile)
+        self.dbConfigFile = dbConfigFile
+        config = ConfigParser.RawConfigParser()
+        config.read(dbConfigFile)
+        self.config = config
 
         self.serverConf = DB.Server(config)
         self.adminConf = DB.Admin(config)
         self.databaseConf = DB.Database(config)
 
+        connInfo = 'postgresql+psycopg2://%(user)s:%(password)s@%(host)s' \
+                   ':%(port)d/%(database)s'
         self.superEngine = sqlalchemy.create_engine(
-            'postgresql+psycopg2://%(user)s:%(password)s@%(host)s:%(port)d/%(database)s' % dict(
+            connInfo % dict(
                 user=self.adminConf.user,
                 password=self.adminConf.password,
                 host=self.serverConf.host,
@@ -180,9 +188,8 @@ class DB:
                 database='postgres'
             )
         )
-
         self.adminEngine = sqlalchemy.create_engine(
-            'postgresql+psycopg2://%(user)s:%(password)s@%(host)s:%(port)d/%(database)s' % dict(
+            connInfo % dict(
                 user=self.adminConf.user,
                 password=self.adminConf.password,
                 host=self.serverConf.host,
@@ -191,7 +198,7 @@ class DB:
             )
         )
         self.userEngine = sqlalchemy.create_engine(
-            'postgresql+psycopg2://%(user)s:%(password)s@%(host)s:%(port)d/%(database)s' % dict(
+            connInfo % dict(
                 user=self.databaseConf.user,
                 password=self.databaseConf.password,
                 host=self.serverConf.host,
@@ -234,10 +241,12 @@ class DB:
 
     def createUser(self):
         logger.info('Action: createUser()')
+        logger.info('UserName: %s' % self.databaseConf.user)
+        logger.info('UserPass: %s' % self.databaseConf.password)
         with self.superConnection() as conn:
             try:
-                conn.execute(
-                    "CREATE ROLE %(role)s WITH NOSUPERUSER INHERIT LOGIN ENCRYPTED PASSWORD '%(password)s'" % dict(
+                conn.execute("CREATE ROLE %(role)s WITH NOSUPERUSER "
+                    "INHERIT LOGIN ENCRYPTED PASSWORD '%(password)s'" % dict(
                         role=self.databaseConf.user,
                         password=self.databaseConf.password
                     )
@@ -250,20 +259,23 @@ class DB:
 
     def createDatabase(self):
         logger.info('Action: createDatabase()')
+        logger.info('DBHost: %s' % self.serverConf.host)
+        logger.info('DBName: %s' % self.databaseConf.name)
         with self.superConnection() as conn:
             try:
-                conn.execute(
-                    "CREATE DATABASE %(name)s WITH OWNER %(role)s ENCODING 'UTF8' TEMPLATE template_postgis" % dict(
+                conn.execute("CREATE DATABASE %(name)s WITH OWNER %(role)s "
+                    "ENCODING 'UTF8' TEMPLATE template_postgis" % dict(
                         name=self.databaseConf.name,
                         role=self.databaseConf.user
                     )
                 )
             except ProgrammingError as e:
-                logger.error('Could not create database %(name)s with owner %(role)s: %(err)s' % dict(
-                    name=self.databaseConf.name,
-                    role=self.databaseConf.user,
-                    err=str(e)
-                ), exc_info=True)
+                logger.error('Could not create database %(name)s '
+                    'with owner %(role)s: %(err)s' % dict(
+                        name=self.databaseConf.name,
+                        role=self.databaseConf.user,
+                        err=str(e)
+                    ), exc_info=True)
 
         with self.adminConnection() as conn:
             try:
@@ -275,67 +287,97 @@ class DB:
                     role=self.databaseConf.user
                 ))
             except ProgrammingError as e:
-                logger.error('Could not create database %(name)s with owner %(role)s: %(err)s' % dict(
-                    name=self.databaseConf.name,
-                    role=self.databaseConf.user,
-                    err=str(e)
-                ), exc_info=True)
+                logger.error('Could not create database %(name)s '
+                    'with owner %(role)s: %(err)s' % dict(
+                        name=self.databaseConf.name,
+                        role=self.databaseConf.user,
+                        err=str(e)
+                    ), exc_info=True)
 
-    def setupDatabase(self):
-        logger.info('Action: setupDatabase()')
+    def createSchema(self):
+        logger.info('Action: createSchema()')
+        with self.userSession() as session:
+            q = exists(select([text("schema_name")])).select_from(
+                text("information_schema.schemata")
+            ).where(text("schema_name = 'data'"))
+            if not session.query(q).scalar():
+                logger.info('Creating schema data')
+                session.execute('CREATE SCHEMA data;')
+                session.commit()
+
+    def createTables(self):
+        logger.info('Action: createTables()')
         try:
             for model in modelsPyramid.models:
                 model.__table__.create(self.userEngine, checkfirst=True)
             Lakes.__table__.create(self.userEngine, checkfirst=True)
         except ProgrammingError as e:
-            logger.warning('Could not setup database on %(name)s: %(err)s' % dict(
-                name=self.databaseConf.name,
-                err=str(e)
-            ))
+            logger.warning('Could not setup database on %(name)s'
+                ': %(err)s' % dict(
+                    name=self.databaseConf.name,
+                    err=str(e)
+                ))
+
+    def setupDatabase(self):
+        logger.info('Action: setupDatabase()')
+        self.createSchema()
+        self.createTables()
 
     def setupFunctions(self):
         logger.info('Action: setupFunctions()')
-
-        os.environ['PGPASSWORD'] = self.databaseConf.password
+        logger.info('DBHost: %s' % self.serverConf.host)
         baseDir = 'forge/sql/'
 
         for fileName in os.listdir('forge/sql/'):
+            logger.info('Action: setupFunctions() %s function' % fileName)
             if fileName != 'legacy.sql':
-                command = 'psql -U %(user)s -d %(dbname)s -a -f %(baseDir)s%(fileName)s' % dict(
-                    user=self.databaseConf.user,
-                    dbname=self.databaseConf.name,
-                    baseDir=baseDir,
-                    fileName=fileName
-                )
+                command = 'psql --quiet -U %(user)s -d %(dbname)s -a -f ' \
+                    '%(baseDir)s%(fileName)s' % dict(
+                        user=self.databaseConf.user,
+                        dbname=self.databaseConf.name,
+                        baseDir=baseDir,
+                        fileName=fileName
+                    )
                 try:
+                    os.environ['PGPASSWORD'] = self.databaseConf.password
                     subprocess.call(command, shell=True)
                 except Exception as e:
-                    logger.error('Could not add custom functions %s to the database: %(err)s' % dict(
-                        fileName=fileName,
-                        err=str(e)
-                    ), exc_info=True)
+                    logger.error('Could not add custom functions '
+                        '%s to the database: %(err)s' % dict(
+                            fileName=fileName,
+                            err=str(e)
+                        ), exc_info=True)
                     logger.error(command)
+                finally:
+                    del os.environ['PGPASSWORD']
             else:
-                with self.adminConnection() as conn:
-                    pgVersion = conn.execute("Select postgis_version();").fetchone()[0]
-                    if pgVersion.startswith("2."):
-                        logger.info('Action: setupFunctions() -> legacy.sql')
-                        command = 'psql --quiet -h %(host)s -U %(user)s -d %(dbname)s -f %(baseDir)s%(fileName)s' % dict(
+                pgVersion = ''
+                with self.userConnection() as conn:
+                    pgVersion = conn.execute(
+                        "SELECT postgis_version();"
+                    ).fetchone()[0]
+                if pgVersion.startswith("2."):
+                    command = 'psql --quiet -h %(host)s -U %(user)s ' \
+                        '-d %(dbname)s -f %(baseDir)s%(fileName)s' % dict(
                             host=self.serverConf.host,
-                            user=self.databaseConf.user,
+                            user=self.adminConf.user,
                             dbname=self.databaseConf.name,
                             baseDir=baseDir,
                             fileName=fileName
                         )
-                        try:
-                            subprocess.call(command, shell=True)
-                        except Exception as e:
-                            logger.error('Could not install postgis 2.1 legacy functions to the database: %(err)s' % dict(
+                    # We need an admin pass for untrusted language
+                    try:
+                        os.environ['PGPASSWORD'] = self.adminConf.password
+                        subprocess.call(command, shell=True)
+                    except Exception as e:
+                        logger.error('Could not install postgis 2.1 '
+                            'legacy functions to the database: '
+                            '%(err)s' % dict(
                                 err=str(e)
                             ), exc_info=True)
-                            logger.error(command)
-
-        del os.environ['PGPASSWORD']
+                        logger.error(command)
+                    finally:
+                        del os.environ['PGPASSWORD']
 
     def populateTables(self):
         logger.info('Action: populateTables()')
@@ -384,7 +426,8 @@ class DB:
         pm.process(featuresArgs, populateFeatures, 1)
 
         tend = time.time()
-        logger.info('All tables have been created. It took %s' % str(datetime.timedelta(seconds=tend - tstart)))
+        logger.info('All tables have been created. It took %s' % str(
+            datetime.timedelta(seconds=tend - tstart)))
 
     def populateLakes(self):
         self.setupDatabase()
@@ -418,20 +461,26 @@ class DB:
             # Once all features have been commited, start creating all
             # the simplified versions of the lakes
             logger.info('Simplifying lakes')
-            tmsConfig = ConfigParser.RawConfigParser()
-            tmsConfig.read('tms.cfg')
-            tiles = Tiles('database.cfg', tmsConfig, time.time())
+            tiles = TerrainTiles(self.dbConfigFile, tmsConfig, time.time())
             geodetic = GlobalGeodetic(True)
             bounds = (tiles.minLon, tiles.minLat, tiles.maxLon, tiles.maxLat)
             zooms = range(tiles.tileMinZ, tiles.tileMaxZ + 1)
             for i in xrange(0, len(zooms)):
                 zoom = zooms[i]
                 tablename = 'lakes_%s' % zoom
-                tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], zoom)
-                tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], zoom)
+                tileMinX, tileMinY = geodetic.LonLatToTile(
+                    bounds[0], bounds[1], zoom
+                )
+                tileMaxX, tileMaxY = geodetic.LonLatToTile(
+                    bounds[2], bounds[3], zoom
+                )
                 tileBounds = geodetic.TileBounds(tileMinX, tileMinY, zoom)
-                pointA = transformCoordinate('POINT(%s %s)' % (tileBounds[0], tileBounds[1]), 4326, 21781).GetPoints()[0]
-                pointB = transformCoordinate('POINT(%s %s)' % (tileBounds[2], tileBounds[3]), 4326, 21781).GetPoints()[0]
+                pointA = transformCoordinate('POINT(%s %s)' % (
+                    tileBounds[0], tileBounds[1]), 4326, 21781
+                ).GetPoints()[0]
+                pointB = transformCoordinate('POINT(%s %s)' % (
+                    tileBounds[2], tileBounds[3]), 4326, 21781
+                ).GetPoints()[0]
                 length = c2d.distance(pointA, pointB)
                 pixelArea = pow(length, 2) / pow(256.0, 2)
                 pixelLength = math.sqrt(pixelArea)
@@ -439,7 +488,8 @@ class DB:
                     create_simplified_geom_table(tablename, pixelLength)
                 )
                 session.commit()
-                logger.info('Commit table public.%s with %s meters tolerance' % (tablename, pixelLength))
+                logger.info('Commit table public.%s with %s meters '
+                    'tolerance' % (tablename, pixelLength))
 
     def dropDatabase(self):
         logger.info('Action: dropDatabase()')
@@ -495,13 +545,15 @@ class DB:
 
     def console(self):
         logger.info('Action: console()')
-        os.environ['PGPASSWORD'] = self.databaseConf.password
-        cmdline = 'psql -h %(host)s -p %(port)d -U %(user)s %(name)s' % dict(
-            host    = self.serverConf.host,
-            port    = self.serverConf.port,
-            user    = self.databaseConf.user,
-            name    = self.databaseConf.name
-        )
-        cmd = cmdline.split()
-        os.spawnvpe(os.P_WAIT, cmd[0], cmd, os.environ)
-        del os.environ['PGPASSWORD']
+        try:
+            os.environ['PGPASSWORD'] = self.databaseConf.password
+            cmdline = 'psql -h %(host)s -p %(port)d -U %(user)s %(name)s' % dict(
+                host    = self.serverConf.host,
+                port    = self.serverConf.port,
+                user    = self.databaseConf.user,
+                name    = self.databaseConf.name
+            )
+            cmd = cmdline.split()
+            os.spawnvpe(os.P_WAIT, cmd[0], cmd, os.environ)
+        finally:
+            del os.environ['PGPASSWORD']

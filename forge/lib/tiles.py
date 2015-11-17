@@ -4,7 +4,8 @@ from forge.lib.global_geodetic import GlobalGeodetic
 
 
 def isInside(tile, bounds):
-    if tile[0] >= bounds[0] and tile[1] >= bounds[1] and tile[2] <= bounds[2] and tile[3] <= bounds[3]:
+    if tile[0] >= bounds[0] and tile[1] >= bounds[1] and \
+            tile[2] <= bounds[2] and tile[3] <= bounds[3]:
         return True
     return False
 
@@ -25,21 +26,50 @@ def grid(bounds, zoomLevels, fullonly):
 
 class Tiles:
 
+    def __init__(self, bounds, minZoom, maxZoom, t0,
+            fullonly=False, basePath=None, tFormat=None, gridOrigin=None, tilesURLs=None):
+        self.t0 = t0
+        self.bounds = bounds
+        self.tileMinZ = minZoom
+        self.tileMaxZ = maxZoom
+        self.fullonly = fullonly
+        self.basePath = basePath
+        self.tFormat = tFormat
+        self.gridOrigin = gridOrigin
+        self.tilesURLs = tilesURLs
+
+    def __iter__(self):
+        zRange = range(self.tileMinZ, self.tileMaxZ + 1)
+
+        for bounds, tileXYZ in grid(self.bounds, zRange, self.fullonly):
+            if self.basePath and self.tFormat:
+                yield (
+                    bounds, tileXYZ, self.t0, self.basePath,
+                    self.tFormat, self.gridOrigin, self.tilesURLs
+                )
+            else:
+                yield (bounds, tileXYZ, self.t0)
+
+
+class TerrainTiles:
+
     def __init__(self, dbConfigFile, tmsConfig, t0):
         self.t0 = t0
 
-        self.minLon = float(tmsConfig.get('Extent', 'minLon'))
-        self.maxLon = float(tmsConfig.get('Extent', 'maxLon'))
-        self.minLat = float(tmsConfig.get('Extent', 'minLat'))
-        self.maxLat = float(tmsConfig.get('Extent', 'maxLat'))
-        self.fullonly = int(tmsConfig.get('Extent', 'fullonly'))
+        self.minLon = tmsConfig.getfloat('Extent', 'minLon')
+        self.maxLon = tmsConfig.getfloat('Extent', 'maxLon')
+        self.minLat = tmsConfig.getfloat('Extent', 'minLat')
+        self.maxLat = tmsConfig.getfloat('Extent', 'maxLat')
+        self.fullonly = tmsConfig.getint('Extent', 'fullonly')
         self.bounds = (self.minLon, self.minLat, self.maxLon, self.maxLat)
 
-        self.tileMinZ = int(tmsConfig.get('Zooms', 'tileMinZ'))
-        self.tileMaxZ = int(tmsConfig.get('Zooms', 'tileMaxZ'))
+        self.bucketBasePath = tmsConfig.get('General', 'bucketpath')
 
-        self.hasLighting = int(tmsConfig.get('Extensions', 'lighting'))
-        self.hasWatermask = int(tmsConfig.get('Extensions', 'watermask'))
+        self.tileMinZ = tmsConfig.getint('Zooms', 'tileMinZ')
+        self.tileMaxZ = tmsConfig.getint('Zooms', 'tileMaxZ')
+
+        self.hasLighting = tmsConfig.getint('Extensions', 'lighting')
+        self.hasWatermask = tmsConfig.getint('Extensions', 'watermask')
 
         self.dbConfigFile = dbConfigFile
 
@@ -47,10 +77,11 @@ class Tiles:
         zRange = range(self.tileMinZ, self.tileMaxZ + 1)
 
         for bounds, tileXYZ in grid(self.bounds, zRange, self.fullonly):
-            yield (bounds, tileXYZ, self.t0, self.dbConfigFile, self.hasLighting, self.hasWatermask)
+            yield (bounds, tileXYZ, self.t0, self.dbConfigFile,
+                self.bucketBasePath, self.hasLighting, self.hasWatermask)
 
 
-class QueueTiles:
+class QueueTerrainTiles:
 
     def __init__(self, qName, dbConfigFile, tmsConfig, t0, num):
         self.t0 = t0
@@ -58,9 +89,12 @@ class QueueTiles:
         self.qName = qName
         self.num = num
 
-        self.hasLighting = int(tmsConfig.get('Extensions', 'lighting'))
-        self.hasWatermask = int(tmsConfig.get('Extensions', 'watermask'))
+        self.bucketBasePath = tmsConfig.get('General', 'bucketPath')
+
+        self.hasLighting = tmsConfig.getint('Extensions', 'lighting')
+        self.hasWatermask = tmsConfig.getint('Extensions', 'watermask')
 
     def __iter__(self):
         for i in range(0, self.num):
-            yield (self.qName, self.t0, self.dbConfigFile, self.hasLighting, self.hasWatermask)
+            yield (self.qName, self.t0, self.dbConfigFile,
+                self.bucketBasePath, self.hasLighting, self.hasWatermask)

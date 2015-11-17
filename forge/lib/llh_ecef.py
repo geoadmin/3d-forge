@@ -38,7 +38,10 @@ def ECEF2LLH(x, y, z):
     p = math.sqrt(x ** 2 + y ** 2)
     th = math.atan2(wgs84_a * z, wgs84_b * p)
     lon = math.atan2(y, x)
-    lat = math.atan2(z + ep ** 2 * wgs84_b * math.sin(th) ** 3, p - wgs84_e2 * wgs84_a * math.cos(th) ** 3)
+    lat = math.atan2(
+        z + ep ** 2 * wgs84_b * math.sin(th) ** 3,
+        p - wgs84_e2 * wgs84_a * math.cos(th) ** 3
+    )
     N = wgs84_a / math.sqrt(1 - wgs84_e2 * math.sin(lat) ** 2)
     alt = p / math.cos(lat) - N
 

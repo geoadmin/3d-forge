@@ -7,18 +7,28 @@ import signal
 
 class PoolManager:
 
-    def __init__(self, logger, numProcs=multiprocessing.cpu_count(), factor=1):
+    def __init__(self, logger, numProcs=multiprocessing.cpu_count(),
+            factor=1, store=False):
         self._numProcs = int(numProcs * factor)
         self.logger = logger
+        self.store = store
+        self.results = []
         self._pool = multiprocessing.Pool(self._numProcs, self._initProcess)
 
     def _abort(self):
         self._pool.terminate()
         self._pool.join()
 
+    def _writer(self, records):
+        for r in records:
+            if r:
+                self.results.append(r)
+
     # Assure that sub processes don't get keyborad interrupts
     def _initProcess(self):
-        self.logger.info('Starting process id: %s' % multiprocessing.current_process().pid)
+        self.logger.info(
+            'Starting process id: %s' % multiprocessing.current_process().pid
+        )
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     def numOfProcesses(self):
@@ -26,7 +36,12 @@ class PoolManager:
 
     # Blocking call
     def process(self, iterable, func, chunks):
-        self._pool.imap_unordered(func, iterable, chunks)
+        if self.store:
+            self._writer(self._pool.imap_unordered(
+                func, iterable, chunksize=chunks
+            ))
+        else:
+            self._pool.imap_unordered(func, iterable, chunks)
         self._pool.close()
         try:
             while len([p for p in self._pool._pool if p.is_alive()]) > 0:

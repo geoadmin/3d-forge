@@ -13,9 +13,9 @@ password: tileforge
 
 [Data]
 baseDir: /geodata/smb/iwi/3DTerrain/2015/
-shapefiles: DHM25/128/,DHM25/64/,DHM25/32/,NW/128/,NW/64/,NW/32/,NW/16/,NW/8/,NW/4/,NW/2/,NW/1/,NW/0.5/
-tablenames: dhm25_128m,dhm25_64m,dhm25_32m,bl_128m,bl_64m,bl_32m,bl_16m,bl_8m,bl_4m,bl_2m,bl_1m,bl_0_5m
-modelnames: dhm25_128m,dhm25_64m,dhm25_32m,bl_128m,bl_64m,bl_32m,bl_16m,bl_8m,bl_4m,bl_2m,bl_1m,bl_0_5m
+shapefiles: DHM25/256,DHM25/128/,DHM25/64/,DHM25/32/,NW/128/,NW/64/,NW/32/,NW/16/,NW/8/,NW/4/,NW/2/,NW/1/,NW/0.5/
+tablenames: dhm25_256m,dhm25_128m,dhm25_64m,dhm25_32m,bl_128m,bl_64m,bl_32m,bl_16m,bl_8m,bl_4m,bl_2m,bl_1m,bl_0_5m
+modelnames: dhm25_256m,dhm25_128m,dhm25_64m,dhm25_32m,bl_128m,bl_64m,bl_32m,bl_16m,bl_8m,bl_4m,bl_2m,bl_1m,bl_0_5m
 lakes: /home/geodata/lakes/lakes.shp
 
 # Paths must be absolute!

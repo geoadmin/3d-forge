@@ -3,6 +3,7 @@
 import sys
 import getopt
 from textwrap import dedent
+from forge.configs import tmsConfig
 from forge.lib.helpers import error
 from forge.lib.boto_conn import S3Keys
 
@@ -10,7 +11,8 @@ from forge.lib.boto_conn import S3Keys
 # One might want to provide an extent also later on
 def usage():
     print(dedent('''\
-        Usage: venv/bin/python forge/script/s3_tiles.py [-p <prefix>|--prefix=<prefix>] <command>')
+        Usage: venv/bin/python forge/script/s3_tiles.py
+               [-p <prefix>|--prefix=<prefix>] <command>')
 
         Commands:
             delete:             delete all keys (tiles)
@@ -33,7 +35,8 @@ def main():
     if len(args) < 1:
         error('you must specify a command', 3, usage=usage)
 
-    s3Keys = S3Keys(prefix)
+    bucketBasePath = tmsConfig.get('General', 'bucketpath')
+    s3Keys = S3Keys(prefix, bucketBasePath)
 
     command = args[0]
     if command == 'delete':

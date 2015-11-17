@@ -4,14 +4,7 @@ from sqlalchemy.sql import func, and_
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 from geoalchemy2.elements import WKBElement
-from geoalchemy2.types import Geometry as GeoAlchemyGeometry
 from shapely.geometry import box, Point
-
-
-class Geometry(GeoAlchemyGeometry):
-
-    def column_expression(self, col):
-        return func.ST_AsEWKB(col, type_=self)
 
 
 class _interpolate_height_on_plane(FunctionElement):
@@ -70,11 +63,16 @@ class Vector(object):
     :params srid: Spatial reference system numerical ID
     """
     @classmethod
-    def bboxIntersects(cls, bbox, srid=4326):
+    def bboxIntersects(cls, bbox, fromSrid=4326, toSrid=4326):
         bboxGeom = shapelyBBox(bbox)
-        wkbGeometry = WKBElement(buffer(bboxGeom.wkb), srid)
+        wkbGeometry = WKBElement(buffer(bboxGeom.wkb), fromSrid)
+        if fromSrid != toSrid:
+            wkbGeometry = func.ST_Transform(wkbGeometry, toSrid)
         geomColumn = cls.geometryColumn()
-        return and_(geomColumn.intersects(wkbGeometry), func.ST_Intersects(geomColumn, wkbGeometry))
+        return and_(
+            geomColumn.intersects(wkbGeometry),
+            func.ST_Intersects(geomColumn, wkbGeometry)
+        )
 
     """
     Returns a slqalchemy.sql.functions.Function (interesects function)
@@ -94,7 +92,7 @@ class Vector(object):
     Returns a slqalchemy.sql.functions.Function
     Use it as a point filter to determine if a geometry should be returned (True or False)
     :params point: A list of dim 3 representing one point [X, Y, Z]
-    :params geomColumn: A sqlAlchemy Column representing a postgis geometry (Must be a triangle)
+    :params geomColumn: A sqlAlchemy Column representing a postgis geometry
     :params srid: Spatial reference system numerical ID
     """
     @classmethod
@@ -117,10 +115,15 @@ class Vector(object):
         geomColumn = cls.geometryColumn()
         bboxGeom = shapelyBBox(bbox)
         wkbGeometry = WKBElement(buffer(bboxGeom.wkb), srid)
-        # ST_DumpValues(Raster, Band Number, True -> returns None and False -> returns numerical vals)
-        return func.ST_DumpValues(bgdi_watermask_rasterize(
-            wkbGeometry, width, height,
-            '.'.join((cls.__table_args__['schema'], cls.__tablename__)), geomColumn.name), 1, False)
+        # ST_DumpValues(Raster, Band Number, True -> returns None
+        # and False -> returns numerical vals)
+        return func.ST_DumpValues(
+            bgdi_watermask_rasterize(
+                wkbGeometry, width, height,
+                '.'.join((cls.__table_args__['schema'], cls.__tablename__)),
+                geomColumn.name
+            ), 1, False
+        )
 
 
 """

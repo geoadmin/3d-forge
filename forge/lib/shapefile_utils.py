@@ -10,7 +10,9 @@ class ShpToGDALFeatures(object):
         if shpFilePath is None:
             raise Exception('No shapefile path provided')
         if re.search(r'(\.shp)$', shpFilePath) is None:
-            raise TypeError('Only shapefiles are supported. Provided path %s' % shpFilePath)
+            raise TypeError(
+                'Only shapefiles are supported. Provided path %s' % shpFilePath
+            )
         self.shpFilePath = shpFilePath
         self.drvName = 'ESRI Shapefile'
         self.drv = ogr.GetDriverByName(self.drvName)

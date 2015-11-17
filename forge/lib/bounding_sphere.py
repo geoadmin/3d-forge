@@ -89,16 +89,21 @@ class BoundingSphere(object):
                 naiveRadius = r
 
             # Make adjustments to the Ritter Sphere to include all points.
-            oldCenterToPointSquared = c3d.magnitudeSquared(c3d.subtract(currentP, ritterCenter))
+            oldCenterToPointSquared = c3d.magnitudeSquared(
+                c3d.subtract(currentP, ritterCenter)
+            )
             if oldCenterToPointSquared > radiusSquared:
                 oldCenterToPoint = math.sqrt(oldCenterToPointSquared)
                 ritterRadius = (ritterRadius + oldCenterToPoint) * 0.5
                 # Calculate center of new Ritter sphere
                 oldToNew = oldCenterToPoint - ritterRadius
                 ritterCenter = [
-                    (ritterRadius * ritterCenter[0] + oldToNew * currentP[0]) / oldCenterToPoint,
-                    (ritterRadius * ritterCenter[1] + oldToNew * currentP[1]) / oldCenterToPoint,
-                    (ritterRadius * ritterCenter[2] + oldToNew * currentP[2]) / oldCenterToPoint,
+                    (ritterRadius * ritterCenter[0] + oldToNew * currentP[0])
+                    / oldCenterToPoint,
+                    (ritterRadius * ritterCenter[1] + oldToNew * currentP[1])
+                    / oldCenterToPoint,
+                    (ritterRadius * ritterCenter[2] + oldToNew * currentP[2])
+                    / oldCenterToPoint
                 ]
 
         # Keep the naive sphere if smaller

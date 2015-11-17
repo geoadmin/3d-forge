@@ -2,28 +2,35 @@
 
 import os
 import ConfigParser
-from sqlalchemy import event
-from sqlalchemy.schema import CreateSchema
 from sqlalchemy import Column, Sequence, BigInteger, Text
 from sqlalchemy.ext.declarative import declarative_base
+from geoalchemy2.types import Geometry
 
-from forge.models import Vector, Geometry
+from forge.models import Vector
 from forge.lib.helpers import isShapefile
 
 
 Base = declarative_base()
-event.listen(Base.metadata, 'before_create', CreateSchema('data'))
 
 table_args = {'schema': 'data'}
 # management to true only for postgis 1.5
-WGS84Polygon3D = Geometry(geometry_type='POLYGON', srid=4326, dimension=3, spatial_index=True, management=True)
-WGS84Polygon2D = Geometry(geometry_type='POLYGON', srid=4326, dimension=2, spatial_index=True, management=True)
+WGS84Polygon3D = Geometry(
+    geometry_type='POLYGON', srid=4326,
+    dimension=3, spatial_index=True, management=True
+)
+WGS84Polygon2D = Geometry(
+    geometry_type='POLYGON', srid=4326, dimension=2,
+    spatial_index=True, management=True
+)
 
 
 class Lakes(Base, Vector):
     __tablename__ = 'lakes'
     __table_args__ = {'schema': 'public'}
-    id = Column(BigInteger(), Sequence('id_lakes_seq', schema=table_args['schema']), nullable=False, primary_key=True)
+    id = Column(
+        BigInteger(), Sequence('id_lakes_seq', schema=table_args['schema']),
+        nullable=False, primary_key=True
+    )
     the_geom = Column('the_geom', WGS84Polygon2D)
 
 
@@ -59,7 +66,8 @@ class ModelsPyramid:
         for i in range(0, len(self.shpsBaseDir)):
             shpBaseDir = '%s%s' % (self.baseDir, self.shpsBaseDir[i])
             if os.path.exists(shpBaseDir):
-                shapefiles = ['%s%s' % (shpBaseDir, f) for f in os.listdir(shpBaseDir) if isShapefile(f)]
+                shapefiles = ['%s%s' % (shpBaseDir, f)
+                    for f in os.listdir(shpBaseDir) if isShapefile(f)]
             else:
                 shapefiles = []
             self.models.append(modelFactory(
@@ -71,8 +79,8 @@ class ModelsPyramid:
     def _buildModelsPyramid(self):
         tmsConfig = ConfigParser.RawConfigParser()
         tmsConfig.read(self.tmsConfigFile)
-        self.tileMinZ = int(tmsConfig.get('Zooms', 'tileMinZ'))
-        self.tileMaxZ = int(tmsConfig.get('Zooms', 'tileMaxZ'))
+        self.tileMinZ = tmsConfig.getint('Zooms', 'tileMinZ')
+        self.tileMaxZ = tmsConfig.getint('Zooms', 'tileMaxZ')
 
         self.modelsPyramid = {}
         for i in range(self.tileMinZ, self.tileMaxZ + 1):
@@ -100,10 +108,5 @@ class ModelsPyramid:
         return LakeNewClass
 
 
-def isInside(tile, bounds):
-    if tile[0] >= bounds[0] and tile[1] >= bounds[1] and tile[2] <= bounds[2] and tile[3] <= bounds[3]:
-        return True
-    return False
-
-
-modelsPyramid = ModelsPyramid('database.cfg', 'tms.cfg')
+modelsPyramid = ModelsPyramid('configs/terrain/database.cfg',
+    'configs/terrain/tms.cfg')
