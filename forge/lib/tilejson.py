@@ -126,7 +126,8 @@ class _TileJSON:
                 if z < self.meta['minzoom']:
                     self.meta['available'] = [globalTilesConfig[z]] + \
                         self.meta['available']
-            self.meta['minzoom'] = 0
+        # Always start at 0
+        self.meta['minzoom'] = 0
 
         # The number of ranges must be equal to maxzoom + 1
         nbRanges = len(self.meta['available'])
