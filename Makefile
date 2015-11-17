@@ -63,15 +63,12 @@ help:
 
 
 .PHONY: all
-all: install apache/testapp.conf configs/terrain/database.cfg configs/terrain/tms.cfg configs/raster/database.cfg logging.cfg test lint
+all: install configs/terrain/database.cfg configs/terrain/tms.cfg configs/raster/database.cfg logging.cfg test lint
 
 .PHONY: install
 install:
 	( if [ -d "$(VENV)" ] ; then echo 'Skipping venv creation'; else virtualenv $(VENV) --system-site-packages; fi ); \
 	$(PYTHON_CMD) setup.py develop
-
-apache/testapp.conf: apache/testapp.conf.mako
-	$(MAKO_CMD) --var "user=$(USERNAME)" --var "directory=$(CURDIR)" $< > $@
 
 configs/terrain/database.cfg: configs/terrain/database.cfg.mako
 	$(MAKO_CMD) --var "pgpass=$(PGPASS)" --var "dbtarget=$(DBTARGET)" --var "username=$(USERNAME)" $< > $@
@@ -191,8 +188,6 @@ tilejson:
 clean:
 	rm -rf venv
 	rm -rf *.egg-info
-	rm -rf 3d-testapp
-	rm -f apache/testapp.conf
 	rm -f configs/terrain/database.cfg
 	rm -f configs/terrain/tms.cfg
 	rm -f configs/raster/database.cfg
