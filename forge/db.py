@@ -8,6 +8,7 @@ import subprocess
 import sys
 import ConfigParser
 import sqlalchemy
+import multiprocessing
 from geoalchemy2 import WKTElement
 from sqlalchemy.sql import exists, select, text
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -421,7 +422,10 @@ class DB:
                     errorfile    = errorfile
                 ))
 
-        pm = PoolManager(logger=logger)
+        cpuCount = multiprocessing.cpu_count()
+        numFiles = len(featuresArgs)
+        numProcs = cpuCount if numFiles >= cpuCount else numFiles
+        pm = PoolManager(logger=logger, numProcs=numProcs, factor=1)
 
         pm.process(featuresArgs, populateFeatures, 1)
 
