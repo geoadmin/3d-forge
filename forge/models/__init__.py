@@ -2,7 +2,7 @@
 
 from sqlalchemy.sql import func, and_
 from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.sql.expression import FunctionElement
+from sqlalchemy.sql.expression import FunctionElement, text
 from geoalchemy2.elements import WKBElement
 from shapely.geometry import box, Point
 
@@ -134,3 +134,19 @@ Returns a shapely.geometry.polygon.Polygon
 
 def shapelyBBox(bbox):
     return box(*bbox)
+
+
+"""
+Returns a sqlalchemy.sql.expression.text
+:params schemaname: the schema name
+:params tablename: the table name
+:params srid: Spatial reference system numerical ID
+"""
+
+
+def tableExtentLiteral(schemaname, tablename, srid):
+    return text("SELECT ST_XMin(r), ST_YMin(r), "
+                "ST_XMax(r), ST_YMax(r) "
+                "FROM (SELECT ST_Collect(ST_Transform(the_geom, %d)) AS r "
+                "FROM %s.%s) AS foo" % (srid, schemaname, tablename)
+                )

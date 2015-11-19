@@ -17,7 +17,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.ext.declarative import declarative_base
 from geoalchemy2.types import Geometry
 
-from forge.models import Vector
+from forge.models import Vector, tableExtentLiteral
 from forge.lib.global_geodetic import GlobalGeodetic
 from forge.layers.metadata import LayerMetadata
 from forge.lib.helpers import timestamp
@@ -78,7 +78,7 @@ def getOrmModel(pkColumnName, pkColumnType, params):
         __table_args__ = {'schema': params.dbSchema}
         id = Column(pkColumnName, pkColumnType, primary_key=True)
         the_geom = Column(
-            Geometry(geometry_type='GEOMETRY', dimension=2, srid=params.toSrid)
+            Geometry(geometry_type='GEOMETRY', dimension=2, srid=params.sridTo)
         )
     return ModelBasedLayer
 
@@ -172,15 +172,29 @@ def createModelBasedTileJSON(params):
     pkColumnName = pkColumn[0].__str__()
     pkColumnType = pkColumn[1].type.__class__
     model = getOrmModel(pkColumnName, pkColumnType, params)
+    # Bounds generated from DB
+    try:
+        conn = engine.connect()
+        bounds = conn.execute(
+            tableExtentLiteral(params.dbSchema, params.tableName, params.sridFrom)
+        ).fetchone()
+        strBounds = tuple(['{:2f}'.format(i) for i in bounds])
+        logger.info('Bounds are %s, %s, %s, %s' % strBounds)
+    except Exception as e:
+        logger.error('An error occured while determining the bounds', exc_info=True)
+        raise Exception(e)
+    finally:
+        conn.close()
+
     try:
         session = scoped_session(sessionmaker(bind=engine))
         # We usually don't scan the last levels
         tiles = Tiles(
-            params.bounds, params.minZoom, params.maxScanZoom,
+            bounds, params.minZoom, params.maxScanZoom,
             t0, params.fullonly
         )
         tMeta = LayerMetadata(
-            bounds=params.bounds, minzoom=params.minZoom,
+            bounds=bounds, minzoom=params.minZoom,
             maxzoom=params.maxZoom, baseUrls=baseUrls,
             description=params.description, attribution=params.attribution,
             name=params.name
@@ -263,7 +277,7 @@ def tileNotExists(tile):
 
     try:
         exists = resourceExists(url, headers=h)
-    except Exception, e:
+    except Exception as e:
         logger.error('Connection Error', exc_info=True)
         logger.error('%s was skipped' % url, exc_info=True)
         raise Exception(e)
@@ -315,7 +329,7 @@ def main(template):
     layerConfig = ConfigParser.RawConfigParser()
     layerConfig.read(template)
     try:
-        terrainBased = layerConfig.get('Grid', 'terrainBased')
+        terrainBased = layerConfig.getboolean('Grid', 'terrainBased')
     except ConfigParser.NoSectionError as e:
         logger.error(e, exc_info=True)
         raise ValueError('The layer configuration file contains errors.')
