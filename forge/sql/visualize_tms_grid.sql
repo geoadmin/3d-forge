@@ -1,4 +1,23 @@
 
+CREATE OR REPLACE FUNCTION lon2tile(lon DOUBLE PRECISION, zoom INTEGER)
+  RETURNS INTEGER AS
+$BODY$
+BEGIN
+    RETURN FLOOR( (lon + 180) / 180 * (1 << zoom) )::INTEGER;
+END;
+$BODY$
+  LANGUAGE plpgsql IMMUTABLE;
+ 
+ 
+CREATE OR REPLACE FUNCTION lat2tile(lat DOUBLE PRECISION, zoom INTEGER)
+  RETURNS INTEGER AS
+$BODY$
+BEGIN
+    RETURN FLOOR( (1.0 - LN(TAN(RADIANS(lat)) + 1.0 / COS(RADIANS(lat))) / PI()) / 2.0 * (1 << zoom) )::INTEGER;
+END;
+$BODY$
+  LANGUAGE plpgsql IMMUTABLE;
+
 CREATE OR REPLACE FUNCTION bgdi_lonlat2tile(lon double precision DEFAULT 7.0, lat double precision DEFAULT 46.0, zoom integer DEFAULT 5)
   RETURNS geometry AS
 $BODY$
