@@ -179,6 +179,8 @@ def createModelBasedTileJSON(params):
             tableExtentLiteral(params.dbSchema, params.tableName, params.sridFrom)
         ).fetchone()
         strBounds = tuple(['{:2f}'.format(i) for i in bounds])
+        # Tuple to list for json converison
+        bounds = [b for b in bounds]
         logger.info('Bounds are %s, %s, %s, %s' % strBounds)
     except Exception as e:
         logger.error('An error occured while determining the bounds', exc_info=True)
