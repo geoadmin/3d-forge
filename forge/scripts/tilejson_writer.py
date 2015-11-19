@@ -106,8 +106,6 @@ def parseModelBasedLayer(dbConfig, layerConfig):
             sridTo         = layerConfig.getint('Grid', 'sridTo'),
             pxTolerance    = layerConfig.getint('Grid', 'pxTolerance'),
             fullonly       = layerConfig.getint('Grid', 'fullonly'),
-            bounds         = map(float,
-                layerConfig.get('Grid', 'bounds').split(',')),
             minZoom        = layerConfig.getint('Grid', 'minZoom'),
             maxZoom        = layerConfig.getint('Grid', 'maxZoom'),
             maxScanZoom    = layerConfig.getint('Grid', 'maxScanZoom'),
@@ -240,7 +238,6 @@ def createTerrainBasedTileJSON(params):
     if 'extensions' in terrainConfig:
         del terrainConfig['extensions']
     # Overwrite
-    terrainConfig['bounds'] = params.bounds
     terrainConfig['minzoom'] = params.minZoom
     terrainConfig['maxzoom'] = params.maxZoom
     terrainConfig['name'] = params.name

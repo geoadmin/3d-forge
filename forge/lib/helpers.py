@@ -105,6 +105,8 @@ def cleanup(filePath, extensions=['.shp', '.shx', '.prj', '.dbf']):
                 raise OSError(e)
 
 # Approximation only, arc must be provided in degrees
+
+
 def degreesToMeters(arc):
     projWGS84 = Proj(proj='latlong', datum='WGS84')
     projLV03 = Proj(init='epsg:21781')
