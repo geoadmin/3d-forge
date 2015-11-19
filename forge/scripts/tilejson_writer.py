@@ -20,7 +20,7 @@ from geoalchemy2.types import Geometry
 from forge.models import Vector, tableExtentLiteral
 from forge.lib.global_geodetic import GlobalGeodetic
 from forge.layers.metadata import LayerMetadata
-from forge.lib.helpers import timestamp
+from forge.lib.helpers import timestamp, degreesToMeters
 from forge.lib.tiles import Tiles
 from forge.lib.logs import getLogger
 from forge.lib.helpers import gzipFileObject, resourceExists
@@ -36,13 +36,15 @@ logger = getLogger(loggingConfig, __name__, suffix=timestamp())
 Base = declarative_base()
 
 
-def scanLayer(tile, session, model, sridFrom, sridTo, tilecount):
+def scanLayer(tile, session, model, sridFrom, sridTo, metaBuffer, tilecount):
     try:
         (bounds, tileXYZ, t0) = tile
         # Get the model according to the zoom level
         query = session.query(model.id).filter(
-            model.bboxIntersects(
-                bounds, fromSrid=sridFrom, toSrid=sridTo)).limit(1)
+            model.withinDistance2D(
+                bounds, fromSrid=sridFrom, toSrid=sridTo, tolerance=metaBuffer
+            )
+        ).limit(1)
         try:
             query.one()
         except NoResultFound:
@@ -188,6 +190,15 @@ def createModelBasedTileJSON(params):
     finally:
         conn.close()
 
+    # pre-calculate the maximazed buffers in degrees
+    if params.pxTolerance:
+        geodetic = GlobalGeodetic(True)
+        buffers = {}
+        for z in range(params.minZoom, params.maxZoom):
+            buffers[z] = degreesToMeters(
+                geodetic.Resolution(z) * float(params.pxTolerance)
+            )
+
     try:
         session = scoped_session(sessionmaker(bind=engine))
         # We usually don't scan the last levels
@@ -202,9 +213,15 @@ def createModelBasedTileJSON(params):
             name=params.name
         )
         for tile in tiles:
+            metaBuffer = 0.
             tilecount += 1
+            if params.pxTolerance:
+                xyz = tile[1]
+                metaBuffer = buffers[xyz[2]]
+
             noGeom = scanLayer(
-                tile, session, model, params.sridFrom, params.sridTo, tilecount
+                tile, session, model, params.sridFrom,
+                params.sridTo, metaBuffer, tilecount
             )
             if noGeom:
                 tMeta.removeTile(noGeom[0], noGeom[1], noGeom[2])

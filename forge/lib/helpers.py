@@ -8,6 +8,7 @@ import sys
 import time
 import datetime
 import cStringIO
+from pyproj import Proj, transform
 
 
 def zigZagEncode(n):
@@ -102,6 +103,15 @@ def cleanup(filePath, extensions=['.shp', '.shx', '.prj', '.dbf']):
                 os.remove('%s/%s%s' % (dirName, baseName, ext))
             except OSError as e:
                 raise OSError(e)
+
+# Approximation only, arc must be provided in degrees
+def degreesToMeters(arc):
+    projWGS84 = Proj(proj='latlong', datum='WGS84')
+    projLV03 = Proj(init='epsg:21781')
+    chCenterWGS84 = [8.3, 46.85]
+    p1 = transform(projWGS84, projLV03, *chCenterWGS84)
+    p2 = transform(projWGS84, projLV03, chCenterWGS84[0] + arc, chCenterWGS84[1])
+    return p2[0] - p1[0]
 
 
 class Bulk:
