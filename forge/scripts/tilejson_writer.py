@@ -5,7 +5,6 @@ import sys
 import time
 import json
 import random
-import requests
 import datetime
 import sqlalchemy
 import cStringIO
@@ -24,7 +23,7 @@ from forge.layers.metadata import LayerMetadata
 from forge.lib.helpers import timestamp
 from forge.lib.tiles import Tiles
 from forge.lib.logs import getLogger
-from forge.lib.helpers import gzipFileObject
+from forge.lib.helpers import gzipFileObject, resourceExists
 from forge.lib.boto_conn import getBucket, writeToS3
 from forge.lib.poolmanager import PoolManager
 
@@ -35,16 +34,6 @@ logger = getLogger(loggingConfig, __name__, suffix=timestamp())
 
 
 Base = declarative_base()
-
-
-def resourceExists(path, headers={}):
-    try:
-        r = requests.head(path, headers=headers)
-    except requests.exceptions.ConnectionError:
-        logger.info('Connection Error')
-        logger.info('%s was skipped' % path)
-        return False
-    return r.status_code == requests.codes.ok
 
 
 def scanLayer(tile, session, model, sridFrom, sridTo, tilecount):
@@ -271,7 +260,14 @@ def tileNotExists(tile):
 
     url = '%s%s%s.%s' % (entryPoint, basePath, tileAdress, tFormat)
     tilecount.value += 1
-    exists = resourceExists(url, headers=h)
+
+    try:
+        exists = resourceExists(url, headers=h)
+    except Exception, e:
+        logger.error('Connection Error', exc_info=True)
+        logger.error('%s was skipped' % url, exc_info=True)
+        raise Exception(e)
+
     if not exists:
         tileskipped.value += 1
     if tilecount.value % 1000 == 0:

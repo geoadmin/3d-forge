@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from osgeo import osr, ogr
+import requests
 import os
 import gzip
 import sys
@@ -82,6 +83,14 @@ def error(msg, exitCode=1, usage=None):
     if usage is not None:
         usage()
     sys.exit(exitCode)
+
+
+def resourceExists(path, headers={}):
+    try:
+        r = requests.head(path, headers=headers)
+    except requests.exceptions.ConnectionError as e:
+        raise requests.exceptions.ConnectionError(e)
+    return r.status_code == requests.codes.ok
 
 
 def cleanup(filePath, extensions=['.shp', '.shx', '.prj', '.dbf']):
