@@ -60,7 +60,8 @@ class Vector(object):
     Returns a slqalchemy.sql.functions.Function (interesects function)
     Use it as a filter to determine if a geometry should be returned (True or False)
     :params bbox: A list of 4 coordinates [minX, minX, maxX, maxY]
-    :params srid: Spatial reference system numerical ID
+    :params fromSrid: Spatial reference system numerical ID of the bbox
+    :params toSrid: Spatial reference system numerical ID of the table
     """
     @classmethod
     def bboxIntersects(cls, bbox, fromSrid=4326, toSrid=4326):
@@ -73,6 +74,24 @@ class Vector(object):
             geomColumn.intersects(wkbGeometry),
             func.ST_Intersects(geomColumn, wkbGeometry)
         )
+
+    """
+    Returns a slqalchemy.sql.functions.Function (interesects function)
+    Use it as a filter to determine if a geometry should be returned (True or False)
+    using a tolerance (in table unit). This function only works in 2 dimensions.
+    :params bbox: A list of 4 coordinates [minX, minX, maxX, maxY]
+    :params fromSrid: Spatial reference system numerical ID of the bbox
+    :params toSrid: Spatial reference system numerical ID of the table
+    :params tolerance: Tolerance in table unit
+    """
+    @classmethod
+    def withinDistance2D(cls, bbox, fromSrid=4326, toSrid=4326, tolerance=0.):
+        bboxGeom = shapelyBBox(bbox)
+        wkbGeometry = WKBElement(buffer(bboxGeom.wkb), fromSrid)
+        if fromSrid != toSrid:
+            wkbGeometry = func.ST_Transform(wkbGeometry, toSrid)
+        geomColumn = cls.geometryColumn()
+        return func.ST_DWithin(geomColumn, wkbGeometry, tolerance)
 
     """
     Returns a slqalchemy.sql.functions.Function (interesects function)
