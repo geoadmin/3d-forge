@@ -2,6 +2,7 @@ VENV = venv
 PYTHON_CMD = $(VENV)/bin/python
 FLAKE8_CMD = $(VENV)/bin/flake8
 AUTOPEP8_CMD = $(VENV)/bin/autopep8
+PIP_CMD := $(VENV)/bin/pip
 MAKO_CMD = $(VENV)/bin/mako-render
 PREFIX ?= 1/
 PYTHON_FILES := $(shell find forge/ -name '*.py')
@@ -9,7 +10,7 @@ USERNAME := $(shell whoami)
 TILEJSON_TEMPLATE ?= configs/raster/ch_swisstopo_swisstlm3d-wanderwege.cfg
 
 MAX_LINE_LENGTH=90
-PEP8_IGNORE="E128,E221,E241,E251,E272,E711"
+PEP8_IGNORE="E128,E221,E241,E251,E272,E711,E731,W503"
 
 # E128: continuation line under-indented for visual indent
 # E221: multiple spaces before operator
@@ -17,6 +18,8 @@ PEP8_IGNORE="E128,E221,E241,E251,E272,E711"
 # E251: multiple spaces around keyword/parameter equals
 # E272: multiple spaces before keyword
 # E711: comparison to None should be 'if cond is None:' (SQLAlchemy's filter syntax requires this ignore!)
+# E731: do not assign a lambda expression, use a def
+# W503: line break before binary operator
 
 .PHONY: help
 help:
@@ -51,7 +54,8 @@ help:
 	@echo "- tmsqueuestats      Get stats of AWS SQS queue"
 	@echo "- tmscreatetiles     Creates tiles using the AWS SQS queue"
 	@echo "- tilejson           Creates a tilejson provided a given template (usage: make tilejson TILEJSON_TEMPLATE=..."
-	@echo "- clean              Clean all generated files and folders"
+	@echo "- clean              Clean all generated files"
+	@echo "- cleanall           Clean all generated files and build tools"
 	@echo
 	@echo "Variables:"
 	@echo
@@ -67,7 +71,7 @@ all: install configs/terrain/database.cfg configs/terrain/tms.cfg configs/raster
 
 .PHONY: install
 install:
-	( if [ -d "$(VENV)" ] ; then echo 'Skipping venv creation'; else virtualenv $(VENV) --system-site-packages; fi ); \
+	( if [ -d "$(VENV)" ] ; then echo 'Skipping venv creation'; else virtualenv $(VENV) --system-site-packages && ${PIP_CMD} install Cython; fi ); \
 	$(PYTHON_CMD) setup.py develop
 
 configs/terrain/database.cfg: configs/terrain/database.cfg.mako
@@ -183,13 +187,14 @@ tmsqueuestats:
 tilejson:
 	$(PYTHON_CMD) forge/scripts/tilejson_writer.py $(TILEJSON_TEMPLATE)
 
-
 .PHONY: clean
 clean:
-	rm -rf venv
-	rm -rf *.egg-info
 	rm -f configs/terrain/database.cfg
 	rm -f configs/terrain/tms.cfg
 	rm -f configs/raster/database.cfg
-	rm -f logging.cfg
+
+.PHONY: cleanall
+cleanall: clean
+	rm -rf venv
+	rm -rf *.egg-info
 	rm -f .tmp/*.*

@@ -20,9 +20,9 @@ To clone use the --recursive option to get all submodules.
 
     make all
 
-## Create the database and import the shapefiles in the DB
+## Create the database, user and import the shapefiles in the DB
 
-    make createdb populate
+    make create populate
 
 ## Test a tile generated in S3
 
