@@ -4,13 +4,13 @@ bucketName: ${bucketname}
 # user specific
 profileName: ${profilename}
 # terrain files base path
-bucketpath: 1.0.0/ch.swisstopo.terrain.3d/default/20160101/4326/
+bucketpath: 1.0.0/ch.swisstopo.terrain.3d/default/20160115/4326/
 # chunks per process (that's a maximum)
 maxChunks: 50
 # when using aws sqs queue, the name of the queue
 sqsqueue: terrain_20150924
-# proc factor (total processes = factor * num_cpus_on_machine
-procfactor: 2
+# proc factor (total processes = factor * num_cpus_on_machine)
+procfactor: 1
 
 [Extent]
 # below is region around thun

@@ -5,7 +5,7 @@ from setuptools import setup
 requires = [
         'autopep8',
         'flake8',
-        'ipython',
+        'ipython==4.0.0',
         'nose',
         'mako',
         'awscli>=1.7.31',
