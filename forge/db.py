@@ -235,8 +235,7 @@ class DB:
 
     @contextmanager
     def userSession(self):
-        engine = sqlalchemy.create_engine(self.userEngine.url)
-        session = scoped_session(sessionmaker(bind=engine))
+        session = scoped_session(sessionmaker(bind=self.userEngine))
         yield session
         session.close()
 
