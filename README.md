@@ -1,8 +1,6 @@
 # 3d-forge
 Read/Write quantized-mesh tiles
 
-To clone use the --recursive option to get all submodules.
-`git clone --recursive https://github.com/geoadmin/3d-forge`
 
 ## Set up the required variables in your .bashrc
 
@@ -207,3 +205,12 @@ The current implementation is rasterizing the vector features with the GDAL ALL_
 ![image](https://cloud.githubusercontent.com/assets/5286659/9340301/36695576-45ef-11e5-91a1-881c6819a03e.png)
 
 [1] http://postgis.net/docs/RT_ST_BandPixelType.html
+
+
+### TODO
+
+- Fix normal vectors computation
+- Extract quantized-mesh reader/writer in a separated module
+- Extract poolmanager in a separated module
+- Add comprehensive doc
+- Write tiles to file system
