@@ -88,7 +88,7 @@ logging.cfg: logging.cfg.mako
 
 .PHONY: test
 test:
-	$(VENV)/bin/nosetests forge/tests/
+	$(VENV)/bin/nosetests tests/
 
 .PHONY: lint
 lint:
