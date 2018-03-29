@@ -66,5 +66,6 @@ def main():
     else:
         error("unknown command '%(command)s'" % {'command': command}, 4, usage=usage)
 
+
 if __name__ == '__main__':
     main()

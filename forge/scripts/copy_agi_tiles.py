@@ -18,5 +18,6 @@ def main():
     bucketBasePath = tmsConfig.get('General', 'bucketpath')
     copyAGITiles(zooms, bounds, bucketBasePath)
 
+
 if __name__ == '__main__':
     main()

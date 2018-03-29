@@ -15,5 +15,6 @@ def main():
     copyKeys('1.0.0/ch.swisstopo.terrain.3d/default/20151231/4326/',
         '1.0.0/ch.swisstopo.terrain.3d/default/20160115/4326/', range(0, 9))
 
+
 if __name__ == '__main__':
     main()

@@ -268,6 +268,7 @@ def createTerrainBasedTileJSON(params):
             ))
     return json.dumps(terrainConfig)
 
+
 tilecount = multiprocessing.Value('i', 0)
 tileskipped = multiprocessing.Value('i', 0)
 # Return None if the tile exists and a list with x,y,z coordinates otherwise

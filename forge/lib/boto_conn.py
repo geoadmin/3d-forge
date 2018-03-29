@@ -55,6 +55,7 @@ def writeToS3(b, path, content, origin, bucketBasePath,
     headers['Access-Control-Allow-Origin'] = '*'
     k.set_contents_from_file(content, headers=headers)
 
+
 copycount = multiprocessing.Value('i', 0)
 
 
