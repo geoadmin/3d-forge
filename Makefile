@@ -74,14 +74,14 @@ install:
 	( if [ -d "$(VENV)" ] ; then echo 'Skipping venv creation'; else virtualenv $(VENV) --system-site-packages && ${PIP_CMD} install Cython; fi ); \
 	$(PYTHON_CMD) setup.py develop
 
-configs/terrain/database.cfg: configs/terrain/database.cfg.mako
-	$(MAKO_CMD) --var "pgpass=$(PGPASS)" --var "dbtarget=$(DBTARGET)" --var "username=$(USERNAME)" $< > $@
+configs/terrain/database.cfg:: configs/terrain/database.cfg.mako
+	$(MAKO_CMD) --var "pgpass=$(PGPASS)" --var "dbhost=$(DBHOST)" --var "username=$(USERNAME)" $< > $@
 
-configs/terrain/tms.cfg: configs/terrain/tms.cfg.mako
+configs/terrain/tms.cfg:: configs/terrain/tms.cfg.mako
 	$(MAKO_CMD) --var "bucketname=$(BUCKETNAME)" --var "profilename=$(PROFILENAME)" $< > $@
 
-configs/raster/database.cfg: configs/raster/database.cfg.mako
-	$(MAKO_CMD) --var "dbtarget=$(DBTARGETLAYER)" --var "username=$(PGUSERLAYER)" --var "pgpass=$(PGPASSLAYER)" $< > $@
+configs/raster/database.cfg:: configs/raster/database.cfg.mako
+	$(MAKO_CMD) --var "dbhost=$(DBTARGETLAYER)" --var "username=$(PGUSERLAYER)" --var "pgpass=$(PGPASSLAYER)" $< > $@
 
 logging.cfg: logging.cfg.mako
 	$(MAKO_CMD) --var "logfilefolder=$(LOGFILEFOLDER)" $< > $@
@@ -104,39 +104,39 @@ console:
 	$(PYTHON_CMD) forge/scripts/db_management.py console
 
 .PHONY: create
-create:
+create: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/db_management.py create
 
 .PHONY: createuser
-createuser:
+createuser: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/db_management.py createuser
 
 .PHONY: createdb
-createdb:
+createdb: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/db_management.py createdb
 
 .PHONY: setupfunctions
-setupfunctions:
+setupfunctions: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/db_management.py setupfunctions
 
 .PHONY: populate
-populate:
+populate: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/db_management.py populate
 
 .PHONY: populatelakes
-populatelakes:
+populatelakes: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/db_management.py populatelakes
 
 .PHONY: dropuser
-dropuser:
+dropuser: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/db_management.py dropuser
 
 .PHONY: dropuser
-dropdb:
+dropdb: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/db_management.py dropdb
 
 .PHONY: destroy
-destroy:
+destroy: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/db_management.py destroy
 
 .PHONY: counttiles
@@ -152,39 +152,39 @@ listtiles:
 	$(PYTHON_CMD) forge/scripts/s3_tiles.py -p $(PREFIX) list
 
 .PHONY: tmspyramid
-tmspyramid:
+tmspyramid: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/tms_writer.py create
 
 .PHONY: tmsmetadata
-tmsmetadata:
+tmsmetadata: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/tms_writer.py metadata
 
 .PHONY: tmsstats
-tmsstats:
+tmsstats: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/tms_writer.py stats
 
 .PHONY: tmsstatsnodb
-tmsstatsnodb:
+tmsstatsnodb: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/tms_writer.py statsnodb
 
 .PHONY: tmscreatequeue
-tmscreatequeue:
+tmscreatequeue: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/tms_writer.py createqueue
 
 .PHONY: tmsdeletequeue
-tmsdeletequeue:
+tmsdeletequeue: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/tms_writer.py deletequeue
 
 .PHONY: tmscreatetiles
-tmscreatetiles:
+tmscreatetiles: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/tms_writer.py createtiles
 
 .PHONY: tmsqueuestats
-tmsqueuestats:
+tmsqueuestats: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/tms_writer.py queuestats
 
 .PHONY: tilejson
-tilejson:
+tilejson: configs/terrain/database.cfg configs/terrain/tms.cfg
 	$(PYTHON_CMD) forge/scripts/tilejson_writer.py $(TILEJSON_TEMPLATE)
 
 .PHONY: clean

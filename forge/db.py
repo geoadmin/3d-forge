@@ -241,6 +241,7 @@ class DB:
         session.close()
 
     def createUser(self):
+        self.dropUser()
         logger.info('Action: createUser()')
         logger.info('UserName: %s' % self.databaseConf.user)
         logger.info('UserPass: %s' % self.databaseConf.password)
@@ -265,7 +266,7 @@ class DB:
         with self.superConnection() as conn:
             try:
                 conn.execute("CREATE DATABASE %(name)s WITH OWNER %(role)s "
-                    "ENCODING 'UTF8' TEMPLATE template_postgis" % dict(
+                    "ENCODING 'UTF8'" % dict(
                         name=self.databaseConf.name,
                         role=self.databaseConf.user
                     )
@@ -278,7 +279,15 @@ class DB:
                         err=str(e)
                     ), exc_info=True)
 
+
         with self.adminConnection() as conn:
+            # WITH PostgreSQL 9.1+
+            try:
+                conn.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
+            except ProgrammingError as e:
+                logger.error(
+                    'Could not create postgis extension',
+                    exc_info=True)
             try:
                 conn.execute("""
                     ALTER SCHEMA public OWNER TO %(role)s;
@@ -514,7 +523,7 @@ class DB:
         with self.superConnection() as conn:
             try:
                 conn.execute(
-                    "DROP ROLE %(role)s" % dict(
+                    "DROP ROLE IF EXISTS %(role)s" % dict(
                         role=self.databaseConf.user
                     )
                 )

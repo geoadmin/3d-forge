@@ -1,9 +1,9 @@
 [Server]
-host: ${dbtarget}
+host: ${dbhost}
 port: 5432
 
 [Admin]
-user: pgkogis
+user: postgres
 password: ${pgpass}
 
 [Database]
