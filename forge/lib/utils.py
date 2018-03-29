@@ -24,20 +24,21 @@ def loadTileContent(baseURL, key, headers):
 
 def copyAGITiles(zooms, bounds, bucketBasePath):
     count = 0
-    fullonly = 0
-    headers = {'Accept': 'application/vnd.quantized-mesh;' +
+    headers = {
+        'Accept': 'application/vnd.quantized-mesh;' +
         'extensions=octvertexnormals-' +
         'watermask,application/octet-stream;q=0.9,*/*;q=0.01'}
     baseURL = 'http://assets.agi.com/stk-terrain/world/'
     bucket = getBucket()
-    for bxyz in grid(bounds, zooms, fullonly):
+    for bxyz in grid(bounds, zooms[0], zooms[len(zooms) - 1]):
         f = cStringIO.StringIO()
         tilebounds, [x, y, z] = bxyz
         bucketKey = tilePathTemplate(x, y, z)
         f.write(loadTileContent(baseURL, bucketKey, headers))
         f.seek(0)
         compressedFile = gzipFileObject(f)
-        writeToS3(bucket, bucketKey, compressedFile,
+        writeToS3(
+            bucket, bucketKey, compressedFile,
             'poc_watermask', bucketBasePath)
         count += 1
         if count % 20 == 0:

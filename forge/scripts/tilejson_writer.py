@@ -16,16 +16,16 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.ext.declarative import declarative_base
 from geoalchemy2.types import Geometry
+from poolmanager import PoolManager
+from quantized_mesh_tile.global_geodetic import GlobalGeodetic
 
 from forge.models import Vector, tableExtentLiteral
-from forge.lib.global_geodetic import GlobalGeodetic
 from forge.layers.metadata import LayerMetadata
 from forge.lib.helpers import timestamp, degreesToMeters
 from forge.lib.tiles import Tiles
 from forge.lib.logs import getLogger
 from forge.lib.helpers import gzipFileObject, resourceExists
 from forge.lib.boto_conn import getBucket, writeToS3
-from forge.lib.poolmanager import PoolManager
 
 
 loggingConfig = ConfigParser.RawConfigParser()
@@ -105,7 +105,6 @@ def parseModelBasedLayer(dbConfig, layerConfig):
             sridFrom       = layerConfig.getint('Grid', 'sridFrom'),
             sridTo         = layerConfig.getint('Grid', 'sridTo'),
             pxTolerance    = layerConfig.getint('Grid', 'pxTolerance'),
-            fullonly       = layerConfig.getint('Grid', 'fullonly'),
             minZoom        = layerConfig.getint('Grid', 'minZoom'),
             maxZoom        = layerConfig.getint('Grid', 'maxZoom'),
             maxScanZoom    = layerConfig.getint('Grid', 'maxScanZoom'),
@@ -131,7 +130,6 @@ def parseTerrainBasedLayer(layerConfig):
             minZoom        = layerConfig.getint('Grid', 'minZoom'),
             maxZoom        = layerConfig.getint('Grid', 'maxZoom'),
             maxScanZoom    = layerConfig.getint('Grid', 'maxScanZoom'),
-            fullonly       = layerConfig.getint('Grid', 'fullonly'),
             name           = layerConfig.get('Metadata', 'name'),
             format         = layerConfig.get('Metadata', 'format'),
             tileTemplate   = layerConfig.get('Metadata', 'tileTemplate'),
@@ -176,14 +174,16 @@ def createModelBasedTileJSON(params):
     try:
         conn = engine.connect()
         bounds = conn.execute(
-            tableExtentLiteral(params.dbSchema, params.tableName, params.sridFrom)
+            tableExtentLiteral(
+                params.dbSchema, params.tableName, params.sridFrom)
         ).fetchone()
         strBounds = tuple(['{:2f}'.format(i) for i in bounds])
         # Tuple to list for json converison
         bounds = [b for b in bounds]
         logger.info('Bounds are %s, %s, %s, %s' % strBounds)
     except Exception as e:
-        logger.error('An error occured while determining the bounds', exc_info=True)
+        logger.error(
+            'An error occured while determining the bounds', exc_info=True)
         raise Exception(e)
     finally:
         conn.close()
@@ -201,8 +201,7 @@ def createModelBasedTileJSON(params):
         session = scoped_session(sessionmaker(bind=engine))
         # We usually don't scan the last levels
         tiles = Tiles(
-            bounds, params.minZoom, params.maxScanZoom,
-            t0, params.fullonly
+            bounds, params.minZoom, params.maxScanZoom, t0
         )
         tMeta = LayerMetadata(
             bounds=bounds, minzoom=params.minZoom,
@@ -285,9 +284,11 @@ def tileNotExists(tile):
         geodetic = GlobalGeodetic(True)
         nbYTiles = geodetic.GetNumberOfYTilesAtZoom(tileXYZ[2])
         tilexyz = (tileXYZ[0], nbYTiles - tileXYZ[1] - 1, tileXYZ[2])
-        tileAdress = '/'.join((str(tilexyz[2]), str(tilexyz[1]), str(tilexyz[0])))
+        tileAdress = '/'.join(
+            (str(tilexyz[2]), str(tilexyz[1]), str(tilexyz[0])))
     else:
-        tileAdress = '/'.join((str(tileXYZ[2]), str(tileXYZ[1]), str(tileXYZ[0])))
+        tileAdress = '/'.join(
+            (str(tileXYZ[2]), str(tileXYZ[1]), str(tileXYZ[0])))
 
     url = '%s%s%s.%s' % (entryPoint, basePath, tileAdress, tFormat)
     tilecount.value += 1
@@ -311,7 +312,8 @@ def tileNotExists(tile):
         logger.info(url)
     if not exists:
         # Return everything in terrain coordinates
-        # e.g. starting at the bottom left (Transformation is performed in Cesium)
+        # e.g. starting at the bottom left
+        # (Transformation is performed in Cesium)
         # https://github.com/camptocamp/cesium/blob/c2c_patches/Source/
         #     Scene/UrlTemplateImageryProvider.js#L500
         return tileXYZ
@@ -323,18 +325,18 @@ def createS3BasedTileJSON(params):
     baseUrls = getBaseUrls(params)
     tiles = Tiles(
         params.bounds, params.minZoom, params.maxScanZoom,
-        t0, fullonly=params.fullonly, basePath=params.bucketBasePath,
+        t0, basePath=params.bucketBasePath,
         tFormat=params.format, gridOrigin=params.gridOrigin,
         tilesURLs=params.tilesURLs
     )
-    pm = PoolManager(logger=logger, factor=1, store=True)
+    pm = PoolManager(factor=1, store=True)
     tMeta = LayerMetadata(
         bounds=params.bounds, minzoom=params.minZoom,
         maxzoom=params.maxZoom, baseUrls=baseUrls,
         description=params.description, attribution=params.attribution,
         format=params.format, name=params.name
     )
-    pm.process(tiles, tileNotExists, maxChunks)
+    pm.imap_unordered(tileNotExists, tiles, maxChunks)
     for xyz in pm.results:
         tMeta.removeTile(xyz[0], xyz[1], xyz[2])
     return tMeta.toJSON()

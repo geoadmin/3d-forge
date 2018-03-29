@@ -15,17 +15,18 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.pool import NullPool
 from contextlib import contextmanager
+from quantized_mesh_tile.global_geodetic import GlobalGeodetic
+from poolmanager import PoolManager
 
 from forge.configs import tmsConfig
 import forge.lib.cartesian2d as c2d
 from forge.models import create_simplified_geom_table
 from forge.lib.tiles import TerrainTiles
-from forge.lib.global_geodetic import GlobalGeodetic
 from forge.models.tables import modelsPyramid, Lakes
 from forge.lib.logs import getLogger
 from forge.lib.shapefile_utils import ShpToGDALFeatures
-from forge.lib.helpers import BulkInsert, timestamp, cleanup, transformCoordinate
-from forge.lib.poolmanager import PoolManager
+from forge.lib.helpers import BulkInsert, timestamp
+from forge.lib.helpers import cleanup, transformCoordinate
 
 
 loggingConfig = ConfigParser.RawConfigParser()
@@ -121,7 +122,7 @@ def populateFeatures(args):
             # add shapefile path to dict
             # self.shpFilePath
             bulk.add(dict(
-                the_geom = WKTElement(polygon.ExportToWkt(), 4326),
+                the_geom=WKTElement(polygon.ExportToWkt(), 4326),
                 shapefilepath=shpFile
             ))
             count += 1
@@ -424,9 +425,8 @@ class DB:
         cpuCount = multiprocessing.cpu_count()
         numFiles = len(featuresArgs)
         numProcs = cpuCount if numFiles >= cpuCount else numFiles
-        pm = PoolManager(logger=logger, numProcs=numProcs, factor=1)
-
-        pm.process(featuresArgs, populateFeatures, 1)
+        pm = PoolManager(numProcs=numProcs, factor=1)
+        pm.imap_unordered(populateFeatures, featuresArgs, 1)
 
         tend = time.time()
         logger.info('All tables have been created. It took %s' % str(

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import json
-from forge.lib.global_geodetic import GlobalGeodetic
+from quantized_mesh_tile.global_geodetic import GlobalGeodetic
 
 # Zoom 0 to 8
 globalTilesConfig = [

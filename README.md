@@ -209,8 +209,5 @@ The current implementation is rasterizing the vector features with the GDAL ALL_
 
 ### TODO
 
-- Fix normal vectors computation
-- Extract quantized-mesh reader/writer in a separated module
-- Extract poolmanager in a separated module
+- Fix normal vectors computation at tile borders
 - Add comprehensive doc
-- Write tiles to file system
