@@ -279,7 +279,6 @@ class DB:
                         err=str(e)
                     ), exc_info=True)
 
-
         with self.adminConnection() as conn:
             # WITH PostgreSQL 9.1+
             try:

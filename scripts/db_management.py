@@ -9,7 +9,7 @@ from forge.lib.helpers import error
 
 def usage():
     print(dedent('''\
-        Usage: venv/bin/python forge/script/db_management.py
+        Usage: venv/bin/python scripts/db_management.py
                [-c database.cfg|--config=database.cfg] <command>')
 
         Commands:

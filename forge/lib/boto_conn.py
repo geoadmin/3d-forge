@@ -13,7 +13,7 @@ from boto.s3.key import Key
 from forge.lib.helpers import timestamp
 from forge.configs import tmsConfig
 from forge.lib.logs import getLogger
-from forge.lib.poolmanager import PoolManager
+from poolmanager import PoolManager
 
 logging.getLogger('boto').setLevel(logging.CRITICAL)
 
@@ -96,10 +96,9 @@ def copyKeys(fromPrefix, toPrefix, zooms):
         log.info('doing zoom ' + str(zoom))
         t0zoom = time.time()
         keys = S3KeyIterator(fromPrefix + str(zoom) + '/', toPrefix + str(zoom) + '/', t0)
-
-        pm = PoolManager(log)
-
-        pm.process(keys, copyKey, 50)
+        cpuCount = multiprocessing.cpu_count()
+        pm = PoolManager(numProcs=cpuCount, factor=1)
+        pm.imap_unordered(copyKey, keys, 50)
 
         log.info(
             'It took %s to copy this zoomlevel (total %s)' %

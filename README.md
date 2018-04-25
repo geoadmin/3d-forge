@@ -5,7 +5,7 @@ Read/Write quantized-mesh tiles
 ## Dependecies
 
 ```bash
-$ sudo apt-get install postgresql postgresql-contrib postgis python-pip gdal-bin python-gdal
+$ sudo apt-get install postgresql postgresql-contrib postgis python-pip gdal-bin python-gdal mono-complete
 ```
 
 ## Set up the required variables in your .bashrc

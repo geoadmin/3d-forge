@@ -5,7 +5,7 @@ AUTOPEP8_CMD = $(VENV)/bin/autopep8
 PIP_CMD := $(VENV)/bin/pip
 MAKO_CMD = $(VENV)/bin/mako-render
 PREFIX ?= 1/
-PYTHON_FILES := $(shell find forge/ -name '*.py')
+PYTHON_FILES := $(shell find scripts/* forge/* -name '*.py')
 USERNAME := $(shell whoami)
 TILEJSON_TEMPLATE ?= configs/raster/ch_swisstopo_swisstlm3d-wanderwege.cfg
 
@@ -72,7 +72,7 @@ all: install configs/terrain/database.cfg configs/terrain/tms.cfg configs/raster
 .PHONY: install
 install:
 	( if [ -d "$(VENV)" ] ; then echo 'Skipping venv creation'; else virtualenv $(VENV) --system-site-packages && ${PIP_CMD} install Cython --index-url https://pypi.fcio.net/simple/; fi ); \
-	${PIP_CMD} install . --index-url https://pypi.fcio.net/simple/;
+	${PIP_CMD} install . --index-url https://pypi.fcio.net/simple/ -e;
 
 configs/terrain/database.cfg:: configs/terrain/database.cfg.mako
 	$(MAKO_CMD) --var "pgpass=$(PGPASS)" --var "dbhost=$(DBHOST)" --var "username=$(USERNAME)" $< > $@

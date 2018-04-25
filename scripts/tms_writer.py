@@ -10,7 +10,7 @@ from forge.lib.helpers import error
 
 def usage():
     print(dedent('''\
-        Usage: venv/bin/python forge/script/tms_writer.py
+        Usage: venv/bin/python scripts/tms_writer.py
                   [-d database.cfg|--database=database.cfg]
                   [-c tms.cfg|--config=tms.cfg]
                   <command>

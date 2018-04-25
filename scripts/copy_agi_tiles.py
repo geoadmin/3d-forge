@@ -8,7 +8,7 @@ from forge.lib.utils import copyAGITiles
 # One might want to provide an extent also later on
 def usage():
     print(dedent('''\
-        Usage: venv/bin/python forge/script/copy_agi_tiles.py')
+        Usage: venv/bin/python scripts/copy_agi_tiles.py')
     '''))
 
 

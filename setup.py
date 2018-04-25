@@ -3,8 +3,8 @@
 from setuptools import setup
 
 requires = [
-        'autopep8',
-        'flake8',
+        'autopep8==1.2.4',
+        'flake8==3.0.4',
         'ipython==4.0.0',
         'nose',
         'mako',

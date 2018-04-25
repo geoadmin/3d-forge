@@ -12,10 +12,11 @@ user: tileforge
 password: tileforge
 
 [Data]
-baseDir: /geodata/share/
-shapefiles: 256/,128/,64/,32/,128/,64/,32/,16/,8/,4/,2/,1/,0.5/
-tablenames: dhm25_256m,dhm25_128m,dhm25_64m,dhm25_32m,bl_128m,bl_64m,bl_32m,bl_16m,bl_8m,bl_4m,bl_2m,bl_1m,bl_0_5m
-modelnames: dhm25_256m,dhm25_128m,dhm25_64m,dhm25_32m,bl_128m,bl_64m,bl_32m,bl_16m,bl_8m,bl_4m,bl_2m,bl_1m,bl_0_5m
+# Input shapefiles
+baseDir: /var/local/efs-dev/geodata/bund/swisstopo/terrain_3D/DTM_2018/Shape/
+shapefiles: 8/,2/,1/,0.5/
+tablenames: bl_2018_8m,bl_2018_2m,bl_2018_1m,bl_2018_0_5m
+modelnames: bl_2018_8m,bl_2018_2m,bl_2018_1m,bl_2018_0_5m
 lakes: /home/geodata/lakes/lakes.shp
 
 # Paths must be absolute!
@@ -25,10 +26,9 @@ reproject: 1
 # Determine if you want to keep the reprojected input file
 keepfiles: 0
 # exe from geodesy (Jerome Ray)
-geosuiteCmd: /home/${username}/GeoSuiteCmdx64/GeoSuiteCmd.exe
+geosuiteCmd: /root/Console/x64/GeoSuiteCmd.exe
 # Temporary find a better location for that!
-outDirectory: /geodata/tmp/
-
+outDirectory: /mnt/output-3d-forge/
 # options for geosuite
 # input projection
 fromPFrames: lv95
@@ -38,5 +38,5 @@ toPFrames: wgs84-ed
 fromAFrames: ln02
 toAFrames: ln02
 
-logfile: /geodata/logs/reprojections_geodata.log
-errorfile: /geodata/logs/reprojections_errors_geodata.log
+logfile: /var/log/3d-forge/reprojections_geodata.log
+errorfile: /var/log/3d-forge/reprojections_errors_geodata.log
