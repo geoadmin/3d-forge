@@ -72,7 +72,7 @@ all: install configs/terrain/database.cfg configs/terrain/tms.cfg configs/raster
 .PHONY: install
 install:
 	( if [ -d "$(VENV)" ] ; then echo 'Skipping venv creation'; else virtualenv $(VENV) --system-site-packages && ${PIP_CMD} install Cython --index-url https://pypi.fcio.net/simple/; fi ); \
-	${PIP_CMD} install . --index-url https://pypi.fcio.net/simple/ -e;
+	${PIP_CMD} install --index-url https://pypi.fcio.net/simple/ -e .;
 
 configs/terrain/database.cfg:: configs/terrain/database.cfg.mako
 	$(MAKO_CMD) --var "pgpass=$(PGPASS)" --var "dbhost=$(DBHOST)" --var "username=$(USERNAME)" $< > $@
@@ -101,91 +101,91 @@ autolint:
 
 .PHONY: console
 console:
-	$(PYTHON_CMD) forge/scripts/db_management.py console
+	$(PYTHON_CMD) scripts/db_management.py console
 
 .PHONY: create
 create: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/db_management.py create
+	$(PYTHON_CMD) scripts/db_management.py create
 
 .PHONY: createuser
 createuser: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/db_management.py createuser
+	$(PYTHON_CMD) scripts/db_management.py createuser
 
 .PHONY: createdb
 createdb: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/db_management.py createdb
+	$(PYTHON_CMD) scripts/db_management.py createdb
 
 .PHONY: setupfunctions
 setupfunctions: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/db_management.py setupfunctions
+	$(PYTHON_CMD) scripts/db_management.py setupfunctions
 
 .PHONY: populate
 populate: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/db_management.py populate
+	$(PYTHON_CMD) scripts/db_management.py populate
 
 .PHONY: populatelakes
 populatelakes: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/db_management.py populatelakes
+	$(PYTHON_CMD) scripts/db_management.py populatelakes
 
 .PHONY: dropuser
 dropuser: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/db_management.py dropuser
+	$(PYTHON_CMD) scripts/db_management.py dropuser
 
 .PHONY: dropuser
 dropdb: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/db_management.py dropdb
+	$(PYTHON_CMD) scripts/db_management.py dropdb
 
 .PHONY: destroy
 destroy: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/db_management.py destroy
+	$(PYTHON_CMD) scripts/db_management.py destroy
 
 .PHONY: counttiles
 counttiles:
-	$(PYTHON_CMD) forge/scripts/s3_tiles.py -p $(PREFIX) count
+	$(PYTHON_CMD) scripts/s3_tiles.py -p $(PREFIX) count
 
 .PHONY: deletetiles
 deletetiles:
-	$(PYTHON_CMD) forge/scripts/s3_tiles.py -p $(PREFIX) delete
+	$(PYTHON_CMD) scripts/s3_tiles.py -p $(PREFIX) delete
 
 .PHONY: listtiles
 listtiles:
-	$(PYTHON_CMD) forge/scripts/s3_tiles.py -p $(PREFIX) list
+	$(PYTHON_CMD) scripts/s3_tiles.py -p $(PREFIX) list
 
 .PHONY: tmspyramid
 tmspyramid: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/tms_writer.py create
+	$(PYTHON_CMD) scripts/tms_writer.py create
 
 .PHONY: tmsmetadata
 tmsmetadata: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/tms_writer.py metadata
+	$(PYTHON_CMD) scripts/tms_writer.py metadata
 
 .PHONY: tmsstats
 tmsstats: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/tms_writer.py stats
+	$(PYTHON_CMD) scripts/tms_writer.py stats
 
 .PHONY: tmsstatsnodb
 tmsstatsnodb: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/tms_writer.py statsnodb
+	$(PYTHON_CMD) scripts/tms_writer.py statsnodb
 
 .PHONY: tmscreatequeue
 tmscreatequeue: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/tms_writer.py createqueue
+	$(PYTHON_CMD) scripts/tms_writer.py createqueue
 
 .PHONY: tmsdeletequeue
 tmsdeletequeue: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/tms_writer.py deletequeue
+	$(PYTHON_CMD) scripts/tms_writer.py deletequeue
 
 .PHONY: tmscreatetiles
 tmscreatetiles: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/tms_writer.py createtiles
+	$(PYTHON_CMD) scripts/tms_writer.py createtiles
 
 .PHONY: tmsqueuestats
 tmsqueuestats: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/tms_writer.py queuestats
+	$(PYTHON_CMD) scripts/tms_writer.py queuestats
 
 .PHONY: tilejson
 tilejson: configs/terrain/database.cfg configs/terrain/tms.cfg
-	$(PYTHON_CMD) forge/scripts/tilejson_writer.py $(TILEJSON_TEMPLATE)
+	$(PYTHON_CMD) scripts/tilejson_writer.py $(TILEJSON_TEMPLATE)
 
 .PHONY: clean
 clean:
