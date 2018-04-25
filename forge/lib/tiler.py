@@ -268,8 +268,9 @@ class TilerManager:
 
     def create(self):
         def callback(counter, result):
-            logger.info('counter: %s' % counter)
-            logger.info('result: %s' % result)
+            if not counter % 10000:
+                logger.info('counter: %s' % counter)
+                logger.info('result: %s' % result)
 
         self.t0 = time.time()
 
@@ -283,7 +284,7 @@ class TilerManager:
         maxChunks = int(self.tmsConfig.get('General', 'maxChunks'))
 
         nbTiles = self.numOfTiles()
-        tilesPerProc = int(nbTiles / pm.numOfProcesses())
+        tilesPerProc = int(nbTiles / pm.nbOfProcesses)
         if tilesPerProc < maxChunks:
             maxChunks = tilesPerProc
         if maxChunks < 1:
@@ -408,17 +409,17 @@ class TilerManager:
             return
         procfactor = int(self.tmsConfig.get('General', 'procfactor'))
 
-        pm = PoolManager(logger=logger, factor=procfactor)
+        pm = PoolManager(factor=procfactor)
         qtiles = QueueTerrainTiles(
             queueName,
             self.dbConfigFile,
             self.tmsConfig,
             self.t0,
-            pm.numOfProcesses()
+            pm.nbOfProcesses
         )
 
         logger.info('Starting creation of tiles from queue %s ' % (queueName))
-        pm.process(qtiles, createTileFromQueue, 1)
+        pm.imap_unordered(createTileFromQueue, qtiles, 1)
         tend = time.time()
         logger.info(
             'It took %s to create %s tiles (%s were skipped) from queue' % (
@@ -505,14 +506,14 @@ class TilerManager:
                         nbObjects = session.query(model).filter(
                             model.bboxIntersects(bounds)
                         ).count()
+                    # top letf corner
                     tileMinX, tileMinY = geodetic.tileAddress(
                         zoom,
-                        bounds[0],
-                        bounds[1])
+                        bounds[0:2]
+                    )
                     tileMaxX, tileMaxY = geodetic.tileAddress(
                         zoom,
-                        bounds[2],
-                        bounds[3]
+                        bounds[2:4]
                     )
                     tileBounds = geodetic.tileBounds(zoom, tileMinX, tileMinY)
                     xCount = tileMaxX - tileMinX + 1
