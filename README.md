@@ -88,7 +88,7 @@ $ run {yourScript}.py
   * change password of superuser to xxx with the following sql query:
 
     ```sql
-    ALTER ROLE postgis WITH PASSWORD 'xxxxxx';
+    ALTER ROLE pgkogis WITH PASSWORD 'xxxxxx';
     ```
 
   * `postgres=# \q` and then `$ exit`

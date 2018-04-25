@@ -3,7 +3,7 @@ host: ${dbhost}
 port: 5432
 
 [Admin]
-user: postgres
+user: pgkogis
 password: ${pgpass}
 
 [Database]
