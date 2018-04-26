@@ -104,6 +104,8 @@ def createTile(tile):
             hasLighting, hasWatermask) = tile
 
         db = DB(dbConfigFile)
+        bucketKey = '%s/%s/%s.terrain' % (
+            tileXYZ[2], tileXYZ[0], tileXYZ[1])
         with db.userSession() as session:
             bucket = getBucket()
 
@@ -187,9 +189,6 @@ def createTile(tile):
                     logger.error(msg, exc_info=True)
                     raise Exception(e)
 
-                bucketKey = '%s/%s/%s.terrain' % (
-                    tileXYZ[2], tileXYZ[0], tileXYZ[1])
-
                 writeToS3(
                     bucket,
                     bucketKey,
@@ -200,15 +199,18 @@ def createTile(tile):
                 )
                 tend = time.time()
                 tilecount.value += 1
-                val = tilecount.value
-                total = val + skipcount.value
-                if val % 10 == 0:
+                tilesCreated = tilecount.value
+                total = tilesCreated + skipcount.value
+                if tilesCreated % 1000 == 0:
                     logger.info(
                         '[%s] Last tile %s (%s rings). '
                         '%s to write %s tiles. (total processed: %s)' % (
-                            pid, bucketKey, nbGeoms,
+                            pid,
+                            bucketKey,
+                            nbGeoms,
                             str(datetime.timedelta(seconds=tend - t0)),
-                            val, total
+                            tilesCreated,
+                            total
                         )
                     )
 
@@ -509,11 +511,12 @@ class TilerManager:
                     # top letf corner
                     tileMinX, tileMinY = geodetic.tileAddress(
                         zoom,
-                        bounds[0:2]
+                        [bounds[0], bounds[3]]
                     )
+                    # bottom right
                     tileMaxX, tileMaxY = geodetic.tileAddress(
                         zoom,
-                        bounds[2:4]
+                        [bounds[2], bounds[1]]
                     )
                     tileBounds = geodetic.tileBounds(zoom, tileMinX, tileMinY)
                     xCount = tileMaxX - tileMinX + 1
