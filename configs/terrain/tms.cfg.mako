@@ -47,10 +47,10 @@ tablename: dhm25_128m
 tablename: dhm25_64m
 
 [11]
-tablename: dhm25_32m
+tablename: dhm25_64m
 
 [12]
-tablename: bl_64m
+tablename: dhm25_32m
 
 [13]
 tablename: bl_32m
