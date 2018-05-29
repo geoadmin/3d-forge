@@ -33,7 +33,8 @@ watermask: 0
 lighting: 0
 
 [Zooms]
-tileMinZ: 8
+# Zoom level to tile
+tileMinZ: 14
 tileMaxZ: 17
 
 [8]
@@ -56,16 +57,16 @@ tablename: dhm25_32m
 tablename: bl_32m
 
 [14]
-tablename: bl_8m
+tablename: bl_2018_8m
 
 [15]
-tablename: bl_2m
+tablename: bl_2018_2m
 
 [16]
-tablename: bl_1m
+tablename: bl_2018_1m
 
 [17]
-tablename: bl_0_5m
+tablename: bl_2018_0_5m
 
 [18]
 tablename: bl_0_5m
