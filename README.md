@@ -81,6 +81,13 @@ $ run {yourScript}.py
 
 - Adapt your configurations in .bashrc
 
+- start DB manually
+
+    ```
+    su postrgres
+    /usr/lib/postgresql/9.4/bin/pg_ctl -D /var/lib/postgresql/9.4/main/ -l start # 'stop' to stop
+    ```
+
 - connect to db host
 
 - sudo su postgres
