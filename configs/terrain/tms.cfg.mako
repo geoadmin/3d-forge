@@ -18,6 +18,13 @@ procfactor: 1
 #maxLon: 7.69554
 #minLat: 46.68688
 #maxLat: 46.83431
+
+# region du shape 1247-24 (adelboden)
+#minLon: 7.639054568027739
+#maxLon: 7.703188120002635
+#minLat: 46.51718858644207
+#maxLat: 46.548623546531424
+
 # below is whole switzerland
 minLon: 5.86725126512748
 maxLon: 10.9209100671547

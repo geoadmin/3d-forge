@@ -9,7 +9,6 @@ import sys
 import ConfigParser
 import sqlalchemy
 import multiprocessing
-from geoalchemy2 import WKTElement
 from sqlalchemy.sql import exists, select, text
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.exc import ProgrammingError
@@ -122,8 +121,8 @@ def populateFeatures(args):
             # add shapefile path to dict
             # self.shpFilePath
             bulk.add(dict(
-                the_geom=WKTElement(polygon.ExportToWkt(), 4326),
-                shapefilepath=shpFile
+                shapefilepath=shpFile,
+                the_geom='SRID=4326;' + polygon.ExportToWkt()
             ))
             count += 1
         bulk.commit()
@@ -464,7 +463,7 @@ class DB:
                 # add shapefile path to dict
                 # self.shpFilePath
                 bulk.add(dict(
-                    the_geom = WKTElement(polygon.ExportToWkt(), 4326)
+                    the_geom='SRID=4326;' + polygon.ExportToWkt()
                 ))
                 count += 1
             bulk.commit()
