@@ -4,7 +4,7 @@ from gatilegrid import getTileGrid
 
 
 def grid(bounds, minZ, maxZ):
-    geodetic = getTileGrid(4326)(extent=bounds, tmsCompatible=True)
+    geodetic = getTileGrid(4326)(extent=bounds, originCorner='bottom-left', tmsCompatible=True)
     gridGenerator = geodetic.iterGrid(
         minZ,
         maxZ)
