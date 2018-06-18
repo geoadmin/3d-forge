@@ -4,7 +4,7 @@ bucketName: ${bucketname}
 # user specific
 profileName: ${profilename}
 # terrain files base path
-bucketpath: 1.0.0/ch.swisstopo.terrain.3d/default/20160115/4326/
+bucketpath: 1.0.0/ch.swisstopo.terrain.3d/default/20180601/4326/
 # chunks per process (that's a maximum)
 maxChunks: 50
 # when using aws sqs queue, the name of the queue
@@ -18,14 +18,18 @@ procfactor: 1
 #maxLon: 7.69554
 #minLat: 46.68688
 #maxLat: 46.83431
+
+# region du shape 1247-24 (adelboden)
+#minLon: 7.639054568027739
+#maxLon: 7.703188120002635
+#minLat: 46.51718858644207
+#maxLat: 46.548623546531424
+
 # below is whole switzerland
 minLon: 5.86725126512748
 maxLon: 10.9209100671547
 minLat: 45.8026860136571
 maxLat: 47.8661652478939
-# fullonly: 0 -> inludes all tiles that intersect, even partly, with extent
-# fullonly: 1 -> include only tiles that fully intersect with extent
-fullonly: 0
 
 [Extensions]
 # watermask: 0 -> no watermask
@@ -36,7 +40,8 @@ watermask: 0
 lighting: 0
 
 [Zooms]
-tileMinZ: 8
+# Zoom level to tile
+tileMinZ: 14
 tileMaxZ: 17
 
 [8]
@@ -50,25 +55,25 @@ tablename: dhm25_128m
 tablename: dhm25_64m
 
 [11]
-tablename: dhm25_32m
+tablename: dhm25_64m
 
 [12]
-tablename: bl_64m
+tablename: dhm25_32m
 
 [13]
 tablename: bl_32m
 
 [14]
-tablename: bl_8m
+tablename: bl_2018_8m
 
 [15]
-tablename: bl_2m
+tablename: bl_2018_2m
 
 [16]
-tablename: bl_1m
+tablename: bl_2018_1m
 
 [17]
-tablename: bl_0_5m
+tablename: bl_2018_0_5m
 
 [18]
 tablename: bl_0_5m

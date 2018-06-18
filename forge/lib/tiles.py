@@ -1,47 +1,33 @@
 # -*- coding: utf-8 -*-
 
-from forge.lib.global_geodetic import GlobalGeodetic
+from gatilegrid import getTileGrid
 
 
-def isInside(tile, bounds):
-    if tile[0] >= bounds[0] and tile[1] >= bounds[1] and \
-            tile[2] <= bounds[2] and tile[3] <= bounds[3]:
-        return True
-    return False
-
-
-def grid(bounds, zoomLevels, fullonly):
-    geodetic = GlobalGeodetic(True)
-
-    for tileZ in zoomLevels:
-        tileMinX, tileMinY = geodetic.LonLatToTile(bounds[0], bounds[1], tileZ)
-        tileMaxX, tileMaxY = geodetic.LonLatToTile(bounds[2], bounds[3], tileZ)
-
-        for tileX in xrange(tileMinX, tileMaxX + 1):
-            for tileY in xrange(tileMinY, tileMaxY + 1):
-                tilebounds = geodetic.TileBounds(tileX, tileY, tileZ)
-                if fullonly == 0 or isInside(tilebounds, bounds):
-                    yield (tilebounds, (tileX, tileY, tileZ))
+def grid(bounds, minZ, maxZ):
+    geodetic = getTileGrid(4326)(extent=bounds, originCorner='bottom-left', tmsCompatible=True)
+    gridGenerator = geodetic.iterGrid(
+        minZ,
+        maxZ)
+    for tileBounds, tileZ, tileX, tileY in gridGenerator:
+        yield (tileBounds, (tileX, tileY, tileZ))
 
 
 class Tiles:
 
     def __init__(self, bounds, minZoom, maxZoom, t0,
-            fullonly=False, basePath=None, tFormat=None, gridOrigin=None, tilesURLs=None):
+                 basePath=None, tFormat=None, gridOrigin=None, tilesURLs=None):
         self.t0 = t0
         self.bounds = bounds
         self.tileMinZ = minZoom
         self.tileMaxZ = maxZoom
-        self.fullonly = fullonly
         self.basePath = basePath
         self.tFormat = tFormat
         self.gridOrigin = gridOrigin
         self.tilesURLs = tilesURLs
 
     def __iter__(self):
-        zRange = range(self.tileMinZ, self.tileMaxZ + 1)
 
-        for bounds, tileXYZ in grid(self.bounds, zRange, self.fullonly):
+        for bounds, tileXYZ in grid(self.bounds, self.tileMinZ, self.tileMaxZ):
             if self.basePath and self.tFormat:
                 yield (
                     bounds, tileXYZ, self.t0, self.basePath,
@@ -60,7 +46,6 @@ class TerrainTiles:
         self.maxLon = tmsConfig.getfloat('Extent', 'maxLon')
         self.minLat = tmsConfig.getfloat('Extent', 'minLat')
         self.maxLat = tmsConfig.getfloat('Extent', 'maxLat')
-        self.fullonly = tmsConfig.getint('Extent', 'fullonly')
         self.bounds = (self.minLon, self.minLat, self.maxLon, self.maxLat)
 
         self.bucketBasePath = tmsConfig.get('General', 'bucketpath')
@@ -74,11 +59,9 @@ class TerrainTiles:
         self.dbConfigFile = dbConfigFile
 
     def __iter__(self):
-        zRange = range(self.tileMinZ, self.tileMaxZ + 1)
-
-        for bounds, tileXYZ in grid(self.bounds, zRange, self.fullonly):
+        for bounds, tileXYZ in grid(self.bounds, self.tileMinZ, self.tileMaxZ):
             yield (bounds, tileXYZ, self.t0, self.dbConfigFile,
-                self.bucketBasePath, self.hasLighting, self.hasWatermask)
+                   self.bucketBasePath, self.hasLighting, self.hasWatermask)
 
 
 class QueueTerrainTiles:

@@ -9,20 +9,18 @@ from sqlalchemy.sql import and_
 from sqlalchemy.orm.exc import NoResultFound
 from geoalchemy2 import WKBElement
 from geoalchemy2.shape import to_shape
+from quantized_mesh_tile import encode
+from gatilegrid import getTileGrid
+from poolmanager import PoolManager
 
 import forge.lib.cartesian2d as c2d
 from forge.db import DB
-from forge.terrain import TerrainTile
 from forge.terrain.metadata import TerrainMetadata
-from forge.terrain.topology import TerrainTopology
 from forge.models.tables import modelsPyramid
 from forge.lib.tiles import TerrainTiles, QueueTerrainTiles
 from forge.lib.boto_conn import getBucket, writeToS3, getSQS, writeSQSMessage
-from forge.lib.helpers import gzipFileObject, timestamp, transformCoordinate, createBBox
-from forge.lib.global_geodetic import GlobalGeodetic
-from forge.lib.geometry_processors import processRingCoordinates
+from forge.lib.helpers import timestamp, transformCoordinate, createBBox
 from forge.lib.logs import getLogger
-from forge.lib.poolmanager import PoolManager
 
 
 # Init logging
@@ -44,15 +42,15 @@ def createTileFromQueue(tq):
         (qName, t0, dbConfigFile, hasLighting, hasWatermask) = tq
         sqs = getSQS()
         q = sqs.get_queue(qName)
-        geodetic = GlobalGeodetic(True)
+        geodetic = getTileGrid(4326)(tmsCompatible=True)
         # we do this as long as we are finding messages in the queue
         while True:
             parseOk = True
             try:
                 # 20 is maximum wait time
                 m = q.read(
-                    visibility_timeout = visibility_timeout,
-                    wait_time_seconds = 20
+                    visibility_timeout=visibility_timeout,
+                    wait_time_seconds=20
                 )
                 if m is None:
                     logger.info(
@@ -64,9 +62,10 @@ def createTileFromQueue(tq):
                 parseOk = False
 
             if not parseOk or len(tiles) % 3 != 0:
+                msgBody = m.get_body()
                 logger.warning(
                     '[%s] Unparsable message received.'
-                    'Skipping...and removing message [%s]' % (pid, m.get_body())
+                    'Skipping...and removing message [%s]' % (pid, msgBody)
                 )
                 q.delete_message(m)
                 continue
@@ -74,15 +73,16 @@ def createTileFromQueue(tq):
             for i in range(0, len(tiles), 3):
                 try:
                     tileXYZ = [tiles[i], tiles[i + 1], tiles[i + 2]]
-                    tilebounds = geodetic.TileBounds(
-                        tileXYZ[0], tileXYZ[1], tileXYZ[2]
+                    tilebounds = geodetic.tileBounds(
+                        tileXYZ[2], tileXYZ[0], tileXYZ[1]
                     )
                     createTile(
                         (tilebounds, tileXYZ, t0, dbConfigFile,
                          hasLighting, hasWatermask)
                     )
                 except Exception as e:
-                    logger.error('[%s] Error while processing '
+                    logger.error(
+                        '[%s] Error while processing '
                         'specific tile %s' % (pid, str(e)), exc_info=True)
 
             # when successfull, we delete the message from the queue
@@ -90,7 +90,8 @@ def createTileFromQueue(tq):
                 pid, body))
             q.delete_message(m)
     except Exception as e:
-        logger.error('[%s] Error occured during processing. '
+        logger.error(
+            '[%s] Error occured during processing. '
             'Halting process ' % str(e), exc_info=True)
 
 
@@ -103,6 +104,8 @@ def createTile(tile):
             hasLighting, hasWatermask) = tile
 
         db = DB(dbConfigFile)
+        bucketKey = '%s/%s/%s.terrain' % (
+            tileXYZ[2], tileXYZ[0], tileXYZ[1])
         with db.userSession() as session:
             bucket = getBucket()
 
@@ -119,7 +122,8 @@ def createTile(tile):
                     watermask = q.watermask
 
             # Get the interpolated point at the 4 corners
-            # 0: (minX, minY), 1: (minX, maxY), 2: (maxX, maxY), 3: (maxX, minY)
+            # 0: (minX, minY), 1: (minX, maxY),
+            # 2: (maxX, maxY), 3: (maxX, minY)
             pts = [
                 (bounds[0], bounds[1], 0),
                 (bounds[0], bounds[3], 0),
@@ -159,7 +163,7 @@ def createTile(tile):
                 clippedGeometry.label('clip')
             ).filter(model.bboxIntersects(bounds))
 
-            terrainTopo = TerrainTopology(hasLighting=hasLighting)
+            geomCoords = []
             for q in query:
                 coords = list(to_shape(q.clip).exterior.coords)
                 if q.id in cornerPts:
@@ -168,45 +172,45 @@ def createTile(tile):
                         c = coords[i]
                         if c[0] == pt[0] and c[1] == pt[1]:
                             coords[i] = [c[0], c[1], pt[2]]
+                geomCoords.append(coords)
 
+            nbGeoms = len(geomCoords)
+            if nbGeoms > 0:
                 try:
-                    rings = processRingCoordinates(coords)
+                    terrainTile = encode(geomCoords,
+                                         bounds=bounds,
+                                         autocorrectGeometries=True,
+                                         hasLighting=hasLighting,
+                                         watermask=watermask)
                 except Exception as e:
-                    msg = '[%s] --------- ERROR ------- occured while ' \
-                        'collapsing non triangular shapes\n' % pid
+                    msg = '[%s] --------- ERROR ------- occured while ' % pid
+                    msg += 'encoding terrain tile\n'
                     msg += '[%s]: %s' % (pid, e)
                     logger.error(msg, exc_info=True)
                     raise Exception(e)
-                # Redundant coord has been remove already
-                for vertices in rings:
-                    terrainTopo.addVertices(vertices)
 
-            bucketKey = '%s/%s/%s.terrain' % (
-                tileXYZ[2], tileXYZ[0], tileXYZ[1])
-            verticesLength = len(terrainTopo.vertices)
-            if verticesLength > 0:
-                terrainTopo.create()
-                # Prepare terrain tile
-                terrainFormat = TerrainTile(watermask=watermask)
-                terrainFormat.fromTerrainTopology(terrainTopo, bounds=bounds)
-
-                # Bytes manipulation and compression
-                fileObject = terrainFormat.toStringIO()
-                compressedFile = gzipFileObject(fileObject)
                 writeToS3(
-                    bucket, bucketKey, compressedFile, model.__tablename__,
-                    bucketBasePath, contentType=terrainFormat.getContentType()
+                    bucket,
+                    bucketKey,
+                    terrainTile.toBytesIO(gzipped=True),
+                    model.__tablename__,
+                    bucketBasePath,
+                    contentType=terrainTile.getContentType()
                 )
                 tend = time.time()
                 tilecount.value += 1
-                val = tilecount.value
-                total = val + skipcount.value
-                if val % 10 == 0:
-                    logger.info('[%s] Last tile %s (%s rings). '
+                tilesCreated = tilecount.value
+                total = tilesCreated + skipcount.value
+                if tilesCreated % 1000 == 0:
+                    logger.info(
+                        '[%s] Last tile %s (%s rings). '
                         '%s to write %s tiles. (total processed: %s)' % (
-                            pid, bucketKey, verticesLength,
+                            pid,
+                            bucketKey,
+                            nbGeoms,
                             str(datetime.timedelta(seconds=tend - t0)),
-                            val, total
+                            tilesCreated,
+                            total
                         )
                     )
 
@@ -215,7 +219,8 @@ def createTile(tile):
                 val = skipcount.value
                 total = val + tilecount.value
                 # One should write an empyt tile
-                logger.info('[%s] Skipping %s %s because no features found '
+                logger.info(
+                    '[%s] Skipping %s %s because no features found '
                     'for this tile (%s skipped from %s total)' % (
                         pid, bucketKey, bounds, val, total
                     )
@@ -264,6 +269,11 @@ class TilerManager:
         self.tmsConfig = tmsConfig
 
     def create(self):
+        def callback(counter, result):
+            if not counter % 10000:
+                logger.info('counter: %s' % counter)
+                logger.info('result: %s' % result)
+
         self.t0 = time.time()
 
         tilecount.value = 0
@@ -272,12 +282,11 @@ class TilerManager:
         tiles = TerrainTiles(self.dbConfigFile, self.tmsConfig, self.t0)
         procfactor = int(self.tmsConfig.get('General', 'procfactor'))
 
-        pm = PoolManager(logger=logger, factor=procfactor)
-
+        pm = PoolManager(factor=procfactor)
         maxChunks = int(self.tmsConfig.get('General', 'maxChunks'))
 
         nbTiles = self.numOfTiles()
-        tilesPerProc = int(nbTiles / pm.numOfProcesses())
+        tilesPerProc = int(nbTiles / pm.nbOfProcesses)
         if tilesPerProc < maxChunks:
             maxChunks = tilesPerProc
         if maxChunks < 1:
@@ -285,11 +294,12 @@ class TilerManager:
 
         logger.info('Starting creation of %s tiles (%s per chunk)' % (
             nbTiles, maxChunks))
-        pm.process(tiles, createTile, maxChunks)
+        pm.imap_unordered(createTile, tiles, maxChunks, callback=callback)
 
         tend = time.time()
         logger.info('It took %s to create %s tiles (%s were skipped)' % (
-            str(datetime.timedelta(seconds=tend - self.t0)), tilecount.value,
+            str(datetime.timedelta(seconds=tend - self.t0)),
+            tilecount.value,
             skipcount.value
         ))
 
@@ -306,23 +316,28 @@ class TilerManager:
             sqs = getSQS()
             q = sqs.get_queue(queueName)
             if q is not None:
-                logger.error('Queue already exists. Can\'t overwrite'
+                logger.error(
+                    'Queue already exists. Can\'t overwrite'
                     ' existing queue. [%s]' % (queueName))
                 return
 
-            # queue with default message visiblity time of 3600. So each message is
-            # blocked for other users for 3600 seconds. Default would be 30 seconds.
+            # queue with default message visiblity time of 3600.
+            # So each message is blocked for other users for 3600 seconds.
+            # Default would be 30 seconds.
             # It's that high because each message contains maxChunks tiles
-            q = sqs.create_queue(queueName, visibility_timeout = visibility_timeout)
+            q = sqs.create_queue(
+                queueName, visibility_timeout=visibility_timeout)
             # Assure queue is kept for maximum of 14 weeks (aws limit).
             # default would be 4 days.
             sqs.set_queue_attribute(q, 'MessageRetentionPeriod', 1209600)
         except Exception as e:
-            logger.error('Error during creation of queue:\n' + str(e), exc_info=True)
+            logger.error(
+                'Error during creation of queue:\n' + str(e), exc_info=True)
             return
 
         if q.count() > 0:
-            logger.error('Queue already contains messages. '
+            logger.error(
+                'Queue already contains messages. '
                 'Use a different queue or delete this queue first')
             return
 
@@ -330,7 +345,8 @@ class TilerManager:
         tiles = TerrainTiles(self.dbConfigFile, self.tmsConfig, self.t0)
         nbTiles = self.numOfTiles()
         try:
-            logger.info('Starting creation of SQS queue with approx. '
+            logger.info(
+                'Starting creation of SQS queue with approx. '
                 '%s tiles)' % (nbTiles))
             totalcount = 0
             tcount = 0
@@ -355,11 +371,13 @@ class TilerManager:
                 messagecount += 1
                 writeSQSMessage(q, msg)
         except Exception as e:
-            logger.error('Error during writing of sqs message:\n' + str(e),
+            logger.error(
+                'Error during writing of sqs message:\n' + str(e),
                 exc_info=True)
 
         tend = time.time()
-        logger.info('It took %s to create %s message in SQS gueue '
+        logger.info(
+            'It took %s to create %s message in SQS gueue '
             'representing %s tiles' % (
                 str(datetime.timedelta(seconds=tend - self.t0)),
                 messagecount, totalcount
@@ -378,7 +396,8 @@ class TilerManager:
             q = sqs.get_queue(queueName)
             sqs.delete_queue(q)
         except Exception as e:
-            logger.error('Error during deletion of queue:\n' + str(e), exc_info=True)
+            logger.error(
+                'Error during deletion of queue:\n' + str(e), exc_info=True)
             return
 
     # Create tiles based on given Queue
@@ -392,18 +411,25 @@ class TilerManager:
             return
         procfactor = int(self.tmsConfig.get('General', 'procfactor'))
 
-        pm = PoolManager(logger=logger, factor=procfactor)
+        pm = PoolManager(factor=procfactor)
         qtiles = QueueTerrainTiles(
-            queueName, self.dbConfigFile, self.tmsConfig, self.t0, pm.numOfProcesses()
+            queueName,
+            self.dbConfigFile,
+            self.tmsConfig,
+            self.t0,
+            pm.nbOfProcesses
         )
 
         logger.info('Starting creation of tiles from queue %s ' % (queueName))
-        pm.process(qtiles, createTileFromQueue, 1)
+        pm.imap_unordered(createTileFromQueue, qtiles, 1)
         tend = time.time()
-        logger.info('It took %s to create %s tiles (%s were skipped) from queue' % (
-            str(datetime.timedelta(seconds=tend - self.t0)), tilecount.value,
-            skipcount.value
-        ))
+        logger.info(
+            'It took %s to create %s tiles (%s were skipped) from queue' % (
+                str(datetime.timedelta(seconds=tend - self.t0)),
+                tilecount.value,
+                skipcount.value
+            )
+        )
 
     def queueStats(self):
         queueName = self.tmsConfig.get('General', 'sqsqueue')
@@ -415,27 +441,31 @@ class TilerManager:
             q = sqs.get_queue(queueName)
             attrs = sqs.get_queue_attributes(q)
         except Exception as e:
-            logger.error('Error during statistics collection:\n' + str(e), exc_info=True)
+            logger.error(
+                'Error during statistics collection:\n' + str(e),
+                exc_info=True)
             return
         logger.info(attrs)
 
     def metadata(self):
         t0 = time.time()
         basePath = self.tmsConfig.get('General', 'bucketpath')
-        baseUrls = [
-            "//terrain0.geo.admin.ch/" + basePath + "{z}/{x}/{y}.terrain?v={version}",
-            "//terrain1.geo.admin.ch/" + basePath + "{z}/{x}/{y}.terrain?v={version}",
-            "//terrain2.geo.admin.ch/" + basePath + "{z}/{x}/{y}.terrain?v={version}",
-            "//terrain3.geo.admin.ch/" + basePath + "{z}/{x}/{y}.terrain?v={version}",
-            "//terrain4.geo.admin.ch/" + basePath + "{z}/{x}/{y}.terrain?v={version}"
-        ]
+        baseUrls = []
+        for i in range(0, 5):
+            url = 'https://terrain10%s.geo.admin.ch' % i
+            url += '/%s{z}/{x}/{y}.terrain?v={version}' % basePath
+            baseUrls.append(url)
 
         db = DB('configs/terrain/database.cfg')
         tiles = TerrainTiles(self.dbConfigFile, self.tmsConfig, t0)
         tMeta = TerrainMetadata(
-            bounds=tiles.bounds, minzoom=tiles.tileMinZ, maxzoom=tiles.tileMaxZ,
-            useGlobalTiles=True, hasLighting=tiles.hasLighting,
-            hasWatermask=tiles.hasWatermask, baseUrls=baseUrls)
+            bounds=tiles.bounds,
+            minzoom=tiles.tileMinZ,
+            maxzoom=tiles.tileMaxZ,
+            useGlobalTiles=True,
+            hasLighting=tiles.hasLighting,
+            hasWatermask=tiles.hasWatermask,
+            baseUrls=baseUrls)
 
         try:
             with db.userSession() as session:
@@ -463,7 +493,7 @@ class TilerManager:
 
         msg = '\n'
         tiles = TerrainTiles(self.dbConfigFile, self.tmsConfig, self.t0)
-        geodetic = GlobalGeodetic(True)
+        geodetic = getTileGrid(4326)(tmsCompatible=True)
         bounds = (tiles.minLon, tiles.minLat, tiles.maxLon, tiles.maxLat)
         zooms = range(tiles.tileMinZ, tiles.tileMaxZ + 1)
 
@@ -478,19 +508,17 @@ class TilerManager:
                         nbObjects = session.query(model).filter(
                             model.bboxIntersects(bounds)
                         ).count()
-                    tileMinX, tileMinY = geodetic.LonLatToTile(
-                        bounds[0], bounds[1], zoom
+                    # top letf corner
+                    tileMinX, tileMinY = geodetic.tileAddress(
+                        zoom,
+                        [bounds[0], bounds[3]]
                     )
-                    tileMaxX, tileMaxY = geodetic.LonLatToTile(
-                        bounds[2], bounds[3], zoom
+                    # bottom right
+                    tileMaxX, tileMaxY = geodetic.tileAddress(
+                        zoom,
+                        [bounds[2], bounds[1]]
                     )
-                    # Fast approach, but might not be fully correct
-                    if tiles.fullonly == 1:
-                        tileMinX += 1
-                        tileMinY += 1
-                        tileMaxX -= 1
-                        tileMaxY -= 1
-                    tileBounds = geodetic.TileBounds(tileMinX, tileMinY, zoom)
+                    tileBounds = geodetic.tileBounds(zoom, tileMinX, tileMinY)
                     xCount = tileMaxX - tileMinX + 1
                     yCount = tileMaxY - tileMinY + 1
                     nbTiles = xCount * yCount
@@ -501,10 +529,7 @@ class TilerManager:
                     pointB = transformCoordinate('POINT(%s %s)' % (
                         tileBounds[2], tileBounds[3]), 4326, 21781
                     ).GetPoints()[0]
-                    length = c2d.distance(pointA, pointB)
-                    if tiles.fullonly == 1:
-                        msg += 'WARNING: stats are approximative because ' \
-                               'fullonly is activated!\n'
+                    length = int(round(c2d.distance(pointA, pointB)))
                     msg += 'At zoom %s:\n' % zoom
                     msg += 'We expect %s tiles overall\n' % nbTiles
                     msg += 'Min X is %s, Max X is %s\n' % (tileMinX, tileMaxX)
@@ -512,7 +537,7 @@ class TilerManager:
                     msg += 'Min Y is %s, Max Y is %s\n' % (tileMinY, tileMaxY)
                     msg += '%s rows over Y\n' % yCount
                     msg += '\n'
-                    msg += 'A tile side is around %s meters' % int(round(length))
+                    msg += 'A tile side is around %s meters' % length
                     if nbTiles > 0 and nbObjects is not None:
                         msg += 'We have an average of about %s triangles ' \
                                'per tile\n' % int(round(nbObjects / nbTiles))

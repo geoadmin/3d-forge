@@ -2,8 +2,8 @@
 
 import osgeo.ogr as ogr
 import osgeo.osr as osr
+from quantized_mesh_tile.global_geodetic import GlobalGeodetic
 from forge.lib.helpers import transformCoordinate
-from forge.lib.global_geodetic import GlobalGeodetic
 
 
 # The goal of this script it to generate a shapefile per pyramidi/zoom level containing

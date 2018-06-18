@@ -1,87 +1,108 @@
 # 3d-forge
+
 Read/Write quantized-mesh tiles
 
+## Dependecies
+
+```bash
+$ sudo apt-get install postgresql postgresql-contrib postgis python-pip gdal-bin python-gdal mono-complete
+```
 
 ## Set up the required variables in your .bashrc
 
-    export PGSPASS=xxx
-
-    export DBTARGET=xxx
-
-    export BUCKETNAME=xxx
-
-    export PROFILENAME=xxx
-
-    export LOGFILEFOLDER=xxx
+```bash
+export PGPASS=xxx
+export DBHOST=xxx
+export BUCKETNAME=xxx
+export PROFILENAME=xxx
+export LOGFILEFOLDER=xxx
+```
 
 ## Getting started
 
-    make all
+```bash
+$ make all
+```
 
 ## Create the database, user and import the shapefiles in the DB
 
-    make create populate
+```bash
+$ make create populate
+```
 
 ## Test a tile generated in S3
 
-    wget --header="Accept-Encoding: gzip,deflate" http://3d.geo.admin.ch/1.0.0/ch.swisstopo.terrain.3d_water/default/20151231/4326/12/4268/3110.terrain -O 12_43268_3110.terrain.gz
-    gzip -d 12_43268_3110.terrain.gz
+```bash
+$ wget --header="Accept-Encoding: gzip,deflate" http://3d.geo.admin.ch/1.0.0/ch.swisstopo.terrain.3d_water/default/20151231/4326/12/4268/3110.terrain -O 12_43268_3110.terrain.gz
+$ gzip -d 12_43268_3110.terrain.gz
+```
 
 ## Interactive programming
 
-    source venv/bin/activate
-    ipython
-    run {yourScript}.py
+```bash
+$ source venv/bin/activate
+$ ipython
+$ run {yourScript}.py
+```
 
 #### Enter debug mode
 
-    %debug
+```bash
+> %debug
+```
 
 #### Get the latest traceback
 
-    %tb
-
+```bash
+> %tb
+```
 
 ## Styling
 
 #### Check styling
 
-    make lint
+```bash
+  make lint
+```
 
 #### Fix styling (only pep8 errors)
 
-    make autolint
+```bash
+  make autolint
+```
 
 ### Copy a file to S3 from command line
 
-    aws --profile $PROFILENAME s3 cp layer.json  s3://$BUCKETNAME/xxx/layer.json
+```bash
+  aws --profile $PROFILENAME s3 cp layer.json  s3://$BUCKETNAME/xxx/layer.json
+```
 
 ## Create 3d-tiling instance
 
-- Create instance here: https://tilegenmanager.prod.bgdi.ch/index/index
+- Adapt your configurations in .bashrc
 
-- Connect to created instance with user `tileforge`
+- start DB manually
 
-- Adapt your configurations (.bashrc, .vim, .screenrc) if desired
+    ```
+    su postrgres
+    /usr/lib/postgresql/9.4/bin/pg_ctl -D /var/lib/postgresql/9.4/main/ -l start # 'stop' to stop
+    ```
 
 - connect to db host
 
 - sudo su postgres
 
   * change password of superuser to xxx with the following sql query:
+
     ```sql
-    ALTER role pgkogis WITH PASSWORD 'xxxxxx';
+    ALTER ROLE pgkogis WITH PASSWORD 'xxxxxx';
     ```
 
-  * exit sudo
+  * `postgres=# \q` and then `$ exit`
 
-- add credentials to .boto file
+- add credentials to `.boto` file or `.aws/config` or `.aws/credentials`
 
-- add configuration to .aws/config
-
-- add credentials to .aws/credentials
-
-- mount zadara with `sudo -u root /bin/mount /var/local/cartoweb`
+- mount EFS
 
 - get project with `git clone --recursive https://github.com/geoadmin/3d-forge`
 
@@ -96,7 +117,7 @@ Read/Write quantized-mesh tiles
 
 - choose the appropriate logging level for postgres client_min_messages = error and log_min_messages = error and log_min_error_statement = error
 
-- if you don't have tileforge user make sure you're using md5 mode in pg_hba.conf (local  all  all  md5)
+- if you don't have tileforge user make sure you're using md5 mode in pg_hba.conf (`local  all  all  md5`)
 
 ## Remove logs
 
@@ -209,8 +230,5 @@ The current implementation is rasterizing the vector features with the GDAL ALL_
 
 ### TODO
 
-- Fix normal vectors computation
-- Extract quantized-mesh reader/writer in a separated module
-- Extract poolmanager in a separated module
+- Fix normal vectors computation at tile borders
 - Add comprehensive doc
-- Write tiles to file system
