@@ -46,7 +46,7 @@ help:
 	@echo "- deletetiles        Delete tiles in S3 bucket using a prefix (usage: make deletetiles PREFIX=12/)"
 	@echo "- listtiles          List tiles in S3 bucket using a prefix (usage: make listtiles PREFIX=12/)"
 	@echo "- tmspyramid         Create the TMS pyramid based on the config file configs/terrain/tms.cfg"
-	@echo "- tmsmetadata        Create the layers.json file"
+	@echo "- tmsmetadata        Create the layers.json file (stored under 3d-forge/.tmp/layers.js)"
 	@echo "- tmsstats           Provide statistics about the TMS pyramid"
 	@echo "- tmsstatsnodb       Provide statistics about the TMS pyramid, without db stats"
 	@echo "- tmscreatequeue     Creates AWS SQS queue with given settings (all tiles)"
