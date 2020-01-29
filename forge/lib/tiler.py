@@ -39,7 +39,7 @@ visibility_timeout = 3600
 def createTileFromQueue(tq):
     pid = os.getpid()
     try:
-        (qName, t0, dbConfigFile, hasLighting, hasWatermask) = tq
+        (qName, t0, dbConfigFile, bucketBasePath, hasLighting, hasWatermask) = tq
         sqs = getSQS()
         q = sqs.get_queue(qName)
         geodetic = getTileGrid(4326)(tmsCompatible=True)
@@ -78,7 +78,7 @@ def createTileFromQueue(tq):
                     )
                     createTile(
                         (tilebounds, tileXYZ, t0, dbConfigFile,
-                         hasLighting, hasWatermask)
+                         bucketBasePath, hasLighting, hasWatermask)
                     )
                 except Exception as e:
                     logger.error(
@@ -103,7 +103,7 @@ def createTile(tile):
         (bounds, tileXYZ, t0, dbConfigFile, bucketBasePath,
             hasLighting, hasWatermask) = tile
 
-        db = DB(dbConfigFile)
+        db = DB('configs/terrain/database.cfg')
         bucketKey = '%s/%s/%s.terrain' % (
             tileXYZ[2], tileXYZ[0], tileXYZ[1])
         with db.userSession() as session:
@@ -219,6 +219,7 @@ def createTile(tile):
                 val = skipcount.value
                 total = val + tilecount.value
                 # One should write an empyt tile
+                # TODO
                 logger.info(
                     '[%s] Skipping %s %s because no features found '
                     'for this tile (%s skipped from %s total)' % (
@@ -236,7 +237,7 @@ def createTile(tile):
 
 def scanTerrain(tMeta, tile, session, tilecount):
     try:
-        (bounds, tileXYZ, t0, dbConfigFile, hasLighting, hasWatermask) = tile
+        (bounds, tileXYZ, t0, dbConfigFile, bucketBasePath, hasLighting, hasWatermask) = tile
 
         # Get the model according to the zoom level
         model = modelsPyramid.getModelByZoom(tileXYZ[2])
@@ -354,7 +355,7 @@ class TilerManager:
             msg = ''
             for tile in tiles:
                 (bounds, tileXYZ, t0, dbConfigFile,
-                 hasLighting, hasWatermask) = tile
+                 bucketBasePath, hasLighting, hasWatermask) = tile
                 if msg:
                     msg += ','
                 msg += ('%s,%s,%s' % (
@@ -451,10 +452,14 @@ class TilerManager:
         t0 = time.time()
         basePath = self.tmsConfig.get('General', 'bucketpath')
         baseUrls = []
-        for i in range(0, 5):
-            url = 'https://terrain10%s.geo.admin.ch' % i
-            url += '/%s{z}/{x}/{y}.terrain?v={version}' % basePath
-            baseUrls.append(url)
+        # TODO testing
+        url = 'https://terrain.dev.bgdi.ch'
+        url += '/%s{z}/{x}/{y}.terrain?v={version}' % basePath
+        baseUrls.append(url)
+        #for i in range(0, 5):
+        #    url = 'https://terrain10%s.geo.admin.ch' % i
+        #    url += '/%s{z}/{x}/{y}.terrain?v={version}' % basePath
+        #    baseUrls.append(url)
 
         db = DB('configs/terrain/database.cfg')
         tiles = TerrainTiles(self.dbConfigFile, self.tmsConfig, t0)
