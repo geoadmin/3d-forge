@@ -8,7 +8,7 @@ Da es seitens Topographie zurzeit aufwendig ist, das aktuelle Terrain in TINs ab
 ![picture alt](img/extend.png "Extend")
 
 ### Test 1
-
+Ein ausgedünntes künstlich hergestelltes Terrain mit der Höhe 0, rechteckig (grau Abbildung 2 oben):
 * Viewer: https://codepen.io/rebert/pen/LYEMReZ
 * Pfad Tiles: //terrain.dev.bgdi.ch/1.0.0/ch.swisstopo.terrain.3d/default/20190902/4326/
 * Cesium Version: 1.65
