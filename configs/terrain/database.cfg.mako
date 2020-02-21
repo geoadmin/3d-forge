@@ -1,10 +1,10 @@
 [Server]
-host: ${dbhost}
+host: localhost
 port: 5432
 
 [Admin]
 user: pgkogis
-password: ${pgpass}
+password: pgkogis_borudel
 
 [Database]
 name: forge_toby

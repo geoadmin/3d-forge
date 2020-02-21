@@ -71,8 +71,8 @@ all: install configs/terrain/database.cfg configs/terrain/tms.cfg configs/raster
 
 .PHONY: install
 install:
-	( if [ -d "$(VENV)" ] ; then echo 'Skipping venv creation'; else virtualenv $(VENV) --system-site-packages && ${PIP_CMD} install Cython --index-url https://pypi.fcio.net/simple/; fi ); \
-	${PIP_CMD} install --index-url https://pypi.fcio.net/simple/ -e .;
+	( if [ -d "$(VENV)" ] ; then echo 'Skipping venv creation'; else virtualenv $(VENV) --system-site-packages && ${PIP_CMD} install Cython==0.28.4 --index-url https://pypi.fcio.net/simple/; fi ); \
+	${PIP_CMD} install --upgrade pip==19.2.3 setuptools==44.0.0 --index-url https://pypi.fcio.net/simple/ -e .;
 
 configs/terrain/database.cfg:: configs/terrain/database.cfg.mako
 	$(MAKO_CMD) --var "pgpass=$(PGPASS)" --var "dbhost=$(DBHOST)" --var "username=$(USERNAME)" $< > $@
